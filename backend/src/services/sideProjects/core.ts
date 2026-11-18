@@ -9,13 +9,20 @@ import { db } from "../../db";
 
 export const CAP = {
   OWN: "SIDE_PROJECTS_MANAGE_OWN",
+  ASSIGNED: "SIDE_PROJECTS_ASSIGNED",
   VIEW: "SIDE_PROJECTS_VIEW",
   REVIEW: "SIDE_PROJECTS_REVIEW",
   ANY: "SIDE_PROJECTS_MANAGE_ANY",
 } as const;
 
-export const STATUSES = ["IDEA", "IN_PROGRESS", "COMPLETED"] as const;
+/** Lifecycle (migration 131). IN_PROGRESS is shown as "Building". ON_HOLD is a pause. */
+export const STATUSES = ["IDEA", "PLANNING", "IN_PROGRESS", "TESTING", "COMPLETED", "ON_HOLD"] as const;
 export type Status = (typeof STATUSES)[number];
+/** The stages that take time and have a planned window, in order. */
+export const STAGES = ["IDEA", "PLANNING", "IN_PROGRESS", "TESTING"] as const;
+export type Stage = (typeof STAGES)[number];
+/** The ordered path on the board (ON_HOLD sits beside it). */
+export const PATH = ["IDEA", "PLANNING", "IN_PROGRESS", "TESTING", "COMPLETED"] as const;
 export const REVIEW_STATES = ["NONE", "CHANGES_REQUESTED", "AWAITING_VERIFICATION", "VERIFIED"] as const;
 export type ReviewState = (typeof REVIEW_STATES)[number];
 export const DOC_TYPES = ["CONCEPT", "SRS", "IMPLEMENTATION_PLAN"] as const;

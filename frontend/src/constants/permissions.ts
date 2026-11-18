@@ -119,6 +119,8 @@ export const Permissions = {
   SAFEGUARDING_MANAGE: "SAFEGUARDING_MANAGE",
   // Student side projects (migration 128). VIEW / REVIEW / MANAGE_ANY are v2-only (useAccess).
   SIDE_PROJECTS_MANAGE_OWN: "SIDE_PROJECTS_MANAGE_OWN",
+  // The Assigned projects page (migration 131): every role except students' and parents'.
+  SIDE_PROJECTS_ASSIGNED: "SIDE_PROJECTS_ASSIGNED",
   // Code Playground: every role by default (backend migration 120)
   CODE_PLAYGROUND_USE: "CODE_PLAYGROUND_USE",
 

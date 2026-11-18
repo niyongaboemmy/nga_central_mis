@@ -231,6 +231,7 @@ export async function assetOfProject(projectId: number, assetId: number) {
     WHERE a.asset_id = ${assetId} AND a.deleted_at IS NULL AND a.scope = 'PROJECT' AND (
       EXISTS (SELECT 1 FROM SideProjectDocument d WHERE d.project_id = ${projectId} AND d.asset_id = a.asset_id)
       OR EXISTS (SELECT 1 FROM SideProjectMedia m WHERE m.project_id = ${projectId} AND m.asset_id = a.asset_id AND m.deleted_at IS NULL)
+      OR EXISTS (SELECT 1 FROM SideProjectUpdateFile uf JOIN SideProjectUpdate u ON u.update_id = uf.update_id WHERE u.project_id = ${projectId} AND uf.asset_id = a.asset_id)
     )`);
 }
 
@@ -239,6 +240,7 @@ export async function projectOfAsset(assetId: number): Promise<number | null> {
   const r = await one(sql`
     SELECT project_id FROM SideProjectDocument WHERE asset_id = ${assetId}
     UNION SELECT project_id FROM SideProjectMedia WHERE asset_id = ${assetId} AND deleted_at IS NULL
+    UNION SELECT u.project_id FROM SideProjectUpdateFile uf JOIN SideProjectUpdate u ON u.update_id = uf.update_id WHERE uf.asset_id = ${assetId}
     LIMIT 1`);
   return r ? Number(r.project_id) : null;
 }

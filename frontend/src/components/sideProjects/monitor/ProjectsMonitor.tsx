@@ -13,7 +13,8 @@ import Board from "../Board";
 import ProjectDrawer from "../ProjectDrawer";
 import Dashboard, { type DrillFilter } from "./Dashboard";
 import ImportDialog from "./ImportDialog";
-import { chipCls, STATUS_SOLID, DocChips, EmptyArt, HEALTH_META, HealthDot, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, cardCls, secondaryBtn, statusColor, timeAgo, useIsDark, REVIEW_META } from "../ui";
+import { StageChip } from "../ProjectCard";
+import { pathStage, chipCls, STATUS_SOLID, DocChips, EmptyArt, HEALTH_META, HealthDot, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, cardCls, secondaryBtn, statusColor, timeAgo, useIsDark, REVIEW_META } from "../ui";
 
 type Tab = "dashboard" | "list" | "board" | "supervising";
 const FILTER_KEYS = ["yearId", "yearMode", "ownerType", "classId", "status", "review", "categoryId", "health", "hasGithub", "hasAccess", "missing", "q"] as const;
@@ -63,7 +64,7 @@ const ProjectsMonitor: React.FC = () => {
   );
 
   useEffect(() => {
-    sideProjectsApi.me().then(setMe).catch(() => setMe({ own: false, view: null, review: false, manageAny: false, supervising: 0 }));
+    sideProjectsApi.me().then(setMe).catch(() => setMe({ own: false, view: null, review: false, manageAny: false, supervising: 0, assigned: false }));
     sideProjectsApi.options().then(setOpts).catch(() => undefined);
     sideProjectsApi.categories().then(setCategories).catch(() => undefined);
   }, []);
@@ -248,7 +249,7 @@ const ProjectsMonitor: React.FC = () => {
         </SelectField>
         <SelectField aria-label="Health" className={selectCls} value={params.get("health") ?? "all"} onChange={(e) => patch({ health: e.target.value === "all" ? null : e.target.value })}>
           <option value="all">Any health</option>
-          {(["ON_TRACK", "STALE", "OVERDUE", "BLOCKED"] as const).map((h) => <option key={h} value={h}>{HEALTH_META[h].label}</option>)}
+          {(["ON_TRACK", "STALE", "OVERDUE", "BLOCKED", "PAUSED"] as const).map((h) => <option key={h} value={h}>{HEALTH_META[h].label}</option>)}
         </SelectField>
         <SelectField aria-label="Review" className={selectCls} value={params.get("review") ?? "all"} onChange={(e) => patch({ review: e.target.value === "all" ? null : e.target.value })}>
           <option value="all">Any review</option>
@@ -280,7 +281,7 @@ const ProjectsMonitor: React.FC = () => {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[60rem] text-left text-sm">
+                <table className="w-full min-w-[66rem] text-left text-sm">
                   <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 dark:bg-gray-800/60 dark:text-gray-400">
                     <tr>
                       <SortHead k="student">Owner</SortHead>
@@ -288,6 +289,7 @@ const ProjectsMonitor: React.FC = () => {
                       <SortHead k="title">Project</SortHead>
                       <SortHead k="status">Status</SortHead>
                       <SortHead k="progress">Progress</SortHead>
+                      <SortHead k="stage">Time in stage</SortHead>
                       <th className="px-3 py-2">Docs</th>
                       <th className="px-3 py-2">Links</th>
                       <SortHead k="activity">Activity</SortHead>
@@ -316,10 +318,14 @@ const ProjectsMonitor: React.FC = () => {
                         <td className="px-3 py-2.5"><StatusPill status={r.status} /></td>
                         <td className="px-3 py-2.5">
                           <div className="flex w-28 items-center gap-2">
-                            <ProgressBar value={r.progress} color={statusColor(r.status, dark)} />
+                            <ProgressBar value={r.progress} color={statusColor(pathStage(r.status, r.pausedFrom), dark)} />
                             <span className="text-[11px] font-bold tabular-nums text-slate-600 dark:text-gray-300">{r.progress}%</span>
                           </div>
                           <HealthDot health={r.health} withLabel />
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <StageChip card={r} />
+                          {r.lastReport !== undefined && <p className="mt-1 text-[10px] text-slate-500 dark:text-gray-400">{r.lastReport ? `Report ${timeAgo(`${r.lastReport}T12:00:00Z`)}` : "No report yet"}</p>}
                         </td>
                         <td className="px-3 py-2.5"><DocChips docs={r.docs} pending={r.conceptPending} /></td>
                         <td className="px-3 py-2.5">

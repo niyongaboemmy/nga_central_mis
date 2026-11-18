@@ -50,6 +50,7 @@ export function sideProjectsRouter(
   auth: express.RequestHandler = authenticate,
   own: express.RequestHandler = authorizeIn(CAP.OWN, undefined, { legacy: [CAP.OWN] }),
   viewerOf: ViewerResolver = snapshotViewer,
+  assigned: express.RequestHandler = authorizeIn(CAP.ASSIGNED, undefined, { legacy: [CAP.ASSIGNED] }),
 ) {
   const router = express.Router();
   router.use(auth);
@@ -102,6 +103,7 @@ export function sideProjectsRouter(
       const supervising = await monitor.listProjects(null, { supervisedBy: uid(req) }, { pageSize: 5 });
       return {
         own: perms.includes(CAP.OWN),
+        assigned: perms.includes(CAP.ASSIGNED),
         view: v.detail && !isEmptyScope(v.detail) ? "detail" : v.summary && !isEmptyScope(v.summary) ? "summary" : null,
         review: !!v.review && !isEmptyScope(v.review),
         manageAny: v.manageAny,
@@ -279,6 +281,8 @@ export function sideProjectsRouter(
 
   // ------------------------------------------------------------------ student board
   router.get("/mine", own, handle(async (req) => projects.myProjects(uid(req), { archived: req.query.archived === "1" })));
+  // Assigned projects: everything I supervise or help build (SIDE_PROJECTS_ASSIGNED).
+  router.get("/assigned", assigned, handle(async (req) => monitor.assignedProjects(uid(req), monitor.parseFilters(req.query))));
   router.get("/people", own, handle(async (req) => members.people(uid(req), String(req.query.q ?? ""))));
 
   router.post(
@@ -481,13 +485,59 @@ export function sideProjectsRouter(
     }),
   );
 
+  const dropTemp = (list: files.Upload[]) => Promise.all(list.map((f) => import("fs").then((fs) => fs.promises.rm(f.path, { force: true })).catch(() => undefined)));
   router.post(
     "/:id/updates",
     own,
+    uploadRateLimit,
+    upload.array("files", 3),
     handle(async (req) => {
-      const a = await studentAccess(req);
+      const list = multerFiles(req);
+      let a;
+      try {
+        a = await studentAccess(req);
+        assertEdit(a);
+      } catch (e) {
+        await dropTemp(list);
+        throw e;
+      }
+      return { id: await progress.addUpdate(a, uid(req), req.body ?? {}, list) };
+    }),
+  );
+  router.patch(
+    "/:id/updates/:uid",
+    own,
+    uploadRateLimit,
+    upload.array("files", 3),
+    handle(async (req) => {
+      const list = multerFiles(req);
+      let a;
+      try {
+        a = await studentAccess(req);
+        assertEdit(a);
+      } catch (e) {
+        await dropTemp(list);
+        throw e;
+      }
+      await progress.updateUpdate(a, uid(req), idParam(req, "uid"), req.body ?? {}, list);
+      return { ok: true };
+    }),
+  );
+  // Daily work activity for the contribution graph (anyone who may open the project).
+  router.get(
+    "/:id/activity",
+    handle(async (req) => {
+      const a = await anyAccess(req);
+      return progress.activityOf(Number(a.project.project_id), Number(req.query.days) || 182);
+    }),
+  );
+  // Stage plan: the project's dates and the stage boundaries (the team, or the lead).
+  router.put(
+    "/:id/plan",
+    handle(async (req) => {
+      const a = await anyAccess(req);
       assertEdit(a);
-      return { id: await progress.addUpdate(a, uid(req), req.body ?? {}) };
+      return { plan: await projects.updatePlan(a, uid(req), req.body ?? {}) };
     }),
   );
   router.delete(

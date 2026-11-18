@@ -16,6 +16,7 @@ const OnboardingTracker = lazy(() => import("./components/tenantMgmt/onboarding/
 const PlatformConsole = lazy(() => import("./components/tenantMgmt/platform/PlatformConsole"));
 const MyProjects = lazy(() => import("./components/sideProjects/MyProjects"));
 const ProjectsMonitor = lazy(() => import("./components/sideProjects/monitor/ProjectsMonitor"));
+const AssignedProjects = lazy(() => import("./components/sideProjects/AssignedProjects"));
 const SubscriptionPage = lazy(() => import("./components/tenantMgmt/account/SubscriptionPage"));
 const SupportAccessPage = lazy(() => import("./components/tenantMgmt/account/SupportAccessPage"));
 const SupportSessionLanding = lazy(() => import("./components/tenantMgmt/platform/SupportSessionLanding"));
@@ -1152,6 +1153,18 @@ function App() {
                   <SystemLayoutWrapper>
                     <Suspense fallback={null}>
                       <MyProjects />
+                    </Suspense>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/assigned-projects"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={null}>
+                      <AssignedProjects />
                     </Suspense>
                   </SystemLayoutWrapper>
                 </ProtectedRoute>

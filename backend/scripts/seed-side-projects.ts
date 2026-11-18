@@ -31,17 +31,34 @@ if (process.env.NODE_ENV === "production") {
 const FIRST = ["Aline", "Eric", "Grace", "Kevin", "Diane", "Patrick", "Sandrine", "Yves", "Claudine", "Olivier", "Brenda", "Jean"];
 const LAST = ["Uwase", "Mugisha", "Ishimwe", "Habimana", "Ingabire", "Niyonzima", "Umutoni", "Nshuti", "Mukamana", "Hakizimana", "Iradukunda", "Bizimana"];
 
-const PROJECTS: Array<{ title: string; cat: string; tags: string[]; problem: string; status: "IDEA" | "IN_PROGRESS" | "COMPLETED"; github?: string; live?: string; color: [number, number, number]; stale?: boolean; verified?: boolean; changes?: boolean; blocked?: boolean }> = [
+type Stage = "IDEA" | "PLANNING" | "IN_PROGRESS" | "TESTING" | "COMPLETED" | "ON_HOLD";
+const PATH: Stage[] = ["IDEA", "PLANNING", "IN_PROGRESS", "TESTING", "COMPLETED"];
+const DAY = 86_400_000;
+const ymd = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const dt = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
+/** A small deterministic generator so every run seeds the same shapes. */
+const rng = (seed: number) => () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+const DID = [
+  "Sketched the screens and agreed the data model.",
+  "Wired the sensor and logged the first readings.",
+  "Fixed the login bug and cleaned up the API.",
+  "Tested with three classmates and noted their feedback.",
+  "Wrote the setup guide and recorded a short demo.",
+  "Refactored the main loop; it is twice as fast now.",
+  "Met the supervisor and reworked the plan.",
+];
+
+const PROJECTS: Array<{ title: string; cat: string; tags: string[]; problem: string; status: Stage; pausedFrom?: Stage; github?: string; live?: string; color: [number, number, number]; stale?: boolean; verified?: boolean; changes?: boolean; blocked?: boolean }> = [
   { title: "Smart irrigation controller", cat: "iot", tags: ["Arduino", "C++", "Sensors"], status: "COMPLETED", github: "https://github.com/nga-demo/smart-irrigation", color: [16, 150, 110], verified: true, problem: "School gardens waste water because nobody can see the soil moisture in real time, so plants are over- or under-watered." },
   { title: "Campus lost & found", cat: "web", tags: ["React", "Node.js", "MySQL"], status: "IN_PROGRESS", github: "https://github.com/nga-demo/lost-found", color: [42, 120, 214], problem: "Students lose items on campus every week and there is no single place to report or find them, so most are never returned." },
-  { title: "Kinyarwanda flashcards app", cat: "mobile", tags: ["Flutter", "Dart"], status: "IN_PROGRESS", color: [20, 184, 166], changes: true, problem: "Younger pupils struggle to learn new Kinyarwanda vocabulary at home because there are no offline practice tools on cheap phones." },
-  { title: "Canteen queue predictor", cat: "ai", tags: ["Python", "scikit-learn"], status: "IDEA", color: [236, 72, 153], problem: "Lunch queues waste up to twenty minutes of break time because students cannot tell when the canteen is least busy." },
-  { title: "Line-following robot", cat: "robotics", tags: ["Arduino", "Motors"], status: "IN_PROGRESS", color: [227, 73, 72], stale: true, problem: "The robotics club has no shared kit to teach control loops, so beginners never get hands-on practice with sensors and motors." },
+  { title: "Kinyarwanda flashcards app", cat: "mobile", tags: ["Flutter", "Dart"], status: "TESTING", color: [42, 120, 214], changes: true, problem: "Younger pupils struggle to learn new Kinyarwanda vocabulary at home because there are no offline practice tools on cheap phones." },
+  { title: "Canteen queue predictor", cat: "ai", tags: ["Python", "scikit-learn"], status: "PLANNING", color: [235, 104, 52], problem: "Lunch queues waste up to twenty minutes of break time because students cannot tell when the canteen is least busy." },
+  { title: "Line-following robot", cat: "robotics", tags: ["Arduino", "Motors"], status: "ON_HOLD", pausedFrom: "IN_PROGRESS", color: [227, 73, 72], stale: true, problem: "The robotics club has no shared kit to teach control loops, so beginners never get hands-on practice with sensors and motors." },
   { title: "Math puzzle game", cat: "game", tags: ["Godot", "GDScript"], status: "COMPLETED", live: "https://nga-demo.itch.io/math-puzzles", color: [27, 175, 122], problem: "Many students see mental arithmetic as boring and avoid practising it, which hurts their speed in exams." },
   { title: "Attendance heat map", cat: "data", tags: ["Python", "Pandas", "Plotly"], status: "IDEA", color: [37, 99, 235], problem: "Class teachers only notice attendance patterns weeks later because the registers are not visualised anywhere." },
   { title: "Phishing awareness quiz", cat: "security", tags: ["JavaScript", "HTML"], status: "IN_PROGRESS", color: [100, 116, 139], blocked: true, problem: "Staff and students click suspicious links in emails because they have never practised spotting phishing messages." },
-  { title: "Library QR finder", cat: "web", tags: ["Vue", "Firebase"], status: "IDEA", color: [59, 108, 255], problem: "Finding a book in the school library takes too long because the shelves are not indexed and the catalogue is on paper." },
-  { title: "Solar charging kiosk", cat: "iot", tags: ["ESP32", "Solar"], status: "IN_PROGRESS", github: "https://github.com/nga-demo/solar-kiosk", color: [237, 161, 0], problem: "Students who board cannot charge their devices during power cuts, which interrupts their study time in the evening." },
+  { title: "Library QR finder", cat: "web", tags: ["Vue", "Firebase"], status: "PLANNING", color: [59, 108, 255], problem: "Finding a book in the school library takes too long because the shelves are not indexed and the catalogue is on paper." },
+  { title: "Solar charging kiosk", cat: "iot", tags: ["ESP32", "Solar"], status: "TESTING", github: "https://github.com/nga-demo/solar-kiosk", color: [237, 161, 0], problem: "Students who board cannot charge their devices during power cuts, which interrupts their study time in the evening." },
   { title: "Peer tutoring matcher", cat: "web", tags: ["Next.js", "Postgres"], status: "COMPLETED", github: "https://github.com/nga-demo/peer-tutor", live: "https://peer-tutor.example.org", color: [42, 120, 214], problem: "Students who need help in a subject rarely find a classmate who is strong in it, even though many would happily help." },
   { title: "Bus arrival tracker", cat: "mobile", tags: ["Kotlin", "GPS"], status: "IDEA", color: [29, 78, 216], problem: "Day students wait at the bus stop without knowing when the school bus will arrive, sometimes for more than half an hour." },
 ];
@@ -136,8 +153,17 @@ async function main() {
   const reviewer = f?.lead ?? staff;
   const cats = new Map((await many(sql`SELECT category_id AS id, slug FROM SideProjectCategory`)).map((c) => [c.slug, Number(c.id)]));
 
+  const now = Date.now();
   for (const [i, p] of PROJECTS.entries()) {
     const owner = students[i % students.length];
+    const rand = rng(i + 7);
+    const finalStage = p.status === "ON_HOLD" ? (p.pausedFrom ?? "IN_PROGRESS") : p.status;
+    const reach = PATH.indexOf(finalStage);
+    // Started some weeks ago; the closing date leaves room (or not) for what is left.
+    const startMs = now - (20 + i * 9) * DAY;
+    const total = 45 + Math.round(rand() * 75);
+    const start = ymd(startMs);
+    const target = ymd(startMs + (total - 1) * DAY);
     const concept = await tmp("concept-note.pdf", pdf(`${p.title} - concept note`));
     const id = await createProject(owner, owner, {
       title: p.title,
@@ -147,12 +173,13 @@ async function main() {
       githubUrl: p.github,
       accessUrl: p.live,
       supervisorId: staff && i % 3 === 0 ? staff : undefined,
-      targetDate: p.status !== "IDEA" ? (i % 4 === 1 ? "2026-11-01" : "2027-03-30") : undefined,
-      status: p.status === "COMPLETED" ? "IN_PROGRESS" : p.status,
+      startDate: start,
+      targetDate: target,
+      status: "IDEA",
       concept,
     } as any);
     const a = () => accessProject(id, { userId: owner });
-    if (p.status !== "IDEA") {
+    if (reach >= 1) {
       const img = await tmp("screenshot.png", await cover(p.color, p.title));
       const assets = await storeProjectFiles(id, owner, [img]);
       await addMedia(id, assets, owner, ["First prototype"]);
@@ -163,28 +190,74 @@ async function main() {
         await addDocument(id, "SRS", asset, owner);
       }
       const m1 = await addMilestone(await a(), owner, { title: "Research and design" });
-      const m2 = await addMilestone(await a(), owner, { title: "First working prototype", dueDate: "2026-12-10" });
+      const m2 = await addMilestone(await a(), owner, { title: "First working prototype", dueDate: ymd(startMs + Math.round(total * 0.6) * DAY) });
       await addMilestone(await a(), owner, { title: "Test with users" });
       await updateMilestone(await a(), owner, m1, { done: true });
-      if (p.status === "COMPLETED" || i % 2 === 0) await updateMilestone(await a(), owner, m2, { done: true });
-      await addUpdate(await a(), owner, { did: "Finished the first prototype and showed it to classmates.", nextSteps: "Collect feedback and fix the rough edges.", blockers: p.blocked ? "Waiting for the school Wi-Fi to allow the test server." : undefined, mood: p.blocked ? 2 : 4 });
+      if (reach >= 3 || i % 2 === 0) await updateMilestone(await a(), owner, m2, { done: true });
     }
-    if (p.status === "COMPLETED") {
-      await moveProject(await a(), owner, { to: "COMPLETED", outcomeSummary: "Working version demoed to the class and used by real users for two weeks." });
-      if (p.verified && reviewer) {
-        const ra = await accessProject(id, { userId: reviewer, summary: null, detail: { all: true }, review: { all: true }, manageAny: true } as any);
-        await review(ra, reviewer, { kind: "VERIFIED", body: "Great work. Verified at the project fair." });
+    // Walk the path through the real service, then backdate the stays so the Gantt has history.
+    for (const st of PATH.slice(1, reach + 1)) {
+      if (st === "COMPLETED") await moveProject(await a(), owner, { to: "COMPLETED", outcomeSummary: "Working version demoed to the class and used by real users for two weeks." });
+      else await moveProject(await a(), owner, { to: st });
+    }
+    if (p.status === "ON_HOLD") await moveProject(await a(), owner, { to: "ON_HOLD", reason: "Waiting for the motor driver to arrive." });
+
+    const plan = await many(sql`SELECT stage, DATE_FORMAT(planned_start, '%Y-%m-%d') AS s, DATE_FORMAT(planned_end, '%Y-%m-%d') AS e FROM SideProjectStage WHERE project_id = ${id}`);
+    const planned = new Map(plan.map((r) => [r.stage, (Date.parse(`${r.e}T00:00:00Z`) - Date.parse(`${r.s}T00:00:00Z`)) / DAY + 1]));
+    await db.execute(sql`DELETE FROM SideProjectStageLog WHERE project_id = ${id}`);
+    const stays: Array<[Stage, number, number | null]> = [];
+    let cursor = startMs + 9 * 3600_000;
+    const visited = PATH.slice(0, reach + 1).filter((st) => st !== "COMPLETED");
+    visited.forEach((st, k) => {
+      const last = k === visited.length - 1 && p.status !== "COMPLETED";
+      // Some stays overrun their plan (Building most often), some finish early.
+      const factor = st === "IN_PROGRESS" ? 0.9 + rand() * 0.8 : 0.6 + rand() * 0.7;
+      const len = Math.max(1, Math.round((planned.get(st) ?? 5) * factor)) * DAY;
+      const end = last ? null : Math.min(cursor + len, now - (visited.length - k) * DAY);
+      stays.push([st, cursor, end]);
+      if (end) cursor = end;
+    });
+    if (p.status === "COMPLETED") stays.push(["COMPLETED", cursor, null]);
+    if (p.status === "ON_HOLD") {
+      const lastStay = stays[stays.length - 1];
+      const pauseAt = now - 6 * DAY;
+      lastStay[2] = Math.max(lastStay[1] + DAY, pauseAt);
+      stays.push(["ON_HOLD", lastStay[2], null]);
+    }
+    for (const [st, from, to] of stays) {
+      await db.execute(sql`INSERT INTO SideProjectStageLog (project_id, stage, entered_at, left_at) VALUES (${id}, ${st}, ${dt(from)}, ${to ? dt(to) : null})`);
+    }
+    const open = stays[stays.length - 1];
+    await db.execute(sql`UPDATE SideProject SET stage_entered_at = ${dt(open[1])}, created_at = ${dt(startMs)}, started_at = IF(started_at IS NULL, NULL, ${dt(stays[1]?.[1] ?? startMs)}),
+      completed_at = IF(completed_at IS NULL, NULL, ${dt(open[1])}) WHERE project_id = ${id}`);
+
+    // Reports spread over the project's life (2-4 a week while working) for the activity graph.
+    if (reach >= 1) {
+      const quietFrom = p.stale ? now - 30 * DAY : now;
+      for (let d = Math.ceil((now - startMs) / DAY); d >= 0; d--) {
+        const at = now - d * DAY;
+        if (at > quietFrom || rand() > 0.42) continue;
+        const stageAt = stays.find(([, f, t]) => at >= f && (t === null || at < t))?.[0] ?? finalStage;
+        if (stageAt === "IDEA" && rand() > 0.4) continue;
+        const blocked = p.blocked && d < 10;
+        await db.execute(sql`
+          INSERT INTO SideProjectUpdate (project_id, author_id, did, next_steps, blockers, mood, work_date, hours, stage, created_at)
+          VALUES (${id}, ${owner}, ${DID[Math.floor(rand() * DID.length)]}, ${rand() > 0.4 ? "Keep going with the next milestone." : null},
+                  ${blocked ? "Waiting for the school Wi-Fi to allow the test server." : null}, ${blocked ? 2 : 3 + Math.floor(rand() * 3)},
+                  ${ymd(at)}, ${Math.max(0.5, Math.round(rand() * 8) / 2)}, ${stageAt}, ${dt(at + 15 * 3600_000)})`);
       }
+    }
+    if (reach >= 1 && !p.stale) await addUpdate(await a(), owner, { did: "Finished the first prototype and showed it to classmates.", nextSteps: "Collect feedback and fix the rough edges.", blockers: p.blocked ? "Waiting for the school Wi-Fi to allow the test server." : undefined, mood: p.blocked ? 2 : 4, workDate: ymd(now), hours: 2 } as any);
+
+    if (p.status === "COMPLETED" && p.verified && reviewer) {
+      const ra = await accessProject(id, { userId: reviewer, summary: null, detail: { all: true }, review: { all: true }, manageAny: true } as any);
+      await review(ra, reviewer, { kind: "VERIFIED", body: "Great work. Verified at the project fair." });
     }
     if (p.changes && reviewer) {
       const ra = await accessProject(id, { userId: reviewer, summary: null, detail: { all: true }, review: { all: true }, manageAny: true } as any);
       await review(ra, reviewer, { kind: "CHANGES_REQUESTED", body: "Add an SRS with the offline sync requirements before the next milestone." });
     }
     if (p.stale) await db.execute(sql`UPDATE SideProject SET last_activity_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY) WHERE project_id = ${id}`);
-    // Spread creation dates over the last months so the trend has a shape.
-    const back = (PROJECTS.length - i) * 17;
-    await db.execute(sql`UPDATE SideProject SET created_at = DATE_SUB(created_at, INTERVAL ${back} DAY),
-      completed_at = IF(completed_at IS NULL, NULL, DATE_SUB(completed_at, INTERVAL ${Math.floor(back / 3)} DAY)) WHERE project_id = ${id}`);
     console.log(`  #${id} ${p.status.padEnd(11)} ${p.title}`);
   }
   console.log("\nDemo accounts:");

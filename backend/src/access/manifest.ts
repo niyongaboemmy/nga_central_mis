@@ -31,7 +31,7 @@ const SCHOOL_ONLY = { scopeable: false };
 export const MIS_MANIFEST = defineManifest({
   app: "mis",
   name: "Central MIS",
-  version: "2026.11.18",
+  version: "2026.11.19",
   capabilities: {
     // People & accounts
     MANAGE_USERS: W("Create, update and deactivate users", "PEOPLE"),
@@ -171,6 +171,7 @@ export const MIS_MANIFEST = defineManifest({
     // keyword in any name. Seeded by migration 128; MANAGE_OWN goes to every role since 129
     // (anyone may own projects: students, staff, parents).
     SIDE_PROJECTS_MANAGE_OWN: W("Run your own projects (board, documents, media, progress)", "ACADEMICS", SCHOOL_ONLY),
+    SIDE_PROJECTS_ASSIGNED: R("See and follow the projects assigned to you", "ACADEMICS", ["detail"], SCHOOL_ONLY),
     SIDE_PROJECTS_VIEW: R("See students' side projects in your area", "ACADEMICS", ["summary", "detail"]),
     SIDE_PROJECTS_REVIEW: W("Review side projects (feedback, changes, verify completion)", "ACADEMICS"),
     SIDE_PROJECTS_MANAGE_ANY: W("Manage every side project (import, correct, archive, categories)", "ACADEMICS", { ...SCHOOL_ONLY, restricted: true }),

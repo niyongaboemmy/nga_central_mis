@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Archive, Kanban, List, Plus, Search, Sparkles, X, Mail } from "lucide-react";
+import { Archive, ClipboardCheck, Kanban, List, Plus, Search, Sparkles, X, Mail } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type ProjectCard, type Status } from "../../api/sideProjects";
 import { useToast } from "../../contexts/ToastContext";
 import { useUser } from "../../contexts/UserContext";
@@ -9,7 +9,11 @@ import Board from "./Board";
 import CreateWizard from "./CreateWizard";
 import ProjectDrawer from "./ProjectDrawer";
 import { MoveDialog } from "./MoveDialog";
-import { CATEGORY_ICON, DocChips, EmptyArt, GlassRing, HealthDot, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, primaryBtn, statusColor, timeAgo, useIsDark, cardCls } from "./ui";
+import { CATEGORY_ICON, DocChips, EmptyArt, GlassRing, HealthDot, PATH, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, pathStage, primaryBtn, statusColor, timeAgo, useIsDark, cardCls } from "./ui";
+import { StageChip } from "./ProjectCard";
+
+/** Light tints of the stage hues that read on the blue hero. */
+const HERO_TINT: Record<Status, string> = { IDEA: "#fdba74", PLANNING: "#6ee7b7", IN_PROGRESS: "#ffffff", TESTING: "#f9a8d4", COMPLETED: "#86efac", ON_HOLD: "#cbd5e1" };
 
 type Pending = { id: number; to: Status; from: Status; title: string; hasLink: boolean; hasImage: boolean; resolve: (ok: boolean) => void };
 
@@ -41,6 +45,8 @@ const MyProjects: React.FC = () => {
   const [moveBusy, setMoveBusy] = useState(false);
   const [moveErr, setMoveErr] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  // Staff with the Assigned projects page get a shortcut to it (and its count) here.
+  const [assigned, setAssigned] = useState<{ total: number; review: number } | null>(null);
   const openId = Number(params.get("project")) || null;
   const [drawerTab, setDrawerTab] = useState<"documents" | undefined>(undefined);
   const cardsRef = useRef<ProjectCard[] | null>(null);
@@ -61,6 +67,10 @@ const MyProjects: React.FC = () => {
   }, [load]);
   useEffect(() => {
     sideProjectsApi.categories().then(setCategories).catch(() => undefined);
+    sideProjectsApi
+      .me()
+      .then((m) => (m.assigned ? sideProjectsApi.assigned().then((a) => setAssigned({ total: a.counts.total, review: a.counts.awaitingReview })) : undefined))
+      .catch(() => undefined);
   }, []);
   useEffect(() => {
     try {
@@ -80,10 +90,22 @@ const MyProjects: React.FC = () => {
 
   const send = async (id: number, to: Status, extra: { outcomeSummary?: string; reason?: string; position?: number }) => {
     const prev = cardsRef.current;
-    setCards((cs) => cs?.map((c) => (c.id === id ? { ...c, status: to, progress: to === "COMPLETED" ? 100 : c.progress, reviewState: to === "COMPLETED" ? "AWAITING_VERIFICATION" : c.reviewState } : c)) ?? cs);
+    const before = prev?.find((c) => c.id === id);
+    setCards(
+      (cs) =>
+        cs?.map((c) =>
+          c.id === id
+            ? { ...c, status: to, pausedFrom: to === "ON_HOLD" ? c.status : null, progress: to === "COMPLETED" ? 100 : c.progress, reviewState: to === "COMPLETED" ? "AWAITING_VERIFICATION" : c.reviewState }
+            : c,
+        ) ?? cs,
+    );
     try {
       await sideProjectsApi.transition(id, { to, ...extra });
-      if (to === "COMPLETED") showToast("🎉 Completed", "success");
+      const label = STATUS_META[to].label;
+      showToast(
+        to === "COMPLETED" ? "🎉 Completed: sent for verification" : to === "ON_HOLD" ? "Paused. The stage clock is stopped" : before?.status === "ON_HOLD" ? `Resumed in ${label}` : `Moved to ${label}`,
+        "success",
+      );
       load();
       return true;
     } catch (e) {
@@ -100,7 +122,7 @@ const MyProjects: React.FC = () => {
     (id: number, to: Status, position = 0): Promise<boolean> => {
       const c = cardsRef.current?.find((x) => x.id === id);
       if (!c) return Promise.resolve(false);
-      const needsWords = (to === "COMPLETED" && c.status === "IN_PROGRESS") || c.status === "COMPLETED";
+      const needsWords = to === "COMPLETED" || to === "ON_HOLD" || c.status === "COMPLETED";
       if (needsWords) {
         return new Promise<boolean>((resolve) => {
           setMoveErr(null);
@@ -119,11 +141,11 @@ const MyProjects: React.FC = () => {
   }, [cards, q, cat]);
 
   const counts = useMemo(() => {
-    const out: Record<Status, number> = { IDEA: 0, IN_PROGRESS: 0, COMPLETED: 0 };
+    const out = Object.fromEntries(STATUS_ORDER.map((s) => [s, 0])) as Record<Status, number>;
     (cards ?? []).forEach((c) => c.myRole !== "INVITED" && (out[c.status] += 1));
     return out;
   }, [cards]);
-  const total = counts.IDEA + counts.IN_PROGRESS + counts.COMPLETED;
+  const total = STATUS_ORDER.reduce((n, s) => n + counts[s], 0);
   const invites = (cards ?? []).filter((c) => c.myRole === "INVITED");
   const avg = total ? Math.round((cards ?? []).filter((c) => c.myRole !== "INVITED").reduce((s, c) => s + c.progress, 0) / total) : 0;
 
@@ -139,17 +161,26 @@ const MyProjects: React.FC = () => {
         <div className="relative flex flex-wrap items-center justify-between gap-6">
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">My projects</h1>
-            <p className="mt-1 text-sm text-white/80">Plan, build and ship your ideas.</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="text-sm text-white/80">Plan, build and ship your ideas.</p>
+              {assigned && assigned.total > 0 && (
+                <Link to="/assigned-projects" className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-inset ring-white/25 backdrop-blur transition hover:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                  <ClipboardCheck className="h-3.5 w-3.5" aria-hidden /> Assigned to me
+                  <span className="rounded-full bg-white px-1.5 text-[10px] font-bold tabular-nums text-blue-700">{assigned.total}</span>
+                  {assigned.review > 0 && <span className="text-[10px] font-medium text-white/85">· {assigned.review} to review</span>}
+                </Link>
+              )}
+            </div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              {STATUS_ORDER.map((s) => {
+              {STATUS_ORDER.filter((s) => s !== "ON_HOLD" || counts.ON_HOLD > 0).map((s) => {
                 const M = STATUS_META[s];
                 return (
-                  <span key={s} className="inline-flex items-center gap-2 rounded-full bg-white/15 py-1.5 pl-2 pr-3.5 ring-1 ring-white/20 backdrop-blur" title={M.label}>
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20">
+                  <span key={s} className={`inline-flex items-center gap-1.5 rounded-full bg-white/15 py-1 pl-1 pr-3 ring-1 ring-white/20 backdrop-blur ${counts[s] ? "" : "opacity-60"}`} title={`${M.label}: ${counts[s]}`}>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: HERO_TINT[s] + "40" }}>
                       <M.icon className="h-3.5 w-3.5" aria-hidden />
                     </span>
-                    <span className="text-base font-extrabold tabular-nums">{counts[s]}</span>
-                    <span className="text-xs font-medium text-white/85">{M.label}</span>
+                    <span className="text-sm font-extrabold tabular-nums">{counts[s]}</span>
+                    <span className="text-[11px] font-medium text-white/85">{M.label}</span>
                   </span>
                 );
               })}
@@ -158,7 +189,7 @@ const MyProjects: React.FC = () => {
               <div className="mt-4 flex h-2 max-w-md gap-1 overflow-hidden rounded-full" role="img" aria-label={STATUS_ORDER.map((s) => `${STATUS_META[s].label} ${counts[s]}`).join(", ")}>
                 {STATUS_ORDER.map((s) =>
                   counts[s] ? (
-                    <motion.span key={s} className="h-full rounded-full" style={{ backgroundColor: s === "IDEA" ? "#fdba74" : s === "IN_PROGRESS" ? "#ffffff" : "#6ee7b7" }} initial={{ flexGrow: 0 }} animate={{ flexGrow: counts[s] }} transition={{ duration: 0.8 }} />
+                    <motion.span key={s} className="h-full rounded-full" style={{ backgroundColor: HERO_TINT[s] }} initial={{ flexGrow: 0 }} animate={{ flexGrow: counts[s] }} transition={{ duration: 0.8 }} />
                   ) : null,
                 )}
               </div>
@@ -218,17 +249,17 @@ const MyProjects: React.FC = () => {
           <button type="button" className={`${primaryBtn} mt-3`} onClick={load}>Retry</button>
         </div>
       ) : !cards ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-80" />)}</div>
+        <div className="flex gap-3 overflow-hidden" aria-busy="true" aria-label="Loading projects">{PATH.map((s) => <Skeleton key={s} className="h-80 w-[17rem] shrink-0 xl:flex-1" />)}</div>
       ) : cards.length === 0 && !archived ? (
         <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className={`${cardCls} flex flex-col items-center gap-4 p-10 text-center`}>
           <EmptyArt />
           <div className="flex items-center gap-2 text-slate-400" aria-hidden>
-            {STATUS_ORDER.map((s, i) => {
+            {PATH.map((s, i) => {
               const M = STATUS_META[s];
               return (
                 <React.Fragment key={s}>
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white" style={{ backgroundColor: statusColor(s, dark) }}><M.icon className="h-5 w-5" /></span>
-                  {i < 2 && <span className="h-0.5 w-8 rounded bg-slate-300 dark:bg-slate-600" />}
+                  {i < PATH.length - 1 && <span className="h-0.5 w-5 rounded bg-slate-300 sm:w-8 dark:bg-slate-600" />}
                 </React.Fragment>
               );
             })}
@@ -236,13 +267,20 @@ const MyProjects: React.FC = () => {
           <button type="button" className={primaryBtn} onClick={() => setWizard("IDEA")}><Plus className="h-4 w-4" /> New project</button>
         </motion.div>
       ) : view === "board" && !archived ? (
-        <Board cards={shown} onOpen={(id) => open(id)} onMove={move} onReorder={(s, ids) => sideProjectsApi.order(s, ids).catch(() => undefined)} onAdd={(s) => setWizard(s)} />
+        <Board cards={shown} onOpen={(id) => open(id)} onMove={move} onReorder={(s, ids) => sideProjectsApi.order(s, ids).catch(() => showToast("The new order wasn't saved", "warning"))} onAdd={(s) => setWizard(s)} />
       ) : (
         <div className={`${cardCls} divide-y divide-slate-100 overflow-hidden dark:divide-gray-700/40`}>
           {shown.length === 0 && <EmptyArt icon={Archive} className="my-8" />}
           {shown.map((c) => (
             <button key={c.id} type="button" onClick={() => open(c.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-gray-700/40">
-              <span className="h-10 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: statusColor(c.status, dark) }} aria-hidden />
+              {(() => {
+                const M = STATUS_META[c.status];
+                return (
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: statusColor(c.status, dark) + "1f", color: statusColor(pathStage(c.status, c.pausedFrom), dark) }} aria-hidden>
+                    <M.icon className="h-5 w-5" />
+                  </span>
+                );
+              })()}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-bold text-slate-800 dark:text-white">{c.title}</span>
@@ -250,8 +288,9 @@ const MyProjects: React.FC = () => {
                   <HealthDot health={c.health} />
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  <ProgressBar value={c.progress} color={statusColor(c.status, dark)} className="max-w-[10rem]" />
+                  <ProgressBar value={c.progress} color={statusColor(pathStage(c.status, c.pausedFrom), dark)} className="max-w-[10rem]" />
                   <span className="text-[11px] font-bold tabular-nums text-slate-500">{c.progress}%</span>
+                  <StageChip card={c} />
                   <span className="hidden text-[11px] text-slate-400 sm:inline">{timeAgo(c.lastActivityAt)}</span>
                 </div>
               </div>

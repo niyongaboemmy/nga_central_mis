@@ -66,7 +66,8 @@ export const FormModal: React.FC<FormModalProps> = ({ open, onClose, title, subt
     const t = window.setTimeout(() => {
       const root = ref.current;
       if (!root || root.contains(document.activeElement)) return;
-      const firstField = root.querySelector<HTMLElement>("[data-autofocus], input:not([type=file]):not([disabled]), textarea:not([disabled])");
+      // An explicit [data-autofocus] wins over the first field in document order.
+      const firstField = root.querySelector<HTMLElement>("[data-autofocus]") ?? root.querySelector<HTMLElement>("input:not([type=file]):not([disabled]), textarea:not([disabled])");
       (firstField ?? root).focus();
     }, 60);
     return () => {

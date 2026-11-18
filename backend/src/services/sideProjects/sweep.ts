@@ -41,7 +41,23 @@ export async function sweepSideProjects(now = new Date()) {
     await notifyMany([Number(p.owner)], "side_project_concept", `Add the concept note for ${p.title}`, "Upload the concept note so your project can move forward.", Number(p.id), false);
     await recordEvent(Number(p.id), null, "NUDGE_CONCEPT");
   }
-  return { stale: staleRows.length, supervisors: digest.size, conceptPending: pending.length };
+  // A stage past its planned end: tell the team and the supervisor once per stay in that stage.
+  const overStage = await many(sql`
+    SELECT sp.project_id AS id, sp.title, sp.owner_user_id AS owner, sp.supervisor_user_id AS sup, sp.status
+    FROM SideProject sp
+    JOIN SideProjectStage st ON st.project_id = sp.project_id AND st.stage = sp.status
+    WHERE sp.deleted_at IS NULL AND sp.archived_at IS NULL AND sp.status IN ('IDEA', 'PLANNING', 'IN_PROGRESS', 'TESTING')
+      AND st.planned_end < DATE(${at})
+      AND NOT EXISTS (SELECT 1 FROM SideProjectEvent e WHERE e.project_id = sp.project_id AND e.type = 'NUDGE_STAGE'
+                      AND e.to_value = sp.status AND e.created_at >= COALESCE(sp.stage_entered_at, sp.created_at))`);
+  const label: Record<string, string> = { IDEA: "Idea", PLANNING: "Planning", IN_PROGRESS: "Building", TESTING: "Testing" };
+  for (const p of overStage) {
+    const team = await many(sql`SELECT user_id AS id FROM SideProjectMember WHERE project_id = ${p.id} AND status = 'ACCEPTED'`);
+    await notifyMany([Number(p.owner), ...team.map((t) => Number(t.id))], "side_project_stage_overdue", `${p.title}: ${label[p.status]} is overdue`, "The planned time for this stage has passed. Move on or adjust the plan.", Number(p.id), false);
+    if (p.sup) await notifyMany([Number(p.sup)], "side_project_stage_overdue", `${p.title}: ${label[p.status]} is overdue`, "A project you supervise is past its stage plan.", Number(p.id), true);
+    await recordEvent(Number(p.id), null, "NUDGE_STAGE", null, p.status);
+  }
+  return { stale: staleRows.length, supervisors: digest.size, conceptPending: pending.length, stageOverdue: overStage.length };
 }
 
 /** Used by tests to age a project. */

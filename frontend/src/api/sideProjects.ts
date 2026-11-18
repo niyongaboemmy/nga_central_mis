@@ -4,9 +4,11 @@ import type { PreviewManifest } from "../lib/files/previewPlan";
 
 /** Student side projects (backend routes/sideProjects.ts). */
 
-export type Status = "IDEA" | "IN_PROGRESS" | "COMPLETED";
+export type Status = "IDEA" | "PLANNING" | "IN_PROGRESS" | "TESTING" | "COMPLETED" | "ON_HOLD";
+/** The four working stages that have a planned window. */
+export type Stage = "IDEA" | "PLANNING" | "IN_PROGRESS" | "TESTING";
 export type ReviewState = "NONE" | "CHANGES_REQUESTED" | "AWAITING_VERIFICATION" | "VERIFIED";
-export type Health = "ON_TRACK" | "STALE" | "OVERDUE" | "BLOCKED" | "DONE" | "IDLE";
+export type Health = "ON_TRACK" | "STALE" | "OVERDUE" | "BLOCKED" | "DONE" | "IDLE" | "PAUSED";
 export type DocType = "CONCEPT" | "SRS" | "IMPLEMENTATION_PLAN";
 export type LinkKind = "VIDEO" | "DESIGN" | "DOCS" | "STORE" | "OTHER";
 
@@ -18,6 +20,67 @@ export interface Category {
   color: string;
 }
 
+export interface StageTiming {
+  enteredAt: string | null;
+  daysIn: number | null;
+  plannedEnd: string | null;
+  plannedDays: number | null;
+  daysLeft: number | null;
+  overrunDays: number;
+}
+
+export interface StageView {
+  stage: Stage;
+  plannedStart: string | null;
+  plannedEnd: string | null;
+  plannedDays: number | null;
+  actualDays: number;
+  state: "done" | "current" | "upcoming" | "skipped";
+  enteredAt: string | null;
+  daysIn: number | null;
+  daysLeft: number | null;
+  overrunDays: number;
+}
+
+export interface Period {
+  stages: StageView[];
+  onHoldDays: number;
+  currentStage: Stage | "COMPLETED";
+  paused: boolean;
+  totalDays: number | null;
+  daysLeftProject: number | null;
+  elapsedPct: number | null;
+}
+
+export interface ReportFile {
+  assetId: number;
+  name: string;
+  size: number;
+}
+
+export interface Report {
+  id: number;
+  did: string;
+  nextSteps: string | null;
+  blockers: string | null;
+  mood: number | null;
+  hours: number | null;
+  stage: Status | null;
+  workDate: string;
+  createdAt: string;
+  editedAt: string | null;
+  authorId: number;
+  author: string;
+  files: ReportFile[];
+}
+
+export interface Activity {
+  since: string;
+  days: number;
+  activity: Array<{ date: string; reports: number; events: number; hours: number }>;
+  stats: { activeDays: number; reports: number; hours: number; currentStreak: number; longestStreak: number };
+}
+
 export interface ProjectCard {
   id: number;
   title: string;
@@ -26,6 +89,8 @@ export interface ProjectCard {
   reviewState: ReviewState;
   progress: number;
   health: Health;
+  pausedFrom: Status | null;
+  stage: StageTiming;
   milestones: { total: number; done: number };
   techTags: string[];
   githubUrl: string | null;
@@ -91,7 +156,9 @@ export interface ProjectDetail extends ProjectCard {
   media: Media[];
   links: Array<{ id: number; kind: LinkKind; label: string; url: string }>;
   milestones: Array<{ id: number; title: string; dueDate: string | null; doneAt: string | null; done: boolean; sort: number }> & any;
-  updates: Array<{ id: number; did: string; nextSteps: string | null; blockers: string | null; mood: number | null; createdAt: string; authorId: number; author: string }>;
+  updates: Report[];
+  period: Period;
+  stays: Array<{ stage: Status; enteredAt: string; leftAt: string | null }>;
   comments: Array<{ id: number; kind: "COMMENT" | "CHANGES_REQUESTED" | "VERIFIED"; body: string; createdAt: string; authorId: number; author: string; authorType: string }>;
   events: Array<{ id: number; type: string; fromValue: string | null; toValue: string | null; note: string | null; createdAt: string; actorId: number | null; actor: string }>;
   members: Array<{ id: number; status: "INVITED" | "ACCEPTED"; name: string; regNumber: string | null; type: string }>;
@@ -104,6 +171,22 @@ export interface MonitorRow extends ProjectCard {
   class: { id: number; name: string; gradeId: number; grade: string; programId: number; program: string } | null;
   year: { id: number; name: string } | null;
   supervisor: { id: number; name: string } | null;
+  relation?: "SUPERVISOR" | "MEMBER" | null;
+  lastReport?: string | null;
+}
+
+export interface StageInsight {
+  stage: Stage;
+  avgActualDays: number;
+  avgPlannedDays: number | null;
+  samples: number;
+  now: number;
+  overrunNow: number;
+}
+
+export interface AssignedResult {
+  counts: { total: number; supervising: number; member: number; awaitingReview: number; overdue: number; stale: number; paused: number; completed: number };
+  rows: MonitorRow[];
 }
 
 export interface Summary {
@@ -140,6 +223,20 @@ export interface Summary {
   topTech: Array<{ tag: string; count: number }>;
   attention: MonitorRow[];
   recentCompleted: MonitorRow[];
+  stages: {
+    stages: StageInsight[];
+    onHold: { now: number; avgDays: number };
+    bottleneck: { stage: Stage; ratio: number } | null;
+    stuck: MonitorRow[];
+  };
+  reporting: {
+    reportsThisWeek: number;
+    hoursThisWeek: number;
+    projectsReportedThisWeek: number;
+    workingProjects: number;
+    quietCount: number;
+    quiet: Array<MonitorRow & { lastReport: string | null; daysSinceReport: number | null }>;
+  };
 }
 
 export interface Me {
@@ -148,6 +245,8 @@ export interface Me {
   review: boolean;
   manageAny: boolean;
   supervising: number;
+  /** may open the Assigned projects page (SIDE_PROJECTS_ASSIGNED) */
+  assigned: boolean;
 }
 
 export interface FilterOptions {
@@ -202,6 +301,15 @@ const toForm = (fields: Record<string, unknown>, files: Record<string, File | Fi
 };
 
 type Progress = (pct: number) => void;
+
+export interface ReportBody {
+  did: string;
+  nextSteps?: string;
+  blockers?: string;
+  mood?: number | null;
+  workDate: string;
+  hours?: number | null;
+}
 /** Multipart config: the shared client defaults to JSON (axios would turn FormData into JSON and
  *  drop the files) and to a 10 s timeout, too short for uploads on school Wi-Fi. */
 const onUp = (cb?: Progress) => ({
@@ -245,7 +353,13 @@ export const sideProjectsApi = {
   updateMilestone: (id: number, mid: number, body: { title?: string; dueDate?: string | null; done?: boolean }) => api.patch(`${B}/${id}/milestones/${mid}`, body),
   removeMilestone: (id: number, mid: number) => api.delete(`${B}/${id}/milestones/${mid}`),
   orderMilestones: (id: number, ids: number[]) => api.patch(`${B}/${id}/milestones/order`, { ids }),
-  addUpdate: (id: number, body: { did: string; nextSteps?: string; blockers?: string; mood?: number | null }) => api.post(`${B}/${id}/updates`, body),
+  addReport: (id: number, body: ReportBody, files: File[], progress?: Progress) =>
+    api.post<Data<{ id: number }>>(`${B}/${id}/updates`, toForm(body as unknown as Record<string, unknown>, { files }), onUp(progress)).then((r) => r.data.data),
+  editReport: (id: number, uid: number, body: ReportBody & { removeFiles?: number[] }, files: File[], progress?: Progress) =>
+    api.patch(`${B}/${id}/updates/${uid}`, toForm(body as unknown as Record<string, unknown>, { files }), onUp(progress)),
+  activity: (id: number, days = 182) => api.get<Data<Activity>>(`${B}/${id}/activity`, { params: { days } }).then((r) => r.data.data),
+  updatePlan: (id: number, body: { startDate: string; targetDate: string; stagePlan?: string[] }) =>
+    api.put<Data<{ plan: Array<{ stage: Stage; start: string; end: string }> }>>(`${B}/${id}/plan`, body).then((r) => r.data.data),
   removeUpdate: (id: number, uid: number) => api.delete(`${B}/${id}/updates/${uid}`),
 
   comment: (id: number, body: string) => api.post(`${B}/${id}/comments`, { body }),
@@ -253,6 +367,8 @@ export const sideProjectsApi = {
   invite: (id: number, who: { userId?: number; regNumber?: string }) => api.post(`${B}/${id}/members`, who),
   removeMember: (id: number, userId: number) => api.delete(`${B}/${id}/members/${userId}`),
   respondInvite: (id: number, accept: boolean) => api.post(`${B}/invitations/${id}`, { accept }),
+
+  assigned: (params: Record<string, unknown> = {}) => api.get<Data<AssignedResult>>(`${B}/assigned`, { params }).then((r) => r.data.data),
 
   // Monitor
   options: () => api.get<Data<FilterOptions>>(`${B}/monitor/options`).then((r) => r.data.data),

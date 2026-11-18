@@ -7,7 +7,8 @@ import { STATUS_META, STATUS_SOLID, Spinner, primaryBtn, secondaryBtn, statusCol
 
 /**
  * Asked when a move needs words: completing (outcome, with nudges for a link and a
- * screenshot), reopening a completed project (reason) or a staff correction (reason).
+ * screenshot), pausing (reason), reopening a completed project (reason) or a staff
+ * correction (reason).
  */
 export const MoveDialog: React.FC<{
   open: { to: Status; from: Status; title: string; hasLink: boolean; hasImage: boolean; correction?: boolean } | null;
@@ -20,6 +21,7 @@ export const MoveDialog: React.FC<{
   const [text, setText] = useState("");
   useEffect(() => setText(""), [open?.to, open?.title]);
   const completing = !!open && open.to === "COMPLETED" && !open.correction;
+  const pausing = !!open && open.to === "ON_HOLD" && !open.correction;
   const min = completing ? 20 : 5;
   const max = completing ? 3000 : 500;
   const ok = text.trim().length >= min;
@@ -36,7 +38,7 @@ export const MoveDialog: React.FC<{
       size="md"
       icon={open?.correction ? Wrench : T.icon}
       tone={[STATUS_SOLID[to], statusColor(to, dark)]}
-      title={completing ? "Complete the project" : open?.correction ? "Correct the status" : "Reopen the project"}
+      title={completing ? "Complete the project" : pausing ? "Put the project on hold" : open?.correction ? "Correct the status" : "Reopen the project"}
       subtitle={open?.title}
       footer={
         <>
@@ -45,7 +47,7 @@ export const MoveDialog: React.FC<{
           </button>
           <button type="button" className={primaryBtn} disabled={!ok || busy} onClick={() => onConfirm(completing ? { outcomeSummary: text.trim() } : { reason: text.trim() })} style={ok ? { backgroundColor: STATUS_SOLID[to] } : undefined}>
             {busy ? <Spinner className="h-4 w-4" /> : <T.icon className="h-4 w-4" />}
-            {T.label}
+            {pausing ? "Pause" : T.label}
           </button>
         </>
       }
@@ -78,8 +80,8 @@ export const MoveDialog: React.FC<{
           </div>
         )}
 
-        <Field label={completing ? "What did it achieve?" : "Why?"} htmlFor="move-text" counter={{ value: text, min, max }} error={error} hint={completing ? "Who used it, what works, what you learned." : undefined}>
-          <TextArea id="move-text" data-autofocus rows={completing ? 4 : 3} value={text} onChange={(e) => setText(e.target.value)} invalid={!!error} placeholder={completing ? "It now waters the garden on its own and logs moisture every hour…" : "Explain the change in one or two sentences"} />
+        <Field label={completing ? "What did it achieve?" : "Why?"} htmlFor="move-text" counter={{ value: text, min, max }} error={error} hint={completing ? "Who used it, what works, what you learned." : pausing ? "The clock of this stage stops while it is paused." : undefined}>
+          <TextArea id="move-text" data-autofocus rows={completing ? 4 : 3} value={text} onChange={(e) => setText(e.target.value)} invalid={!!error} placeholder={completing ? "It now waters the garden on its own and logs moisture every hour…" : pausing ? "Waiting for the sensors to arrive / exams week…" : "Explain the change in one or two sentences"} />
         </Field>
       </div>
     </FormModal>

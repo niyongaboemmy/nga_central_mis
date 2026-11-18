@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Check, ExternalLink, Figma, Flag, Quote, Tag, Trophy, FileText, Github, Globe, Link2, Pencil, Plus, Store, Trash2, UserCheck, Video, X } from "lucide-react";
+import { Check, ExternalLink, Figma, Quote, Tag, Trophy, FileText, Github, Globe, Link2, Pencil, Plus, Store, Trash2, UserCheck, Video, X } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type LinkKind, type ProjectDetail } from "../../../api/sideProjects";
 import { useToast } from "../../../contexts/ToastContext";
 import UserAvatar from "../../ui/UserAvatar";
+import StageTimeline from "./StageTimeline";
+import ContributionGraph from "./ContributionGraph";
 import { CategoryPicker, PersonPicker, TagInput, checkGithub, checkHttps } from "../fields";
 import { Field, FormSection, IconInput, TextArea } from "../form";
 import { CATEGORY_ICON, FieldError, iconBtn, inputCls, inputErrCls, primaryBtn, secondaryBtn, Spinner, cardCls } from "../ui";
@@ -11,7 +13,6 @@ import { CATEGORY_ICON, FieldError, iconBtn, inputCls, inputErrCls, primaryBtn, 
 const LINK_ICON: Record<LinkKind, React.ElementType> = { VIDEO: Video, DESIGN: Figma, DOCS: FileText, STORE: Store, OTHER: Link2 };
 const LINK_KINDS: LinkKind[] = ["VIDEO", "DESIGN", "DOCS", "STORE", "OTHER"];
 
-const fmtDate = (d: string | null) => (d ? new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : null);
 
 export const ExtLink: React.FC<{ href: string; icon: React.ElementType; label: string }> = ({ href, icon: Icon, label }) => (
   <a href={href} target="_blank" rel="noopener noreferrer" className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-500 hover:text-blue-700 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100">
@@ -21,7 +22,7 @@ export const ExtLink: React.FC<{ href: string; icon: React.ElementType; label: s
   </a>
 );
 
-const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSaved: () => void; staff?: boolean }> = ({ p, categories, onSaved, staff }) => {
+const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSaved: () => void; staff?: boolean; wide?: boolean }> = ({ p, categories, onSaved, staff, wide }) => {
   const { showToast } = useToast();
   const [edit, setEdit] = useState(false);
   const [f, setF] = useState(() => init(p));
@@ -39,7 +40,6 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
     if (g) e.githubUrl = g;
     const a = checkHttps(f.accessUrl);
     if (a) e.accessUrl = a;
-    if (f.startDate && f.targetDate && f.targetDate < f.startDate) e.targetDate = "Before the start date";
     f.links.forEach((l, i) => {
       const m = checkHttps(l.url) ?? (l.url.trim() ? null : "Add the link");
       if (m) e[`links.${i}.url`] = m;
@@ -56,8 +56,6 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
         techTags: f.techTags,
         githubUrl: f.githubUrl,
         accessUrl: f.accessUrl,
-        startDate: f.startDate || null,
-        targetDate: f.targetDate || null,
         supervisorId: f.supervisor?.id ?? null,
         links: f.links.filter((l) => l.url.trim()),
       });
@@ -94,8 +92,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
         </div>
 
         {/* Problem (and outcome) */}
-        <section className={`${cardCls} relative overflow-hidden p-5 pl-6`}>
-          <span className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-blue-600 to-blue-400" aria-hidden />
+        <section className={`${cardCls} p-5`}>
           <div className="flex items-start gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
               <Quote className="h-4 w-4" aria-hidden />
@@ -120,7 +117,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
         </section>
 
         {/* Facts */}
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <FactTile label="Category" icon={Tag}>
             <div className="flex items-center gap-2.5">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: `${catColor}1a`, color: catColor }}>
@@ -138,7 +135,6 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
               </div>
             )}
           </FactTile>
-          <TimelineTile start={p.startDate ?? p.startedAt?.slice(0, 10) ?? p.createdAt.slice(0, 10)} target={p.targetDate} done={p.status === "COMPLETED"} />
           <FactTile label="Supervisor" icon={UserCheck}>
             {p.supervisor ? (
               <div className="flex items-center gap-2.5">
@@ -164,6 +160,12 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
               </div>
             )}
           </FactTile>
+        </div>
+
+        {/* Time: planned vs actual per stage, and the daily work calendar */}
+        <div className={`grid gap-4 ${wide ? "2xl:grid-cols-2" : ""}`}>
+          <StageTimeline p={p} canEdit={p.rights.edit || p.rights.manageAny} onSaved={onSaved} />
+          <ContributionGraph projectId={p.id} refreshKey={p.lastActivityAt} />
         </div>
 
         {/* Links */}
@@ -267,15 +269,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
           </div>
         </FormSection>
 
-        <FormSection title="Plan" icon={Calendar}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Start date" htmlFor="ov-start">
-              <IconInput id="ov-start" icon={Calendar} type="date" value={f.startDate} onChange={(e) => set("startDate", e.target.value)} className="[color-scheme:light] dark:[color-scheme:dark]" />
-            </Field>
-            <Field label="Target date" htmlFor="ov-target" error={errors.targetDate}>
-              <IconInput id="ov-target" icon={Flag} type="date" value={f.targetDate} onChange={(e) => set("targetDate", e.target.value)} invalid={!!errors.targetDate} className="[color-scheme:light] dark:[color-scheme:dark]" />
-            </Field>
-          </div>
+        <FormSection title="Supervision" icon={UserCheck}>
           <Field label="Supervisor" icon={UserCheck}>
             <PersonPicker value={f.supervisor} onChange={(v) => set("supervisor", v)} search={sideProjectsApi.supervisors} placeholder="Search a teacher" error={errors.supervisorId} />
           </Field>
@@ -309,40 +303,6 @@ const FactTile: React.FC<{ label: string; icon: React.ElementType; children: Rea
     {children}
   </div>
 );
-
-const DAY = 86_400_000;
-/** Start → target with how much of the time has gone, and days left (or overdue). */
-const TimelineTile: React.FC<{ start: string; target: string | null; done: boolean }> = ({ start, target, done }) => {
-  const s = new Date(`${start.slice(0, 10)}T00:00:00Z`).getTime();
-  const t = target ? new Date(`${target}T00:00:00Z`).getTime() : null;
-  const now = Date.now();
-  const pct = t && t > s ? Math.max(0, Math.min(100, ((now - s) / (t - s)) * 100)) : 0;
-  const left = t ? Math.ceil((t - now) / DAY) : null;
-  const chip =
-    done ? { text: "Finished", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" }
-    : left === null ? { text: "No target", cls: "bg-slate-100 text-slate-600 dark:bg-gray-700/60 dark:text-gray-300" }
-    : left < 0 ? { text: `${-left}d overdue`, cls: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300" }
-    : left === 0 ? { text: "Due today", cls: "bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200" }
-    : { text: `${left}d left`, cls: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" };
-  return (
-    <FactTile label="Timeline" icon={Calendar}>
-      <div className="flex items-center justify-between gap-2 text-xs">
-        <span>
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">Start</span>
-          <span className="font-bold text-slate-900 dark:text-white">{fmtDate(start) ?? "—"}</span>
-        </span>
-        <span className="text-right">
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">Target</span>
-          <span className="font-bold text-slate-900 dark:text-white">{fmtDate(target) ?? "—"}</span>
-        </span>
-      </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-700/60" role="img" aria-label={t ? `${Math.round(pct)}% of the time used` : "No target date"}>
-        <motion.div className={`h-full rounded-full ${left !== null && left < 0 && !done ? "bg-red-500" : "bg-gradient-to-r from-blue-600 to-blue-400"}`} initial={{ width: 0 }} animate={{ width: `${done ? 100 : pct}%` }} transition={{ duration: 0.8 }} />
-      </div>
-      <span className={`mt-2.5 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip.cls}`}>{chip.text}</span>
-    </FactTile>
-  );
-};
 
 function init(p: ProjectDetail) {
   return {

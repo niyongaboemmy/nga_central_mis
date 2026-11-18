@@ -36,7 +36,7 @@ const collision: CollisionDetection = (args) => {
 };
 
 const columnsOf = (cards: AnyCard[]): Columns => {
-  const c: Columns = { IDEA: [], IN_PROGRESS: [], COMPLETED: [] };
+  const c: Columns = { IDEA: [], PLANNING: [], IN_PROGRESS: [], TESTING: [], COMPLETED: [], ON_HOLD: [] };
   [...cards].sort((a, b) => a.boardPosition - b.boardPosition || b.id - a.id).forEach((x) => c[x.status].push(x.id));
   return c;
 };
@@ -71,17 +71,28 @@ const SortableCard: React.FC<{ card: AnyCard; onOpen: (id: number) => void; onMo
   );
 };
 
-const Column: React.FC<{ status: Status; ids: number[]; byId: Map<number, AnyCard>; children: React.ReactNode; onAdd?: () => void; activeOver: boolean }> = ({ status, ids, children, onAdd, activeOver }) => {
+const Column: React.FC<{ status: Status; ids: number[]; byId: Map<number, AnyCard>; children: React.ReactNode; onAdd?: () => void; activeOver: boolean; dragging: boolean }> = ({ status, ids, children, onAdd, activeOver, dragging }) => {
   const dark = useIsDark();
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` });
   const M = STATUS_META[status];
   const color = statusColor(status, dark);
   const hot = isOver || activeOver;
+  // On hold folds into a slim rail while it is empty; it opens as soon as a card is lifted.
+  if (status === "ON_HOLD" && ids.length === 0 && !dragging) {
+    return (
+      <section ref={setNodeRef} aria-label={`${M.label} column, empty`} className="flex min-h-[18rem] w-14 shrink-0 snap-start flex-col items-center gap-3 rounded-3xl border border-dashed border-slate-300/80 bg-slate-50/60 py-4 dark:border-gray-700/60 dark:bg-gray-800/20">
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl text-white" style={{ backgroundColor: color }} title="Drag a card here to pause it">
+          <M.icon className="h-4 w-4" aria-hidden />
+        </span>
+        <span className="text-xs font-semibold text-slate-500 [writing-mode:vertical-rl] dark:text-gray-400">{M.label}</span>
+      </section>
+    );
+  }
   return (
     <section
       ref={setNodeRef}
       aria-label={`${M.label} column`}
-      className={`flex min-h-[18rem] flex-col rounded-3xl border p-3 transition ${hot ? "border-transparent ring-2" : "border-slate-200/70 dark:border-gray-700/40"} ${M.soft}`}
+      className={`flex min-h-[18rem] w-[17rem] shrink-0 snap-start flex-col rounded-3xl border p-3 transition xl:w-auto xl:min-w-[15.5rem] xl:flex-1 ${status === "ON_HOLD" ? "border-dashed" : ""} ${hot ? "border-transparent ring-2" : "border-slate-200/70 dark:border-gray-700/40"} ${M.soft}`}
       style={hot ? ({ ["--tw-ring-color" as any]: color } as React.CSSProperties) : undefined}
     >
       <header className="mb-3 flex items-center justify-between px-1">
@@ -94,7 +105,7 @@ const Column: React.FC<{ status: Status; ids: number[]; byId: Map<number, AnyCar
             {ids.length}
           </motion.span>
         </div>
-        {onAdd && status !== "COMPLETED" && (
+        {onAdd && (status === "IDEA" || status === "PLANNING" || status === "IN_PROGRESS") && (
           <button type="button" onClick={onAdd} aria-label={`New project in ${M.label}`} className="rounded-full p-1.5 text-slate-500 transition hover:bg-white hover:text-slate-800 dark:hover:bg-gray-800/60 dark:hover:text-white">
             <Plus className="h-4 w-4" />
           </button>
@@ -219,9 +230,9 @@ const Board: React.FC<BoardProps> = ({ cards, onOpen, onMove, onReorder, onAdd, 
 
   return (
     <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={() => origin.current && (setCols(origin.current.cols), setActive(null))} accessibility={{ announcements }}>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]" role="group" aria-label="Project stages">
         {STATUS_ORDER.map((s) => (
-          <Column key={s} status={s} ids={cols[s]} byId={byId} onAdd={onAdd ? () => onAdd(s) : undefined} activeOver={active !== null && overStatus === s && origin.current?.status !== s}>
+          <Column key={s} status={s} ids={cols[s]} byId={byId} dragging={active !== null} onAdd={onAdd ? () => onAdd(s) : undefined} activeOver={active !== null && overStatus === s && origin.current?.status !== s}>
             <SortableContext items={cols[s]} strategy={verticalListSortingStrategy}>
               <AnimatePresence initial={false}>
                 {cols[s].map((id) => {

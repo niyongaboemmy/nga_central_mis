@@ -35,7 +35,8 @@ const HEADERS: Record<string, string> = {
 };
 
 const STATUS_WORDS: Record<string, string> = {
-  idea: "IDEA", "in progress": "IN_PROGRESS", in_progress: "IN_PROGRESS", inprogress: "IN_PROGRESS", ongoing: "IN_PROGRESS",
+  idea: "IDEA", planning: "PLANNING", design: "PLANNING", building: "IN_PROGRESS", testing: "TESTING", review: "TESTING",
+  "on hold": "ON_HOLD", on_hold: "ON_HOLD", paused: "ON_HOLD", "in progress": "IN_PROGRESS", in_progress: "IN_PROGRESS", inprogress: "IN_PROGRESS", ongoing: "IN_PROGRESS",
   completed: "COMPLETED", complete: "COMPLETED", done: "COMPLETED", finished: "COMPLETED",
 };
 

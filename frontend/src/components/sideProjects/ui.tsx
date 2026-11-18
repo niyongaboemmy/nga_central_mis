@@ -2,14 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   AlertOctagon, Bot, BrainCircuit, CheckCircle2, CircleDashed, Clock3, Cpu, FileCheck2, FileClock, FileText, Gamepad2, Globe,
-  Hourglass, LineChart, Lightbulb, Loader2, PauseCircle, Rocket, ShieldCheck, Smartphone, Sparkles, UploadCloud, BadgeCheck, MessageSquareWarning,
+  FlaskConical, Hourglass, LineChart, PencilRuler, Lightbulb, Loader2, PauseCircle, Rocket, ShieldCheck, Smartphone, Sparkles, UploadCloud, BadgeCheck, MessageSquareWarning,
 } from "lucide-react";
-import type { DocType, Health, ReviewState, Status } from "../../api/sideProjects";
+import type { DocType, Health, ReviewState, Stage, Status } from "../../api/sideProjects";
 
 /**
- * Side projects visual language. Status colours are the validated three-slot categorical set
- * (dataviz reference palette: orange / blue / aqua, light and dark steps), always paired with an
- * icon and a label so colour never carries meaning alone.
+ * Side projects visual language. Stage colours are a validated five-slot categorical order
+ * (dataviz reference palette: orange / aqua / blue / magenta / green, light and dark steps,
+ * adjacent pairs CVD-checked in both modes) plus a neutral grey for On hold. Always paired with
+ * an icon and a label so colour never carries meaning alone.
  */
 
 export const STATUS_META: Record<Status, { label: string; icon: React.ElementType; color: string; dark: string; soft: string; ring: string; text: string }> = {
@@ -22,8 +23,17 @@ export const STATUS_META: Record<Status, { label: string; icon: React.ElementTyp
     ring: "ring-orange-200 dark:ring-orange-500/30",
     text: "text-orange-700 dark:text-orange-300",
   },
+  PLANNING: {
+    label: "Planning",
+    icon: PencilRuler,
+    color: "#1baf7a",
+    dark: "#199e70",
+    soft: "bg-emerald-50 dark:bg-emerald-500/10",
+    ring: "ring-emerald-200 dark:ring-emerald-500/30",
+    text: "text-emerald-700 dark:text-emerald-300",
+  },
   IN_PROGRESS: {
-    label: "In progress",
+    label: "Building",
     icon: Rocket,
     color: "#2a78d6",
     dark: "#3987e5",
@@ -31,19 +41,52 @@ export const STATUS_META: Record<Status, { label: string; icon: React.ElementTyp
     ring: "ring-blue-200 dark:ring-blue-500/30",
     text: "text-blue-700 dark:text-blue-300",
   },
+  TESTING: {
+    label: "Testing",
+    icon: FlaskConical,
+    color: "#e87ba4",
+    dark: "#d55181",
+    soft: "bg-pink-50 dark:bg-pink-500/10",
+    ring: "ring-pink-200 dark:ring-pink-500/30",
+    text: "text-pink-700 dark:text-pink-300",
+  },
   COMPLETED: {
     label: "Completed",
     icon: CheckCircle2,
-    color: "#1baf7a",
-    dark: "#199e70",
-    soft: "bg-emerald-50 dark:bg-emerald-500/10",
-    ring: "ring-emerald-200 dark:ring-emerald-500/30",
-    text: "text-emerald-700 dark:text-emerald-300",
+    color: "#008300",
+    dark: "#0ca30c",
+    soft: "bg-green-50 dark:bg-green-500/10",
+    ring: "ring-green-200 dark:ring-green-500/30",
+    text: "text-green-700 dark:text-green-300",
+  },
+  ON_HOLD: {
+    label: "On hold",
+    icon: PauseCircle,
+    color: "#8a8f98",
+    dark: "#7c828c",
+    soft: "bg-slate-100 dark:bg-gray-700/40",
+    ring: "ring-slate-300 dark:ring-gray-600/60",
+    text: "text-slate-700 dark:text-gray-200",
   },
 };
-export const STATUS_ORDER: Status[] = ["IDEA", "IN_PROGRESS", "COMPLETED"];
+/** The path a project walks (board columns, stage tracks); On hold sits beside it. */
+export const PATH: Status[] = ["IDEA", "PLANNING", "IN_PROGRESS", "TESTING", "COMPLETED"];
+export const STAGES: Stage[] = ["IDEA", "PLANNING", "IN_PROGRESS", "TESTING"];
+export const STATUS_ORDER: Status[] = [...PATH, "ON_HOLD"];
 /** Darker steps of the same hues for solid fills that carry white text (>= 4.5:1). */
-export const STATUS_SOLID: Record<Status, string> = { IDEA: "#c2410c", IN_PROGRESS: "#1d4ed8", COMPLETED: "#047857" };
+export const STATUS_SOLID: Record<Status, string> = {
+  IDEA: "#c2410c",
+  PLANNING: "#047857",
+  IN_PROGRESS: "#1d4ed8",
+  TESTING: "#be185d",
+  COMPLETED: "#15803d",
+  ON_HOLD: "#475569",
+};
+/** Where a project really is on the path (a paused one counts where it paused). */
+export const pathStage = (s: Status, pausedFrom?: Status | null): Status => (s === "ON_HOLD" ? (pausedFrom && pausedFrom !== "ON_HOLD" ? pausedFrom : "IDEA") : s);
+
+/** "3d", "1 day", "today" for chips. */
+export const dayWord = (n: number) => (n === 1 ? "1 day" : `${n} days`);
 
 /** Status palette (good / warning / serious / critical), always with an icon + label. */
 export const HEALTH_META: Record<Health, { label: string; icon: React.ElementType; color: string; cls: string }> = {
@@ -53,6 +96,7 @@ export const HEALTH_META: Record<Health, { label: string; icon: React.ElementTyp
   BLOCKED: { label: "Blocked", icon: AlertOctagon, color: "#ec835a", cls: "text-orange-700 dark:text-orange-300" },
   DONE: { label: "Done", icon: BadgeCheck, color: "#0ca30c", cls: "text-green-700 dark:text-green-400" },
   IDLE: { label: "Not started", icon: CircleDashed, color: "#94a3b8", cls: "text-slate-600 dark:text-gray-300" },
+  PAUSED: { label: "On hold", icon: PauseCircle, color: "#8a8f98", cls: "text-slate-600 dark:text-gray-300" },
 };
 
 export const REVIEW_META: Record<ReviewState, { label: string; icon: React.ElementType; cls: string } | null> = {
