@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Archive, ArchiveRestore, Clock, FileStack, Images, LayoutGrid, MessagesSquare, MoreVertical, Target, Trash2, Users, Wrench, X, GraduationCap, Hash, CalendarRange } from "lucide-react";
+import { Archive, ArchiveRestore, Clock, FileStack, Images, LayoutGrid, MessagesSquare, MoreVertical, Target, Trash2, Users, Wrench, X, GraduationCap, Hash, CalendarRange, Briefcase } from "lucide-react";
 import { failure, fileUrl, sideProjectsApi, type Category, type ProjectDetail, type Status } from "../../api/sideProjects";
 import { useToast } from "../../contexts/ToastContext";
 import { useConfirm } from "../../contexts/ConfirmContext";
@@ -11,7 +11,7 @@ import DocumentsPanel from "./panels/DocumentsPanel";
 import GalleryPanel from "./panels/GalleryPanel";
 import ProgressPanel from "./panels/ProgressPanel";
 import { FeedbackPanel, InviteBanner, TeamPanel, TimelinePanel } from "./panels/ActivityPanels";
-import { MoveDialog } from "./fields";
+import { MoveDialog, TYPE_LABEL } from "./fields";
 import { STATUS_SOLID, CATEGORY_ICON, HealthDot, ProgressRing, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, statusColor, useIsDark } from "./ui";
 
 type Tab = "overview" | "documents" | "gallery" | "progress" | "timeline" | "feedback" | "team";
@@ -201,6 +201,11 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
                     <span className="flex items-center gap-2 font-semibold text-slate-800 dark:text-white">
                       <UserAvatar name={p.owner.name} src={p.owner.avatar} userId={p.owner.id} size={26} decorative /> {p.owner.name}
                     </span>
+                    {p.owner.type !== "STUDENT" && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">
+                        <Briefcase className="h-3 w-3" aria-hidden /> {TYPE_LABEL[p.owner.type] ?? p.owner.type}
+                      </span>
+                    )}
                     {p.owner.regNumber && <span className="flex items-center gap-1 font-mono"><Hash className="h-3.5 w-3.5" aria-hidden />{p.owner.regNumber}</span>}
                     {p.class && <span className="flex items-center gap-1"><GraduationCap className="h-3.5 w-3.5" aria-hidden />{p.class.name}{p.class.grade ? ` · ${p.class.grade}` : ""}</span>}
                     {p.academicYear && <span className="flex items-center gap-1"><CalendarRange className="h-3.5 w-3.5" aria-hidden />{p.academicYear.name}</span>}

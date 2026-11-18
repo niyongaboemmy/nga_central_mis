@@ -236,7 +236,7 @@ export function sideProjectsRouter(
     handle(async (req) => {
       await requireAny(req);
       const studentId = Number(req.body?.studentId);
-      if (!studentId) fail(400, "VALIDATION", "Choose the student", "studentId");
+      if (!studentId) fail(400, "VALIDATION", "Choose the owner", "studentId");
       const id = await projects.createProject(studentId, uid(req), { ...req.body, concept: req.file ?? null }, { conceptPending: !req.file && !req.body?.conceptWritten });
       await notify.notifyMany([studentId], "side_project_created_for", "A project was added for you", "Open My projects to see it.", id, false);
       return { id };
@@ -270,16 +270,16 @@ export function sideProjectsRouter(
     }),
   );
   router.get(
-    "/admin/students",
+    "/admin/people",
     handle(async (req) => {
       await requireAny(req);
-      return members.classmates(0, String(req.query.q ?? ""));
+      return members.people(0, String(req.query.q ?? ""));
     }),
   );
 
   // ------------------------------------------------------------------ student board
   router.get("/mine", own, handle(async (req) => projects.myProjects(uid(req), { archived: req.query.archived === "1" })));
-  router.get("/classmates", own, handle(async (req) => members.classmates(uid(req), String(req.query.q ?? ""))));
+  router.get("/people", own, handle(async (req) => members.people(uid(req), String(req.query.q ?? ""))));
 
   router.post(
     "/",
@@ -524,7 +524,7 @@ export function sideProjectsRouter(
     own,
     handle(async (req) => {
       const a = await studentAccess(req);
-      const userId = await members.invite(a, uid(req), req.body?.regNumber);
+      const userId = await members.invite(a, uid(req), { userId: req.body?.userId, regNumber: req.body?.regNumber });
       await notify.onInvite(Number(a.project.project_id), uid(req), userId);
       return { userId };
     }),

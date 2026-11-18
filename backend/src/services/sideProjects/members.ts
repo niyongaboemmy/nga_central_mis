@@ -4,21 +4,28 @@ import { clip, fail, fullName, many, one, recordEvent } from "./core";
 import { ProjectAccess } from "./access";
 
 /**
- * Team projects (plan Phase 5): the owner invites classmates by registration number; an
+ * Team projects (plan Phase 5): the owner invites anyone (people search or registration number); an
  * invited student accepts or declines. Accepted members edit like the owner, but only the
  * owner deletes, archives and manages the team.
  */
 
 const MAX_MEMBERS = 8;
 
-export async function invite(a: ProjectAccess, by: number, regNumber: unknown) {
+/**
+ * Invite someone to the team: picked from the people search (`userId`) or typed as a
+ * registration number. Anyone active may join -- students, staff, parents.
+ */
+export async function invite(a: ProjectAccess, by: number, who: { userId?: unknown; regNumber?: unknown }) {
   if (!a.isOwner && !a.manageAny) fail(403, "NOT_OWNER", "Only the project owner can invite");
-  const reg = clip(regNumber, 20);
-  if (!reg) fail(400, "VALIDATION", "Enter a registration number", "regNumber");
-  const s = await one(sql`
-    SELECT u.user_id, u.status, p.user_type FROM UserProfile p JOIN User u ON u.user_id = p.user_id
-    WHERE p.registration_number = ${reg}`);
-  if (!s || String(s.user_type).toUpperCase() !== "STUDENT" || s.status !== "ACTIVE") fail(404, "STUDENT_NOT_FOUND", "No active student has this registration number", "regNumber");
+  const reg = clip(who.regNumber, 20);
+  const id = Number(who.userId);
+  if (!reg && !(Number.isInteger(id) && id > 0)) fail(400, "VALIDATION", "Choose a person", "regNumber");
+  const s = await one(
+    Number.isInteger(id) && id > 0
+      ? sql`SELECT u.user_id, u.status FROM User u JOIN UserProfile p ON p.user_id = u.user_id WHERE u.user_id = ${id}`
+      : sql`SELECT u.user_id, u.status FROM UserProfile p JOIN User u ON u.user_id = p.user_id WHERE p.registration_number = ${reg}`,
+  );
+  if (!s || s.status !== "ACTIVE") fail(404, "PERSON_NOT_FOUND", "No active person matches", "regNumber");
   const userId = Number(s.user_id);
   if (userId === Number(a.project.owner_user_id)) fail(409, "ALREADY_MEMBER", "That's the project owner", "regNumber");
   const n = await one(sql`SELECT COUNT(*) AS n FROM SideProjectMember WHERE project_id = ${a.project.project_id}`);
@@ -52,12 +59,15 @@ export async function removeMember(a: ProjectAccess, by: number, userId: number)
   await recordEvent(Number(a.project.project_id), by, self ? "MEMBER_LEFT" : "MEMBER_REMOVED", null, String(userId));
 }
 
-export async function classmates(userId: number, q: string) {
+/** People search for team invites and for staff registering a project: every active user. */
+export async function people(userId: number, q: string, opts: { students?: boolean } = {}) {
   const needle = `%${clip(q, 60)}%`;
   return many(sql`
-    SELECT u.user_id AS id, ${fullName("p")} AS name, p.registration_number AS regNumber
+    SELECT u.user_id AS id, ${fullName("p")} AS name, p.registration_number AS regNumber, p.user_type AS type
     FROM User u JOIN UserProfile p ON p.user_id = u.user_id
-    WHERE u.status = 'ACTIVE' AND p.user_type = 'STUDENT' AND u.user_id <> ${userId} AND p.registration_number IS NOT NULL
-      AND (CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) LIKE ${needle} OR p.registration_number LIKE ${needle})
-    ORDER BY p.first_name LIMIT 10`);
+    WHERE u.status = 'ACTIVE' AND u.user_id <> ${userId}
+      ${opts.students ? sql`AND p.user_type = 'STUDENT'` : sql``}
+      AND (CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) LIKE ${needle}
+           OR p.registration_number LIKE ${needle} OR u.email LIKE ${needle})
+    ORDER BY p.first_name, p.last_name LIMIT 12`);
 }

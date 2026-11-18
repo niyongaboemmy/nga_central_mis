@@ -32,6 +32,8 @@ export interface MonitorFilters {
   q?: string | null;
   archived?: boolean;
   supervisedBy?: number | null;
+  /** STUDENT = students' projects, STAFF = everyone else's (teachers, staff, parents). */
+  ownerType?: "STUDENT" | "STAFF" | null;
 }
 
 const num = (v: unknown) => (v === undefined || v === null || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
@@ -55,6 +57,7 @@ export function parseFilters(q: Record<string, unknown>): MonitorFilters {
     supervisorId: num(q.supervisorId),
     q: s(q.q),
     archived: bool(q.archived) === true,
+    ownerType: q.ownerType === "STUDENT" || q.ownerType === "STAFF" ? q.ownerType : null,
   };
 }
 
@@ -80,13 +83,15 @@ async function loadRows(scope: ScopeEntry | null, f: MonitorFilters) {
     conds.push(sql`NOT EXISTS (SELECT 1 FROM SideProjectDocument d WHERE d.project_id = sp.project_id AND d.doc_type = ${f.missing})`);
   }
   if (f.supervisorId) conds.push(sql`sp.supervisor_user_id = ${f.supervisorId}`);
+  if (f.ownerType === "STUDENT") conds.push(sql`up.user_type = 'STUDENT'`);
+  if (f.ownerType === "STAFF") conds.push(sql`(up.user_type IS NULL OR up.user_type <> 'STUDENT')`);
   if (f.q) {
     const like = `%${f.q.slice(0, 80)}%`;
     conds.push(sql`(sp.title LIKE ${like} OR up.registration_number LIKE ${like} OR CONCAT(COALESCE(up.first_name,''),' ',COALESCE(up.last_name,'')) LIKE ${like} OR sp.tech_tags LIKE ${like})`);
   }
   const r = await many(sql`
     SELECT ${cardColumns},
-           up.registration_number AS regNumber, ${fullName("up")} AS studentName, u.avatar_version AS avatarVersion,
+           up.registration_number AS regNumber, up.user_type AS ownerType, ${fullName("up")} AS studentName, u.avatar_version AS avatarVersion,
            cg.class_group_id AS classId, cg.name AS className, g.grade_id AS gradeId, g.name AS gradeName,
            pr.program_id AS programId, pr.name AS programName,
            sp.academic_year_id AS yearId, ay.name AS yearName, ${fullName("sv")} AS supervisorName
@@ -104,6 +109,7 @@ async function loadRows(scope: ScopeEntry | null, f: MonitorFilters) {
       id: Number(x.ownerId),
       name: x.studentName,
       regNumber: x.regNumber,
+      type: String(x.ownerType || "STUDENT").toUpperCase(),
       avatar: avatarUrls(Number(x.ownerId), x.avatarVersion == null ? null : Number(x.avatarVersion))?.sm ?? null,
     },
     class: x.classId ? { id: Number(x.classId), name: x.className, gradeId: Number(x.gradeId), grade: x.gradeName, programId: Number(x.programId), program: x.programName } : null,
@@ -182,6 +188,8 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
   const categories = new Map<string, { name: string; color: string; count: number }>();
   const tech = new Map<string, { tag: string; count: number }>();
   const classes = new Map<string, { classId: number | null; name: string; grade: string | null; students: Set<number>; IDEA: number; IN_PROGRESS: number; COMPLETED: number }>();
+  const studentOwners = new Set<number>();
+  let staffProjects = 0;
   let completedNow = 0,
     completedPrev = 0,
     withGithub = 0,
@@ -193,6 +201,8 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
     health[p.health] = (health[p.health] ?? 0) + 1;
     review[p.reviewState] = (review[p.reviewState] ?? 0) + 1;
     owners.add(p.student.id);
+    if (p.student.type === "STUDENT") studentOwners.add(p.student.id);
+    else staffProjects += 1;
     if (inWin(p.completedAt, windows.current)) completedNow += 1;
     if (inWin(p.completedAt, windows.previous)) completedPrev += 1;
     if (p.githubUrl) withGithub += 1;
@@ -209,8 +219,9 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
       e.count += 1;
       tech.set(k, e);
     }
-    const key = p.class ? String(p.class.id) : "none";
-    const cl = classes.get(key) ?? { classId: p.class?.id ?? null, name: p.class?.name ?? "No class", grade: p.class?.grade ?? null, students: new Set<number>(), IDEA: 0, IN_PROGRESS: 0, COMPLETED: 0 };
+    const staff = p.student.type !== "STUDENT";
+    const key = staff ? "staff" : p.class ? String(p.class.id) : "none";
+    const cl = classes.get(key) ?? { classId: staff ? null : p.class?.id ?? null, name: staff ? "Staff & others" : p.class?.name ?? "No class", grade: p.class?.grade ?? null, students: new Set<number>(), IDEA: 0, IN_PROGRESS: 0, COMPLETED: 0 };
     cl.students.add(p.student.id);
     cl[p.status] += 1;
     classes.set(key, cl);
@@ -294,7 +305,10 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
       projects: rows.length,
       students: owners.size,
       population,
-      participation: population ? Math.round((owners.size / population) * 100) : null,
+      studentOwners: studentOwners.size,
+      participation: population ? Math.round((studentOwners.size / population) * 100) : null,
+      studentProjects: rows.length - staffProjects,
+      staffProjects,
       byStatus,
       completedThisTerm: completedNow,
       completedPreviousTerm: completedPrev,
@@ -324,7 +338,8 @@ export async function exportRows(scope: ScopeEntry | null, f: MonitorFilters, fo
   const rows = await loadRows(scope, f);
   const data = rows.map((p) => ({
     "Reg. number": p.student.regNumber ?? "",
-    Student: p.student.name ?? "",
+    Owner: p.student.name ?? "",
+    "Owner type": p.student.type,
     Class: p.class?.name ?? "",
     Grade: p.class?.grade ?? "",
     Programme: p.class?.program ?? "",

@@ -130,7 +130,7 @@ const MyProjects: React.FC = () => {
   return (
     <div className="mx-auto max-w-7xl space-y-5 px-4 py-6">
       {/* Hero */}
-      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-indigo-600 to-violet-600 p-5 text-white shadow-float">
+      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-700 via-brand-600 to-sky-500 p-5 text-white shadow-float">
         <Sparkles className="absolute -right-6 -top-6 h-40 w-40 text-white/10" aria-hidden />
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div>

@@ -2,13 +2,13 @@ import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
-  Activity, AlertTriangle, BadgeCheck, Clock3, FileWarning, FolderKanban, Github, Globe, Hourglass, PauseCircle, Table2, TrendingDown, TrendingUp, Users, AlertOctagon, Minus,
+  Activity, AlertTriangle, BadgeCheck, Briefcase, Clock3, FileWarning, FolderKanban, Github, Hourglass, PauseCircle, Table2, TrendingDown, TrendingUp, Users, AlertOctagon, Minus,
 } from "lucide-react";
 import { fileUrl, type Health, type MonitorRow, type Status, type Summary } from "../../../api/sideProjects";
 import UserAvatar from "../../ui/UserAvatar";
 import { HEALTH_META, ReviewBadge, STATUS_META, STATUS_ORDER, statusColor, timeAgo, useIsDark, cardCls, CATEGORY_ICON } from "../ui";
 
-export type DrillFilter = Partial<{ status: Status; review: string; health: Health; missing: string; hasGithub: string; hasAccess: string; classId: number }>;
+export type DrillFilter = Partial<{ ownerType: "STUDENT" | "STAFF"; status: Status; review: string; health: Health; missing: string; hasGithub: string; hasAccess: string; classId: number }>;
 
 const SEQ = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95"];
 const SEQ_DARK = ["#1e293b", "#184f95", "#1c5cab", "#256abf", "#3987e5", "#6da7ec"];
@@ -167,7 +167,7 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         <Tile icon={FolderKanban} value={s.totals.projects} label="Projects" delay={0} onClick={detail ? () => onDrill({}) : undefined} />
-        <Tile icon={Users} value={s.totals.participation !== null ? `${s.totals.participation}%` : s.totals.students} label={s.totals.participation !== null ? `${s.totals.students} of ${s.totals.population} students` : "Students"} tone="text-violet-700 bg-violet-50 dark:bg-violet-500/15 dark:text-violet-200" delay={0.03} />
+        <Tile icon={Users} value={s.totals.participation !== null ? `${s.totals.participation}%` : s.totals.students} label={s.totals.participation !== null ? `${s.totals.studentOwners} of ${s.totals.population} students` : "Owners"} tone="text-teal-700 bg-teal-50 dark:bg-teal-500/15 dark:text-teal-200" delay={0.03} />
         <Tile icon={BadgeCheck} value={s.totals.completedThisTerm} label={`Completed · ${s.totals.termLabel}`} delta={delta} tone="text-emerald-700 bg-emerald-50 dark:bg-emerald-500/15 dark:text-emerald-200" delay={0.06} onClick={detail ? () => onDrill({ status: "COMPLETED" }) : undefined} />
         <Tile icon={Hourglass} value={s.totals.awaitingVerification} label="Awaiting verification" tone="text-sky-700 bg-sky-50 dark:bg-sky-500/15 dark:text-sky-200" delay={0.09} onClick={detail ? () => onDrill({ review: "AWAITING_VERIFICATION" }) : undefined} />
         <Tile icon={PauseCircle} value={s.totals.stale} label="No recent activity" tone="text-amber-700 bg-amber-50 dark:bg-amber-500/15 dark:text-amber-200" delay={0.12} onClick={detail ? () => onDrill({ health: "STALE" }) : undefined} />
@@ -175,8 +175,8 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
         <Tile icon={AlertOctagon} value={s.totals.blocked} label="Blocked" tone="text-orange-700 bg-orange-50 dark:bg-orange-500/15 dark:text-orange-200" delay={0.18} onClick={detail ? () => onDrill({ health: "BLOCKED" }) : undefined} />
         <Tile icon={FileWarning} value={s.totals.conceptPending} label="Concept needed" tone="text-rose-700 bg-rose-50 dark:bg-rose-500/15 dark:text-rose-200" delay={0.21} onClick={detail ? () => onDrill({ missing: "CONCEPT" }) : undefined} />
         <Tile icon={Github} value={s.totals.projects ? `${Math.round((s.totals.withGithub / s.totals.projects) * 100)}%` : "—"} label="With GitHub" tone="text-slate-700 bg-slate-100 dark:bg-slate-700 dark:text-slate-200" delay={0.24} onClick={detail ? () => onDrill({ hasGithub: "1" }) : undefined} />
-        <Tile icon={Globe} value={s.totals.withAccess} label="Live" tone="text-indigo-700 bg-indigo-50 dark:bg-indigo-500/15 dark:text-indigo-200" delay={0.27} onClick={detail ? () => onDrill({ hasAccess: "1" }) : undefined} />
         <Tile icon={AlertTriangle} value={s.totals.changesRequested} label="Changes requested" tone="text-yellow-800 bg-yellow-50 dark:bg-yellow-500/15 dark:text-yellow-200" delay={0.3} onClick={detail ? () => onDrill({ review: "CHANGES_REQUESTED" }) : undefined} />
+        <Tile icon={Briefcase} value={s.totals.staffProjects} label="Staff & others' projects" tone="text-slate-700 bg-slate-100 dark:bg-slate-700 dark:text-slate-200" delay={0.36} onClick={detail ? () => onDrill({ ownerType: "STAFF" }) : undefined} />
         <Tile icon={Activity} value={`${s.totals.avgProgress}%`} label="Average progress" tone="text-cyan-700 bg-cyan-50 dark:bg-cyan-500/15 dark:text-cyan-200" delay={0.33} />
       </div>
 
