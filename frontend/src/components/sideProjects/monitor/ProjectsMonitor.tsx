@@ -149,14 +149,14 @@ const ProjectsMonitor: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-4 px-4 py-6">
-      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-900 to-blue-700 p-5 text-white shadow-float">
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-900 to-blue-700 p-5 text-white ">
         <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" aria-hidden />
         <div className="absolute -bottom-16 right-32 h-40 w-40 rounded-full bg-blue-500/20" aria-hidden />
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight">All projects</h1>
             <p className="mt-1 flex items-center gap-2 text-xs text-white/70">
-              {loading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400" aria-hidden />}
+              {loading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <span className="h-2 w-2 rounded-full bg-emerald-400 " aria-hidden />}
               {refreshedAt ? `Updated ${timeAgo(refreshedAt.toISOString())}` : "Loading"}
             </p>
           </div>
@@ -167,14 +167,14 @@ const ProjectsMonitor: React.FC = () => {
                 <a href={sideProjectsApi.exportUrl({ ...filters }, "csv")} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-sm font-semibold backdrop-blur hover:bg-white/20"><Download className="h-4 w-4" /> CSV</a>
               </>
             )}
-            {me?.manageAny && <button type="button" onClick={() => setImportOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-sm font-bold text-blue-700 shadow hover:bg-blue-50"><Upload className="h-4 w-4" /> Import</button>}
+            {me?.manageAny && <button type="button" onClick={() => setImportOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50"><Upload className="h-4 w-4" /> Import</button>}
             <button type="button" onClick={load} aria-label="Refresh" className="rounded-full bg-white/10 p-2 hover:bg-white/20"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button>
           </div>
         </div>
         <nav className="relative mt-4 flex gap-1" role="tablist">
           {tabs.filter((t) => t.show).map((t) => (
             <button key={t.key} type="button" role="tab" aria-selected={effectiveTab === t.key} onClick={() => patch({ tab: t.key })} className={`relative inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold transition ${effectiveTab === t.key ? "text-blue-700" : "text-white/80 hover:bg-white/10"}`}>
-              {effectiveTab === t.key && <motion.span layoutId="spm-tab" className="absolute inset-0 rounded-full bg-white shadow" />}
+              {effectiveTab === t.key && <motion.span layoutId="spm-tab" className="absolute inset-0 rounded-full bg-white " />}
               <t.icon className="relative h-4 w-4" aria-hidden /> <span className="relative">{t.label}</span>
             </button>
           ))}

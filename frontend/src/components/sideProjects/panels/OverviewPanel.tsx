@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Check, ExternalLink, Figma, Flag, FileText, Github, Globe, Link2, Pencil, Plus, Store, Trash2, UserCheck, Video, X } from "lucide-react";
+import { Calendar, Check, ExternalLink, Figma, Flag, Quote, Tag, Trophy, FileText, Github, Globe, Link2, Pencil, Plus, Store, Trash2, UserCheck, Video, X } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type LinkKind, type ProjectDetail } from "../../../api/sideProjects";
 import { useToast } from "../../../contexts/ToastContext";
 import UserAvatar from "../../ui/UserAvatar";
@@ -75,66 +75,125 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
 
   if (!edit) {
     const CatIcon = CATEGORY_ICON[p.category?.icon ?? "sparkles"] ?? CATEGORY_ICON.sparkles;
+    const catColor = p.category?.color ?? "#64748b";
+    const canEdit = p.rights.edit && !staff;
+    const links = [
+      ...(p.githubUrl ? [{ key: "gh", href: p.githubUrl, icon: Github, label: "GitHub", sub: p.githubUrl.replace("https://github.com/", "") }] : []),
+      ...(p.accessUrl ? [{ key: "live", href: p.accessUrl, icon: Globe, label: "Live app", sub: hostOf(p.accessUrl) }] : []),
+      ...p.links.map((l) => ({ key: `l${l.id}`, href: l.url, icon: LINK_ICON[l.kind], label: l.label, sub: hostOf(l.url) })),
+    ];
     return (
-      <div className="space-y-4">
-        {p.rights.edit && !staff && (
-          <div className="flex justify-end">
-            <button type="button" className={secondaryBtn} onClick={() => setEdit(true)}>
-              <Pencil className="h-4 w-4" /> Edit
+      <div className="space-y-5">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">About this project</h3>
+          {canEdit && (
+            <button type="button" className={`${secondaryBtn} !min-h-[36px] !px-4 !py-1.5`} onClick={() => setEdit(true)}>
+              <Pencil className="h-3.5 w-3.5" /> Edit
             </button>
+          )}
+        </div>
+
+        {/* Problem (and outcome) */}
+        <section className={`${cardCls} relative overflow-hidden p-5 pl-6`}>
+          <span className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-blue-600 to-blue-400" aria-hidden />
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+              <Quote className="h-4 w-4" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">The problem</p>
+              <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-slate-800 dark:text-gray-100">{p.problemStatement}</p>
+              {p.description && <p className="mt-3 whitespace-pre-line border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-600 dark:border-gray-700/40 dark:text-gray-300">{p.description}</p>}
+            </div>
           </div>
-        )}
-        <section className={`${cardCls} p-4`}>
-          <h3 className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-gray-400">Problem</h3>
-          <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700 dark:text-gray-200">{p.problemStatement}</p>
-          {p.description && <p className="mt-3 whitespace-pre-line border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-600 dark:border-gray-700/40 dark:text-gray-300">{p.description}</p>}
           {p.outcomeSummary && (
-            <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-100">
-              <Check className="mr-1 inline h-4 w-4" /> {p.outcomeSummary}
+            <div className="mt-4 flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-500/10">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                <Trophy className="h-4 w-4" aria-hidden />
+              </span>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Outcome</p>
+                <p className="mt-0.5 text-sm text-emerald-900 dark:text-emerald-100">{p.outcomeSummary}</p>
+              </div>
             </div>
           )}
         </section>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className={`${cardCls} flex items-center gap-3 p-3`}>
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${p.category?.color ?? "#94a3b8"}22` }}>
-              <CatIcon className="h-5 w-5" style={{ color: p.category?.color ?? "#64748b" }} aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-slate-800 dark:text-white">{p.category?.name ?? "—"}</p>
-              <div className="mt-1 flex flex-wrap gap-1">
+
+        {/* Facts */}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <FactTile label="Category" icon={Tag}>
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: `${catColor}1a`, color: catColor }}>
+                <CatIcon className="h-[18px] w-[18px]" aria-hidden />
+              </span>
+              <span className="truncate text-sm font-bold text-slate-900 dark:text-white">{p.category?.name ?? "Not set"}</span>
+            </div>
+            {p.techTags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1">
                 {p.techTags.map((t) => (
-                  <span key={t} className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-gray-700/50 dark:text-gray-300">{t}</span>
+                  <span key={t} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-gray-700/60 dark:text-gray-300">
+                    {t}
+                  </span>
                 ))}
               </div>
-            </div>
-          </div>
-          <div className={`${cardCls} flex items-center gap-3 p-3`}>
-            <Calendar className="h-5 w-5 text-slate-400" aria-hidden />
-            <div className="flex flex-1 items-center justify-between gap-2 text-xs">
-              <div><p className="text-slate-500 dark:text-gray-400">Start</p><p className="font-bold text-slate-800 dark:text-white">{fmtDate(p.startDate) ?? "—"}</p></div>
-              <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-slate-300 dark:from-slate-600 dark:to-slate-500" />
-              <div className="text-right"><p className="text-slate-500 dark:text-gray-400">Target</p><p className="font-bold text-slate-800 dark:text-white">{fmtDate(p.targetDate) ?? "—"}</p></div>
-            </div>
-          </div>
-          <div className={`${cardCls} flex items-center gap-3 p-3`}>
-            <UserCheck className="h-5 w-5 text-slate-400" aria-hidden />
-            {p.supervisor ? (
-              <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-gray-100">
-                <UserAvatar name={p.supervisor.name} userId={p.supervisor.id} size={26} decorative /> {p.supervisor.name}
-              </span>
-            ) : (
-              <span className="text-sm text-slate-500 dark:text-gray-400">—</span>
             )}
-          </div>
+          </FactTile>
+          <TimelineTile start={p.startDate ?? p.startedAt?.slice(0, 10) ?? p.createdAt.slice(0, 10)} target={p.targetDate} done={p.status === "COMPLETED"} />
+          <FactTile label="Supervisor" icon={UserCheck}>
+            {p.supervisor ? (
+              <div className="flex items-center gap-2.5">
+                <UserAvatar name={p.supervisor.name} userId={p.supervisor.id} size={36} decorative />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{p.supervisor.name}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-gray-400">Guides this project</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-dashed border-slate-300 text-slate-400 dark:border-gray-600">
+                  <UserCheck className="h-4 w-4" aria-hidden />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-600 dark:text-gray-300">Not assigned</p>
+                  {canEdit && (
+                    <button type="button" onClick={() => setEdit(true)} className="text-[11px] font-semibold text-blue-600 hover:underline dark:text-blue-300">
+                      Add one
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </FactTile>
         </div>
-        {(p.githubUrl || p.accessUrl || p.links.length > 0) && (
-          <div className="flex flex-wrap gap-2">
-            {p.githubUrl && <ExtLink href={p.githubUrl} icon={Github} label={p.githubUrl.replace("https://github.com/", "")} />}
-            {p.accessUrl && <ExtLink href={p.accessUrl} icon={Globe} label={new URL(p.accessUrl).hostname} />}
-            {p.links.map((l) => (
-              <ExtLink key={l.id} href={l.url} icon={LINK_ICON[l.kind]} label={l.label} />
+
+        {/* Links */}
+        {links.length > 0 ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {links.map((l) => (
+              <a
+                key={l.key}
+                href={l.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${cardCls} group flex items-center gap-3 p-3 transition hover:-translate-y-0.5 hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`}
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white transition group-hover:bg-blue-600 dark:bg-gray-700">
+                  <l.icon className="h-[18px] w-[18px]" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-slate-900 dark:text-white">{l.label}</span>
+                  <span className="block truncate text-xs text-slate-500 dark:text-gray-400">{l.sub}</span>
+                </span>
+                <ExternalLink className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-blue-600" aria-hidden />
+              </a>
             ))}
           </div>
+        ) : (
+          canEdit && (
+            <button type="button" onClick={() => setEdit(true)} className="flex w-full items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-slate-200 p-4 text-sm font-semibold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-400 dark:hover:bg-blue-500/10">
+              <Link2 className="h-4 w-4" aria-hidden /> Add a GitHub, live or demo link
+            </button>
+          )
         )}
       </div>
     );
@@ -182,7 +241,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
                       {LINK_KINDS.map((k) => {
                         const KI = LINK_ICON[k];
                         return (
-                          <button key={k} type="button" role="radio" aria-checked={l.kind === k} aria-label={k.toLowerCase()} title={k.charAt(0) + k.slice(1).toLowerCase()} onClick={() => linkAt(i, { kind: k })} className={`flex h-7 w-7 items-center justify-center rounded-full transition ${l.kind === k ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-gray-700/50"}`}>
+                          <button key={k} type="button" role="radio" aria-checked={l.kind === k} aria-label={k.toLowerCase()} title={k.charAt(0) + k.slice(1).toLowerCase()} onClick={() => linkAt(i, { kind: k })} className={`flex h-7 w-7 items-center justify-center rounded-full transition ${l.kind === k ? "bg-blue-600 text-white " : "text-slate-500 hover:bg-slate-100 dark:hover:bg-gray-700/50"}`}>
                             <KI className="h-3.5 w-3.5" />
                           </button>
                         );
@@ -231,6 +290,57 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
         </button>
       </div>
     </div>
+  );
+};
+
+const hostOf = (u: string) => {
+  try {
+    return new URL(u).hostname.replace(/^www\./, "");
+  } catch {
+    return u;
+  }
+};
+
+const FactTile: React.FC<{ label: string; icon: React.ElementType; children: React.ReactNode }> = ({ label, icon: Icon, children }) => (
+  <div className={`${cardCls} flex flex-col p-4`}>
+    <p className="mb-3 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">
+      <Icon className="h-3.5 w-3.5" aria-hidden /> {label}
+    </p>
+    {children}
+  </div>
+);
+
+const DAY = 86_400_000;
+/** Start → target with how much of the time has gone, and days left (or overdue). */
+const TimelineTile: React.FC<{ start: string; target: string | null; done: boolean }> = ({ start, target, done }) => {
+  const s = new Date(`${start.slice(0, 10)}T00:00:00Z`).getTime();
+  const t = target ? new Date(`${target}T00:00:00Z`).getTime() : null;
+  const now = Date.now();
+  const pct = t && t > s ? Math.max(0, Math.min(100, ((now - s) / (t - s)) * 100)) : 0;
+  const left = t ? Math.ceil((t - now) / DAY) : null;
+  const chip =
+    done ? { text: "Finished", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" }
+    : left === null ? { text: "No target", cls: "bg-slate-100 text-slate-600 dark:bg-gray-700/60 dark:text-gray-300" }
+    : left < 0 ? { text: `${-left}d overdue`, cls: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300" }
+    : left === 0 ? { text: "Due today", cls: "bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200" }
+    : { text: `${left}d left`, cls: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" };
+  return (
+    <FactTile label="Timeline" icon={Calendar}>
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span>
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">Start</span>
+          <span className="font-bold text-slate-900 dark:text-white">{fmtDate(start) ?? "—"}</span>
+        </span>
+        <span className="text-right">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">Target</span>
+          <span className="font-bold text-slate-900 dark:text-white">{fmtDate(target) ?? "—"}</span>
+        </span>
+      </div>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-700/60" role="img" aria-label={t ? `${Math.round(pct)}% of the time used` : "No target date"}>
+        <motion.div className={`h-full rounded-full ${left !== null && left < 0 && !done ? "bg-red-500" : "bg-gradient-to-r from-blue-600 to-blue-400"}`} initial={{ width: 0 }} animate={{ width: `${done ? 100 : pct}%` }} transition={{ duration: 0.8 }} />
+      </div>
+      <span className={`mt-2.5 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip.cls}`}>{chip.text}</span>
+    </FactTile>
   );
 };
 

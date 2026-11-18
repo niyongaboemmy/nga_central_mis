@@ -23,7 +23,7 @@ const Row: React.FC<{ m: Ms; canEdit: boolean; onToggle: () => void; onDelete: (
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: m.id, disabled: !canEdit });
   const overdue = !m.done && m.dueDate && m.dueDate < new Date().toISOString().slice(0, 10);
   return (
-    <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`group flex items-center gap-2 rounded-xl px-2 py-2 transition ${isDragging ? "bg-white shadow-float dark:bg-gray-700/50" : "hover:bg-slate-50 dark:hover:bg-gray-700/40"}`}>
+    <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`group flex items-center gap-2 rounded-xl px-2 py-2 transition ${isDragging ? "bg-white dark:bg-gray-700/50" : "hover:bg-slate-50 dark:hover:bg-gray-700/40"}`}>
       {canEdit && (
         <button type="button" className="cursor-grab text-slate-300 hover:text-slate-500 dark:text-slate-600" aria-label="Reorder" {...attributes} {...listeners}>
           <GripVertical className="h-4 w-4" />

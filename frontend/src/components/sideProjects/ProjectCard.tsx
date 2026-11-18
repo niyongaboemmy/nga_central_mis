@@ -21,8 +21,8 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
   const invited = card.myRole === "INVITED";
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition dark:bg-gray-800/40 ${
-        dragging ? "rotate-[1.5deg] scale-[1.02] border-brand-400 shadow-float" : "border-slate-200/80 hover:-translate-y-0.5 hover:shadow-soft dark:border-gray-700/40"
+      className={`group relative overflow-hidden rounded-2xl border bg-white text-left transition dark:bg-gray-800/40 ${
+        dragging ? "rotate-[1.5deg] scale-[1.02] border-brand-400 " : "border-slate-200/80 hover:-translate-y-0.5 dark:border-gray-700/40"
       } ${invited ? "ring-2 ring-dashed ring-blue-300" : ""}`}
     >
       <button type="button" onClick={() => onOpen(card.id)} className="block w-full text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30" aria-label={`Open ${card.title}`}>
@@ -36,7 +36,7 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
           )}
           <div className="absolute left-2 top-2 flex gap-1">
             {card.category && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-slate-700 shadow-sm backdrop-blur dark:bg-gray-900/80 dark:text-gray-100">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-slate-700 backdrop-blur dark:bg-gray-900/80 dark:text-gray-100">
                 <CatIcon className="h-3 w-3" style={{ color: card.category.color }} aria-hidden />
                 {card.category.name}
               </span>
@@ -128,7 +128,7 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
             <MoreHorizontal className="h-4 w-4" />
           </button>
           {menu && (
-            <div role="menu" className="absolute bottom-8 right-0 z-20 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-float dark:border-gray-700/60 dark:bg-gray-800" onPointerDown={(e) => e.stopPropagation()}>
+            <div role="menu" className="absolute bottom-8 right-0 z-20 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700/60 dark:bg-gray-800" onPointerDown={(e) => e.stopPropagation()}>
               {STATUS_ORDER.filter((s) => s !== card.status).map((s) => {
                 const M = STATUS_META[s];
                 return (

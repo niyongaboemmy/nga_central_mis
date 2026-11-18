@@ -31,4 +31,4 @@ SET u.`access_version` = u.`access_version` + 1;
 -- No violet/purple in the NGA palette (primary is blue): re-colour the two seeded categories
 -- that used it, only where nobody has changed them since migration 128.
 UPDATE `SideProjectCategory` SET `color` = '#14b8a6' WHERE `slug` = 'mobile' AND `color` = '#8b5cf6';
-UPDATE `SideProjectCategory` SET `color` = '#0284c7' WHERE `slug` = 'other' AND `color` = '#a855f7';
+UPDATE `SideProjectCategory` SET `color` = '#1d4ed8' WHERE `slug` = 'other' AND `color` IN ('#a855f7', '#0284c7');

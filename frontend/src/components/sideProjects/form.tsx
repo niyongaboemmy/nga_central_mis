@@ -29,7 +29,7 @@ export interface FormModalProps {
 const SIZES = { md: "sm:max-w-lg", lg: "sm:max-w-2xl", xl: "sm:max-w-5xl" };
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export const FormModal: React.FC<FormModalProps> = ({ open, onClose, title, subtitle, icon: Icon, tone = ["#2563eb", "#0ea5e9"], band, footer, size = "lg", busy, children }) => {
+export const FormModal: React.FC<FormModalProps> = ({ open, onClose, title, subtitle, icon: Icon, tone = ["#2563eb", "#2563eb"], band, footer, size = "lg", busy, children }) => {
   const titleId = useId();
   const descId = useId();
   const ref = useRef<HTMLDivElement>(null);
@@ -95,7 +95,7 @@ export const FormModal: React.FC<FormModalProps> = ({ open, onClose, title, subt
             aria-labelledby={titleId}
             aria-describedby={subtitle ? descId : undefined}
             tabIndex={-1}
-            className={`relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[28px] border border-slate-200/70 bg-white shadow-2xl focus:outline-none sm:max-h-[88vh] sm:rounded-[28px] dark:border-gray-700/40 dark:bg-gray-900 ${SIZES[size]}`}
+            className={`relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[28px] border border-slate-200/70 bg-white focus:outline-none sm:max-h-[88vh] sm:rounded-[28px] dark:border-gray-700/40 dark:bg-gray-900 ${SIZES[size]}`}
             initial={{ opacity: 0, y: 40, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.98 }}
@@ -104,7 +104,7 @@ export const FormModal: React.FC<FormModalProps> = ({ open, onClose, title, subt
             <div className="mx-auto mt-2.5 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden dark:bg-gray-700" aria-hidden />
             <header className="flex items-start gap-4 px-6 pb-4 pt-5 sm:px-8 sm:pt-7">
               {Icon && (
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg shadow-blue-600/20" style={{ background: `linear-gradient(135deg, ${tone[0]}, ${tone[1]})` }}>
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white " style={{ background: `linear-gradient(135deg, ${tone[0]}, ${tone[1]})` }}>
                   <Icon className="h-6 w-6" aria-hidden />
                 </span>
               )}
@@ -237,9 +237,9 @@ export function OptionCards<T extends string>({
             onClick={() => onChange(o.value)}
             whileTap={{ scale: 0.98 }}
             className={`relative flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-              on ? "bg-white shadow-md dark:bg-gray-800/60" : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm dark:border-gray-700/60 dark:bg-gray-800/30 dark:hover:border-gray-600"
+              on ? "bg-white dark:bg-gray-800/60" : "border-slate-200 bg-white hover:border-slate-300 dark:border-gray-700/60 dark:bg-gray-800/30 dark:hover:border-gray-600"
             }`}
-            style={on ? { borderColor: color, boxShadow: `0 8px 24px -12px ${color}66` } : undefined}
+            style={on ? { borderColor: color } : undefined}
           >
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition" style={{ backgroundColor: on ? color : `${color}14`, color: on ? "#fff" : color }}>
               <o.icon className="h-5 w-5" aria-hidden />

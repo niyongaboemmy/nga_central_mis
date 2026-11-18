@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Calendar, Check, Download, FileCheck2, FileUp, Github, Globe, Lightbulb, Link2, PenLine, Rocket, Sparkles, Target, Trash2, UserCheck, Users, Wand2,
+  ArrowLeft, ArrowRight, Calendar, Check, Clock, Download, FileCheck2, FileText, FileUp, Github, Globe, Image as ImageIcon, Lightbulb, Link2, Paperclip, PenLine, Rocket, Sparkles, Target, Trash2, UserCheck, Users, Wand2, X,
 } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type Status } from "../../api/sideProjects";
 import { CategoryPicker, PersonPicker, TagInput, checkGithub, checkHttps } from "./fields";
@@ -12,6 +12,7 @@ const DOC_ACCEPT = ".pdf,.doc,.docx,.odt,.md,.txt,.ppt,.pptx";
 const STEPS = [
   { key: "basics", icon: Lightbulb, label: "The idea", caption: "Title, problem, category" },
   { key: "concept", icon: FileCheck2, label: "Concept note", caption: "Upload or write it" },
+  { key: "attachments", icon: Paperclip, label: "Attachments", caption: "Optional · now or later" },
   { key: "launch", icon: Rocket, label: "Links & plan", caption: "All optional" },
 ] as const;
 
@@ -33,7 +34,7 @@ const addMonths = (n: number) => {
 
 /** Step band: three segments that fill as you go, each a button back to a finished step. */
 const StepBand: React.FC<{ step: number; onGo: (i: number) => void }> = ({ step, onGo }) => (
-  <ol className="grid grid-cols-3 gap-2" aria-label="Steps">
+  <ol className="grid grid-cols-4 gap-2" aria-label="Steps">
     {STEPS.map((s, i) => {
       const state = i < step ? "done" : i === step ? "now" : "next";
       return (
@@ -46,7 +47,7 @@ const StepBand: React.FC<{ step: number; onGo: (i: number) => void }> = ({ step,
             className="group w-full text-left focus:outline-none disabled:cursor-default"
           >
             <span className="relative block h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-gray-700/60">
-              <motion.span className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-blue-600 to-sky-500" initial={false} animate={{ width: state === "next" ? "0%" : "100%" }} transition={{ duration: 0.35 }} />
+              <motion.span className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-blue-600 to-blue-500" initial={false} animate={{ width: state === "next" ? "0%" : "100%" }} transition={{ duration: 0.35 }} />
             </span>
             <span className="mt-2 flex items-center gap-2">
               <span
@@ -79,7 +80,11 @@ const Preview: React.FC<{
   hasLive: boolean;
   target: string;
   checks: Array<{ label: string; ok: boolean }>;
-}> = ({ title, category, tags, status, conceptReady, hasGithub, hasLive, target, checks }) => {
+  srs?: boolean;
+  plan?: boolean;
+  mediaCount?: number;
+  cover?: string | null;
+}> = ({ title, category, tags, status, conceptReady, hasGithub, hasLive, target, checks, srs, plan, mediaCount = 0, cover }) => {
   const dark = useIsDark();
   const Icon = CATEGORY_ICON[category?.icon ?? "sparkles"] ?? Sparkles;
   const accent = category?.color ?? statusColor(status, dark);
@@ -88,13 +93,14 @@ const Preview: React.FC<{
   return (
     <aside className="space-y-4" aria-label="Preview">
       <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">Preview</p>
-      <motion.div layout className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-soft dark:border-gray-700/40 dark:bg-gray-800/40">
+      <motion.div layout className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-gray-700/40 dark:bg-gray-800/40">
         <div className="relative h-28 overflow-hidden" style={{ background: `linear-gradient(135deg, ${accent}33, ${accent}0d)` }}>
+          {cover && <motion.img key={cover} src={cover} alt="" initial={{ opacity: 0, scale: 1.08 }} animate={{ opacity: 1, scale: 1 }} className="absolute inset-0 h-full w-full object-cover" />}
           <motion.div key={category?.id ?? "none"} initial={{ scale: 0.6, opacity: 0, rotate: -10 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} className="flex h-full items-center justify-center">
             <Icon className="h-12 w-12" style={{ color: accent }} aria-hidden />
           </motion.div>
           <span className="absolute -right-6 -top-6 h-20 w-20 rounded-full" style={{ backgroundColor: `${accent}1f` }} aria-hidden />
-          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold shadow-sm dark:bg-gray-900/80" style={{ color: statusColor(status, dark) }}>
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold dark:bg-gray-900/80" style={{ color: statusColor(status, dark) }}>
             <S.icon className="h-3 w-3" aria-hidden /> {S.label}
           </span>
         </div>
@@ -114,7 +120,18 @@ const Preview: React.FC<{
             <span className={`inline-flex h-6 w-6 items-center justify-center rounded-lg ${conceptReady ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-slate-100 dark:bg-gray-700/60"}`} title="Concept note">
               <FileCheck2 className="h-3.5 w-3.5" aria-hidden />
             </span>
-            <span className="flex items-center gap-2">
+            {([["SRS", srs], ["Plan", plan]] as const).map(([l, on]) => (
+              <span key={l} className={`ml-1 inline-flex h-6 items-center rounded-lg px-1.5 text-[10px] font-bold ${on ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-gray-700/60 dark:text-gray-400"}`} title={l}>
+                {l}
+              </span>
+            ))}
+            <span className="ml-auto flex items-center gap-2">
+              {mediaCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold" title="Files">
+                  <ImageIcon className="h-3 w-3" aria-hidden />
+                  {mediaCount}
+                </span>
+              )}
               {target && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold">
                   <Calendar className="h-3 w-3" aria-hidden />
@@ -156,7 +173,37 @@ const Preview: React.FC<{
   );
 };
 
-/** New project in three steps. The concept note (a file or the short written form) is required. */
+/** One optional document: a compact dropzone, or the chosen file with a remove button. */
+const DocSlot: React.FC<{ label: string; file: File | null; onFile: (f: File | null) => void; accept: string; template: string }> = ({ label, file, onFile, accept, template }) => (
+  <div>
+    <p className="mb-1.5 text-[13px] font-semibold text-slate-700 dark:text-gray-200">{label}</p>
+    <AnimatePresence mode="wait">
+      {file ? (
+        <motion.div key="f" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white">
+            <Check className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs font-semibold text-slate-900 dark:text-white">{file.name}</span>
+            <span className="text-[11px] text-slate-600 dark:text-gray-300">{fmtBytes(file.size)}</span>
+          </span>
+          <button type="button" aria-label={`Remove ${label}`} onClick={() => onFile(null)} className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-white hover:text-red-600 dark:hover:bg-gray-800">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </motion.div>
+      ) : (
+        <motion.div key="d" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <Dropzone compact onFiles={(f) => onFile(f[0])} accept={accept} label={`Add the ${label}`} hint="PDF · Word · Markdown" />
+        </motion.div>
+      )}
+    </AnimatePresence>
+    <a href={template} download className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline dark:text-blue-300">
+      <Download className="h-3 w-3" /> Template
+    </a>
+  </div>
+);
+
+/** New project in four steps. The concept note (a file or the short written form) is required. */
 const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", categories, onClose, onCreated }) => {
   const dark = useIsDark();
   const [step, setStep] = useState(0);
@@ -167,6 +214,12 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   const [tags, setTags] = useState<string[]>([]);
   const [mode, setMode] = useState<"upload" | "write">("upload");
   const [file, setFile] = useState<File | null>(null);
+  const [srs, setSrs] = useState<File | null>(null);
+  const [plan, setPlan] = useState<File | null>(null);
+  const [media, setMedia] = useState<File[]>([]);
+  const [mediaErr, setMediaErr] = useState<string | null>(null);
+  const [phase, setPhase] = useState<string | null>(null);
+  const [attachNote, setAttachNote] = useState<string | null>(null);
   const [written, setWritten] = useState({ users: "", solution: "", impact: "" });
   const [github, setGithub] = useState("");
   const [access, setAccess] = useState("");
@@ -187,6 +240,12 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       setTags([]);
       setMode("upload");
       setFile(null);
+      setSrs(null);
+      setPlan(null);
+      setMedia([]);
+      setMediaErr(null);
+      setPhase(null);
+      setAttachNote(null);
       setWritten({ users: "", solution: "", impact: "" });
       setGithub("");
       setAccess("");
@@ -220,7 +279,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
         if (written.impact.trim().length < 10) e["concept.impact"] = "At least 10 characters";
       }
     }
-    if (s === 2) {
+    if (s === 3) {
       const g = checkGithub(github);
       if (g) e.githubUrl = g;
       const a = checkHttps(access);
@@ -240,7 +299,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   };
 
   const submit = async () => {
-    const all = { ...check(0), ...check(1), ...check(2) };
+    const all = { ...check(0), ...check(1), ...check(3) };
     setErrors(all);
     if (Object.keys(all).length) {
       if (all.title || all.problemStatement) setStep(0);
@@ -262,9 +321,27 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
         status,
       };
       if (mode === "write") fields.conceptWritten = { problem: problem.trim(), ...written };
+      setPhase(mode === "upload" ? "Uploading the concept" : "Creating");
       const r = await sideProjectsApi.create(fields, mode === "upload" ? file : null, setProgress);
+      // Attachments go up right after the project exists; a failed one never undoes the project.
+      const jobs: Array<[string, () => Promise<unknown>]> = [
+        ...(srs ? ([["SRS", () => sideProjectsApi.uploadDocument(r.id, "SRS", srs, setProgress)]] as Array<[string, () => Promise<unknown>]>) : []),
+        ...(plan ? ([["implementation plan", () => sideProjectsApi.uploadDocument(r.id, "IMPLEMENTATION_PLAN", plan, setProgress)]] as Array<[string, () => Promise<unknown>]>) : []),
+        ...(media.length ? ([[`${media.length} file${media.length > 1 ? "s" : ""}`, () => sideProjectsApi.uploadMedia(r.id, media, setProgress)]] as Array<[string, () => Promise<unknown>]>) : []),
+      ];
+      const failed: string[] = [];
+      for (const [i, [label, run]] of jobs.entries()) {
+        setPhase(`Attachments ${i + 1}/${jobs.length}`);
+        setProgress(0);
+        try {
+          await run();
+        } catch (e) {
+          failed.push(`${label} (${failure(e).message})`);
+        }
+      }
+      if (failed.length) setAttachNote(`Couldn't attach: ${failed.join("; ")}. Add it from the project's tabs.`);
       setDone(true);
-      setTimeout(() => onCreated(r.id), 1100);
+      setTimeout(() => onCreated(r.id), failed.length ? 3500 : 1100);
     } catch (e) {
       const f = failure(e);
       setErrors({ [f.field ?? "form"]: f.message });
@@ -272,8 +349,23 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       else if (f.field?.startsWith("concept") || f.field === "file") setStep(1);
     } finally {
       setBusy(false);
+      setPhase(null);
     }
   };
+
+  const attachCount = (srs ? 1 : 0) + (plan ? 1 : 0) + media.length;
+  const addMedia = (files: File[]) => {
+    setMediaErr(null);
+    const video = files.find((f) => /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(f.name));
+    if (video) setMediaErr("Videos aren't uploaded: add them as a Video link.");
+    const ok = files.filter((f) => f !== video && !media.some((m) => m.name === f.name && m.size === f.size));
+    const next = [...media, ...ok];
+    if (next.length > 10) setMediaErr("Up to 10 files at once. Add more later from the Gallery.");
+    setMedia(next.slice(0, 10));
+  };
+  const previews = useMemo(() => media.map((m) => (m.type.startsWith("image/") ? URL.createObjectURL(m) : null)), [media]);
+  useEffect(() => () => previews.forEach((u) => u && URL.revokeObjectURL(u)), [previews]);
+  const coverPreview = previews.find(Boolean) ?? null;
 
   const err = (k: string) => errors[k];
   const variants = useMemo(() => ({ enter: (d: number) => ({ x: d * 32, opacity: 0 }), center: { x: 0, opacity: 1 }, exit: (d: number) => ({ x: d * -32, opacity: 0 }) }), []);
@@ -290,16 +382,20 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
         <ArrowLeft className="h-4 w-4" /> {step === 0 ? "Cancel" : "Back"}
       </button>
       <div className="flex items-center gap-2">
-        <span className="hidden text-xs text-slate-500 sm:inline dark:text-gray-400">Step {step + 1} of 3</span>
-        {step < 2 ? (
+        <span className="hidden text-xs text-slate-500 sm:inline dark:text-gray-400">Step {step + 1} of 4</span>
+        {step === 2 && attachCount === 0 ? (
           <button type="button" className={primaryBtn} onClick={() => go(step + 1)}>
-            Continue <ArrowRight className="h-4 w-4" />
+            <Clock className="h-4 w-4" /> Do it later &amp; continue
+          </button>
+        ) : step < 3 ? (
+          <button type="button" className={primaryBtn} onClick={() => go(step + 1)}>
+            Continue{step === 2 ? ` with ${attachCount}` : ""} <ArrowRight className="h-4 w-4" />
           </button>
         ) : (
           <button type="button" className={primaryBtn} onClick={submit} disabled={busy}>
             {busy ? (
               <>
-                <Spinner className="h-4 w-4" /> {progress < 100 && mode === "upload" ? `Uploading ${progress}%` : "Creating"}
+                <Spinner className="h-4 w-4" /> {phase ?? "Creating"}{progress > 0 && progress < 100 ? ` · ${progress}%` : ""}
               </>
             ) : (
               <>
@@ -320,7 +416,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       size="xl"
       icon={Wand2}
       title="New project"
-      subtitle={done ? "All set" : "Three quick steps. Only the idea and the concept note are required."}
+      subtitle={done ? "All set" : "Four quick steps. Only the idea and the concept note are required."}
       band={done ? undefined : <StepBand step={step} onGo={go} />}
       footer={footer}
     >
@@ -330,19 +426,20 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
             <motion.span
               key={i}
               className="absolute h-2 w-2 rounded-full"
-              style={{ backgroundColor: ["#2563eb", "#0ea5e9", "#10b981", "#f59e0b", "#eb6834"][i % 5], top: "45%", left: "50%" }}
+              style={{ backgroundColor: ["#2563eb", "#2563eb", "#10b981", "#f59e0b", "#eb6834"][i % 5], top: "45%", left: "50%" }}
               initial={{ x: 0, y: 0, opacity: 1 }}
               animate={{ x: Math.cos((i / 10) * Math.PI * 2) * 140, y: Math.sin((i / 10) * Math.PI * 2) * 90, opacity: 0 }}
               transition={{ duration: 1 }}
               aria-hidden
             />
           ))}
-          <motion.span initial={{ rotate: -45, scale: 0.5 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: "spring", stiffness: 220, damping: 12 }} className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/30">
+          <motion.span initial={{ rotate: -45, scale: 0.5 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: "spring", stiffness: 220, damping: 12 }} className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white ">
             <Check className="h-10 w-10" />
           </motion.span>
           <div>
             <p className="text-lg font-bold text-slate-900 dark:text-white">{title}</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">Added to {STATUS_META[status].label}</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">Added to {STATUS_META[status].label}{attachCount && !attachNote ? ` with ${attachCount} attachment${attachCount > 1 ? "s" : ""}` : ""}</p>
+            {attachNote && <p role="alert" className="mx-auto mt-3 max-w-md rounded-2xl bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">{attachNote}</p>}
           </div>
         </motion.div>
       ) : (
@@ -383,7 +480,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
                         <AnimatePresence mode="wait">
                           {file ? (
                             <motion.div key="file" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
+                              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white ">
                                 <Check className="h-6 w-6" />
                               </span>
                               <div className="min-w-0 flex-1">
@@ -421,6 +518,50 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
                 )}
 
                 {step === 2 && (
+                  <>
+                    <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-blue-50 to-blue-50 p-4 dark:from-blue-500/10 dark:to-blue-500/10">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-600 dark:bg-gray-800 dark:text-blue-300">
+                        <Lightbulb className="h-5 w-5" aria-hidden />
+                      </span>
+                      <p className="text-sm text-slate-700 dark:text-gray-200">
+                        <span className="font-semibold">Optional.</span> Skip it now and add them anytime from the project's <span className="font-semibold">Documents</span> and <span className="font-semibold">Gallery</span> tabs.
+                      </p>
+                    </div>
+                    <FormSection title="Documents" icon={FileText}>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <DocSlot label="SRS" file={srs} onFile={setSrs} accept=".pdf,.doc,.docx,.odt,.md,.txt" template="/templates/projects/srs.md" />
+                        <DocSlot label="Implementation plan" file={plan} onFile={setPlan} accept=".pdf,.doc,.docx,.odt,.md,.txt,.xls,.xlsx,.ppt,.pptx" template="/templates/projects/implementation-plan.md" />
+                      </div>
+                    </FormSection>
+                    <FormSection title="Screenshots & files" icon={ImageIcon} aside={<span className="text-xs font-semibold tabular-nums text-slate-500 dark:text-gray-400">{media.length}/10</span>}>
+                      <Dropzone multiple compact onFiles={addMedia} accept="image/*,.pdf,.ppt,.pptx,.xls,.xlsx,.csv,.zip,.md,.txt,.json,.py,.js,.ts,.html,.css,.sql" label="Drop screenshots, diagrams, files" hint="The first image becomes the cover" error={mediaErr} disabled={media.length >= 10} />
+                      {media.length > 0 && (
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                          <AnimatePresence initial={false}>
+                            {media.map((m, i) => (
+                              <motion.div key={`${m.name}-${m.size}`} layout initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} className="group relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-gray-700/40 dark:bg-gray-800/40">
+                                {previews[i] ? (
+                                  <img src={previews[i] as string} alt={m.name} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full flex-col items-center justify-center gap-1 p-2 text-center">
+                                    <FileText className="h-7 w-7 text-blue-500" aria-hidden />
+                                    <span className="line-clamp-2 text-[10px] font-semibold text-slate-600 dark:text-gray-300">{m.name}</span>
+                                  </div>
+                                )}
+                                {i === previews.findIndex(Boolean) && <span className="absolute left-1.5 top-1.5 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white ">Cover</span>}
+                                <button type="button" aria-label={`Remove ${m.name}`} onClick={() => setMedia((x) => x.filter((_, j) => j !== i))} className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white/90 text-slate-600 opacity-0 transition hover:text-red-600 focus:opacity-100 group-hover:opacity-100 dark:bg-gray-900/90 dark:text-gray-300">
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                        </div>
+                      )}
+                    </FormSection>
+                  </>
+                )}
+
+                {step === 3 && (
                   <>
                     <FormSection title="Links" icon={Link2}>
                       <div className="grid gap-4 sm:grid-cols-2">
@@ -471,7 +612,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
           </div>
           <div className="hidden md:block">
             <div className="sticky top-0">
-              <Preview title={title.trim()} category={category} tags={tags} status={status} conceptReady={conceptReady} hasGithub={!!github.trim()} hasLive={!!access.trim()} target={target} checks={checks} />
+              <Preview title={title.trim()} category={category} tags={tags} status={status} conceptReady={conceptReady} hasGithub={!!github.trim()} hasLive={!!access.trim()} target={target} checks={checks} srs={!!srs} plan={!!plan} mediaCount={media.length} cover={coverPreview} />
             </div>
           </div>
         </div>
