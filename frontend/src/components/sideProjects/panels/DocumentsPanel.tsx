@@ -69,20 +69,20 @@ const Slot: React.FC<{ type: DocType; slot: { current: DocVersion | null; versio
   return (
     <motion.div layout className={`${cardCls} overflow-hidden`}>
       <div className="flex items-center gap-3 p-3">
-        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${cur ? "bg-emerald-500 text-white" : pending ? "bg-red-500 text-white" : "bg-slate-100 text-slate-400 dark:bg-slate-700"}`}>
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${cur ? "bg-emerald-500 text-white" : pending ? "bg-red-500 text-white" : "bg-slate-100 text-slate-400 dark:bg-gray-700/50"}`}>
           <M.icon className="h-5 w-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-white">
             {M.label}
             {M.required && <Lock className="h-3 w-3 text-slate-400" aria-label="Required" />}
-            {cur && <span className="rounded-md bg-slate-100 px-1.5 text-[10px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">v{cur.version}</span>}
-            {cur?.source === "WRITTEN" && <Sparkles className="h-3 w-3 text-brand-500" aria-label="Written in the form" />}
+            {cur && <span className="rounded-md bg-slate-100 px-1.5 text-[10px] font-bold text-slate-600 dark:bg-gray-700/50 dark:text-gray-300">v{cur.version}</span>}
+            {cur?.source === "WRITTEN" && <Sparkles className="h-3 w-3 text-blue-500" aria-label="Written in the form" />}
           </p>
           {cur ? (
-            <p className="truncate text-xs text-slate-500 dark:text-slate-400">{cur.name} · {fmtBytes(cur.size)} · {timeAgo(cur.createdAt)}</p>
+            <p className="truncate text-xs text-slate-500 dark:text-gray-400">{cur.name} · {fmtBytes(cur.size)} · {timeAgo(cur.createdAt)}</p>
           ) : (
-            <a href={TEMPLATE[type]} download className="text-xs font-semibold text-brand-600 hover:underline dark:text-brand-200">Template</a>
+            <a href={TEMPLATE[type]} download className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-200">Template</a>
           )}
         </div>
         {cur && (
@@ -98,19 +98,19 @@ const Slot: React.FC<{ type: DocType; slot: { current: DocVersion | null; versio
         )}
       </div>
       {showVersions && (
-        <ul className="border-t border-slate-100 px-3 py-2 dark:border-slate-700">
+        <ul className="border-t border-slate-100 px-3 py-2 dark:border-gray-700/40">
           {slot.versions.map((v) => (
-            <li key={v.id} className="flex items-center gap-2 py-1 text-xs text-slate-600 dark:text-slate-300">
-              <span className={`rounded-md px-1.5 font-bold ${v.isCurrent ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-100" : "bg-slate-100 dark:bg-slate-700"}`}>v{v.version}</span>
+            <li key={v.id} className="flex items-center gap-2 py-1 text-xs text-slate-600 dark:text-gray-300">
+              <span className={`rounded-md px-1.5 font-bold ${v.isCurrent ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-100" : "bg-slate-100 dark:bg-gray-700/50"}`}>v{v.version}</span>
               <span className="flex-1 truncate">{v.name}</span>
               <span className="text-slate-400">{timeAgo(v.createdAt)}</span>
-              <button type="button" className="text-brand-600 dark:text-brand-200" onClick={() => onPreview(v)} aria-label={`Preview v${v.version}`}><Eye className="h-3.5 w-3.5" /></button>
+              <button type="button" className="text-blue-600 dark:text-blue-200" onClick={() => onPreview(v)} aria-label={`Preview v${v.version}`}><Eye className="h-3.5 w-3.5" /></button>
             </li>
           ))}
         </ul>
       )}
       {canEdit && (
-        <div className="border-t border-slate-100 p-3 dark:border-slate-700">
+        <div className="border-t border-slate-100 p-3 dark:border-gray-700/40">
           <Dropzone compact onFiles={upload} accept={ACCEPT[type]} busy={busy} progress={progress} error={error} label={cur ? "Replace" : "Add"} icon={cur ? RefreshCw : undefined} />
         </div>
       )}
@@ -125,9 +125,9 @@ const DocumentsPanel: React.FC<{ p: ProjectDetail; onChanged: () => void }> = ({
     <div className="space-y-3">
       <div className="flex items-center gap-2" aria-label={`${filled} of 3 documents`}>
         {[0, 1, 2].map((i) => (
-          <motion.span key={i} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: i * 0.1 }} className={`h-1.5 flex-1 origin-left rounded-full ${i < filled ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-700"}`} />
+          <motion.span key={i} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: i * 0.1 }} className={`h-1.5 flex-1 origin-left rounded-full ${i < filled ? "bg-emerald-500" : "bg-slate-200 dark:bg-gray-700/50"}`} />
         ))}
-        <span className="text-xs font-bold tabular-nums text-slate-600 dark:text-slate-300">{filled}/3</span>
+        <span className="text-xs font-bold tabular-nums text-slate-600 dark:text-gray-300">{filled}/3</span>
       </div>
       {(["CONCEPT", "SRS", "IMPLEMENTATION_PLAN"] as DocType[]).map((t) => (
         <Slot key={t} type={t} slot={p.documents[t]} canEdit={p.rights.edit} pending={t === "CONCEPT" && p.conceptPending} projectId={p.id} onChanged={onChanged} onPreview={setPreview} />

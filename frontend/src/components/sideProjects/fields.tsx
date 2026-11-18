@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Github, Image as ImageIcon, PartyPopper, Search, Undo2, X } from "lucide-react";
-import Modal from "../ui/Modal";
+import { Check, Search, X } from "lucide-react";
 import UserAvatar from "../ui/UserAvatar";
-import { sideProjectsApi, type Category, type Status } from "../../api/sideProjects";
-import { CATEGORY_ICON, FieldError, inputCls, inputErrCls, labelCls, primaryBtn, secondaryBtn, Spinner, STATUS_META, statusColor, useIsDark } from "./ui";
+import { sideProjectsApi, type Category } from "../../api/sideProjects";
+import { CATEGORY_ICON, FieldError, inputCls, inputErrCls, Spinner } from "./ui";
 
 /** Shared client-side checks — the same limits the server enforces. */
 export const GITHUB_RE = /^https:\/\/github\.com\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}\/?$/;
@@ -32,9 +31,9 @@ export const CharMeter: React.FC<{ value: string; min: number; max: number }> = 
   const r = 7;
   const c = 2 * Math.PI * r;
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] tabular-nums text-slate-500 dark:text-slate-400" aria-live="polite">
+    <span className="inline-flex items-center gap-1 text-[10px] tabular-nums text-slate-500 dark:text-gray-400" aria-live="polite">
       <svg width="18" height="18" className="-rotate-90" aria-hidden>
-        <circle cx="9" cy="9" r={r} fill="none" strokeWidth="2.5" className="stroke-slate-200 dark:stroke-slate-700" />
+        <circle cx="9" cy="9" r={r} fill="none" strokeWidth="2.5" className="stroke-slate-200 dark:stroke-gray-700" />
         <circle cx="9" cy="9" r={r} fill="none" strokeWidth="2.5" strokeLinecap="round" stroke={n > max ? "#d03b3b" : ok ? "#0ca30c" : "#3b6cff"} strokeDasharray={c} strokeDashoffset={c - (pct / 100) * c} />
       </svg>
       {n < min ? `${min - n}` : `${n}/${max}`}
@@ -48,20 +47,28 @@ export const CategoryPicker: React.FC<{ categories: Category[]; value: number | 
       const Icon = CATEGORY_ICON[c.icon] ?? CATEGORY_ICON.sparkles;
       const on = value === c.id;
       return (
-        <button
+        <motion.button
           key={c.id}
           type="button"
           role="radio"
           aria-checked={on}
+          whileTap={{ scale: 0.95 }}
           onClick={() => onChange(on ? null : c.id)}
-          className={`flex flex-col items-center gap-1 rounded-2xl border p-2 text-[11px] font-semibold transition ${
-            on ? "border-transparent text-white shadow-md" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+          className={`group relative flex flex-col items-center gap-2 rounded-2xl border-2 px-2 py-3 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+            on ? "bg-white text-slate-900 shadow-md dark:bg-gray-800/60 dark:text-white" : "border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm dark:border-gray-700/60 dark:bg-gray-800/30 dark:text-gray-300"
           }`}
-          style={on ? { backgroundColor: c.color } : undefined}
+          style={on ? { borderColor: c.color, boxShadow: `0 8px 20px -12px ${c.color}` } : undefined}
         >
-          <Icon className="h-5 w-5" style={on ? undefined : { color: c.color }} aria-hidden />
-          <span className="leading-tight">{c.name}</span>
-        </button>
+          <span className="flex h-9 w-9 items-center justify-center rounded-full transition" style={{ backgroundColor: on ? c.color : `${c.color}17`, color: on ? "#fff" : c.color }}>
+            <Icon className="h-[18px] w-[18px]" aria-hidden />
+          </span>
+          <span className="text-center leading-tight">{c.name}</span>
+          {on && (
+            <motion.span layoutId="cat-check" className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full text-white" style={{ backgroundColor: c.color }}>
+              <Check className="h-2.5 w-2.5" />
+            </motion.span>
+          )}
+        </motion.button>
       );
     })}
   </div>
@@ -85,14 +92,14 @@ export const TagInput: React.FC<{ value: string[]; onChange: (v: string[]) => vo
   const shown = sugg.filter((s) => !value.some((v) => v.toLowerCase() === s.toLowerCase())).slice(0, 8);
   return (
     <div>
-      <div className={`${inputCls} flex flex-wrap items-center gap-1.5`}>
+      <div className={`${inputCls} flex flex-wrap items-center gap-1.5 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/15`}>
         {value.map((t) => (
-          <span key={t} className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">
+          <motion.span key={t} layout initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="inline-flex items-center gap-1 rounded-full bg-blue-50 py-0.5 pl-2.5 pr-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-500/30">
             {t}
-            <button type="button" aria-label={`Remove ${t}`} onClick={() => onChange(value.filter((v) => v !== t))}>
+            <button type="button" aria-label={`Remove ${t}`} onClick={() => onChange(value.filter((v) => v !== t))} className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-blue-100 dark:hover:bg-blue-500/30">
               <X className="h-3 w-3" />
             </button>
-          </span>
+          </motion.span>
         ))}
         <input
           value={text}
@@ -109,9 +116,10 @@ export const TagInput: React.FC<{ value: string[]; onChange: (v: string[]) => vo
         />
       </div>
       {shown.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-gray-400">Popular:</span>
           {shown.map((s) => (
-            <button key={s} type="button" onClick={() => add(s)} className="rounded-lg border border-dashed border-slate-300 px-2 py-0.5 text-[11px] text-slate-600 hover:border-brand-500 hover:text-brand-700 dark:border-slate-600 dark:text-slate-300">
+            <button key={s} type="button" onClick={() => add(s)} className="rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 transition hover:border-solid hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-300 dark:hover:bg-blue-500/10">
               + {s}
             </button>
           ))}
@@ -167,19 +175,19 @@ export const PersonPicker: React.FC<{
   return (
     <div ref={box} className="relative">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
         <input
           value={q}
           onFocus={() => setOpen(true)}
           onChange={(e) => (setQ(e.target.value), setOpen(true))}
           placeholder={placeholder}
           aria-label={placeholder}
-          className={`${inputCls} pl-9 ${error ? inputErrCls : ""}`}
+          className={`${inputCls} pl-11 ${error ? inputErrCls : ""}`}
         />
         {busy && open && <Spinner className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />}
       </div>
       {open && list.length > 0 && (
-        <div className="absolute z-30 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-float dark:border-slate-600 dark:bg-slate-800">
+        <div className="absolute z-30 mt-2 max-h-60 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-float dark:border-gray-700/60 dark:bg-gray-800/40">
           {list.map((p) => (
             <button
               key={p.id}
@@ -189,14 +197,14 @@ export const PersonPicker: React.FC<{
                 setOpen(false);
                 setQ("");
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-gray-700/50"
             >
               <UserAvatar name={p.name} userId={p.id} size={24} decorative />
-              <span className="flex-1 truncate text-slate-700 dark:text-slate-100">{p.name}</span>
+              <span className="flex-1 truncate text-slate-700 dark:text-gray-100">{p.name}</span>
               {p.regNumber ? (
-                <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">{p.regNumber}</span>
+                <span className="text-[10px] font-mono text-slate-500 dark:text-gray-400">{p.regNumber}</span>
               ) : p.type ? (
-                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">{TYPE_LABEL[p.type] ?? p.type}</span>
+                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-gray-700/50 dark:text-gray-300">{TYPE_LABEL[p.type] ?? p.type}</span>
               ) : null}
             </button>
           ))}
@@ -204,62 +212,5 @@ export const PersonPicker: React.FC<{
       )}
       <FieldError message={error} />
     </div>
-  );
-};
-
-/**
- * Asked when a move needs words: completing (outcome, with nudges for a link and a
- * screenshot) or reopening a completed project (reason). Resolves the payload or null.
- */
-export const MoveDialog: React.FC<{
-  open: { to: Status; from: Status; title: string; hasLink: boolean; hasImage: boolean; correction?: boolean } | null;
-  busy: boolean;
-  error: string | null;
-  onCancel: () => void;
-  onConfirm: (payload: { outcomeSummary?: string; reason?: string }) => void;
-}> = ({ open, busy, error, onCancel, onConfirm }) => {
-  const dark = useIsDark();
-  const [text, setText] = useState("");
-  useEffect(() => setText(""), [open?.to, open?.title]);
-  if (!open) return null;
-  const completing = open.to === "COMPLETED" && !open.correction;
-  const min = completing ? 20 : 5;
-  const M = STATUS_META[open.to];
-  const ok = text.trim().length >= min;
-  return (
-    <Modal isOpen onClose={onCancel} title={<span className="flex items-center gap-2"><M.icon className="h-5 w-5" style={{ color: statusColor(open.to, dark) }} />{completing ? "Complete project" : open.correction ? "Correct status" : "Reopen project"}</span>} size="md">
-      <div className="space-y-4">
-        {completing && (
-          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-sky-50 p-3 dark:from-emerald-500/10 dark:to-sky-500/10">
-            <PartyPopper className="h-8 w-8 text-emerald-600" aria-hidden />
-            <div className="flex flex-1 gap-2">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${open.hasLink ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-100" : "bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100"}`}>
-                {open.hasLink ? <Check className="h-3 w-3" /> : <Github className="h-3 w-3" />} Link
-              </span>
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${open.hasImage ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-100" : "bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100"}`}>
-                {open.hasImage ? <Check className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />} Screenshot
-              </span>
-            </div>
-          </motion.div>
-        )}
-        <div>
-          <div className="flex items-center justify-between">
-            <label htmlFor="move-text" className={labelCls}>{completing ? "What did it achieve?" : "Why?"}</label>
-            <CharMeter value={text} min={min} max={completing ? 3000 : 500} />
-          </div>
-          <textarea id="move-text" autoFocus rows={completing ? 4 : 2} value={text} onChange={(e) => setText(e.target.value)} className={`${inputCls} ${error ? inputErrCls : ""}`} />
-          <FieldError message={error} />
-        </div>
-        <div className="flex justify-end gap-2">
-          <button type="button" className={secondaryBtn} onClick={onCancel}>
-            <Undo2 className="h-4 w-4" /> Cancel
-          </button>
-          <button type="button" className={primaryBtn} disabled={!ok || busy} onClick={() => onConfirm(completing ? { outcomeSummary: text.trim() } : { reason: text.trim() })}>
-            {busy ? <Spinner className="h-4 w-4" /> : <M.icon className="h-4 w-4" />}
-            {M.label}
-          </button>
-        </div>
-      </div>
-    </Modal>
   );
 };

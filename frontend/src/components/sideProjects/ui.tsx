@@ -52,7 +52,7 @@ export const HEALTH_META: Record<Health, { label: string; icon: React.ElementTyp
   OVERDUE: { label: "Overdue", icon: Clock3, color: "#d03b3b", cls: "text-red-700 dark:text-red-400" },
   BLOCKED: { label: "Blocked", icon: AlertOctagon, color: "#ec835a", cls: "text-orange-700 dark:text-orange-300" },
   DONE: { label: "Done", icon: BadgeCheck, color: "#0ca30c", cls: "text-green-700 dark:text-green-400" },
-  IDLE: { label: "Not started", icon: CircleDashed, color: "#94a3b8", cls: "text-slate-600 dark:text-slate-300" },
+  IDLE: { label: "Not started", icon: CircleDashed, color: "#94a3b8", cls: "text-slate-600 dark:text-gray-300" },
 };
 
 export const REVIEW_META: Record<ReviewState, { label: string; icon: React.ElementType; cls: string } | null> = {
@@ -142,7 +142,7 @@ export const ProgressRing: React.FC<{ value: number; size?: number; stroke?: num
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }} role="img" aria-label={label ?? `${v}% done`}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-slate-200 dark:stroke-slate-700" />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-slate-200 dark:stroke-gray-700" />
         <motion.circle
           cx={size / 2}
           cy={size / 2}
@@ -157,13 +157,13 @@ export const ProgressRing: React.FC<{ value: number; size?: number; stroke?: num
           transition={{ duration: 0.8, ease: "easeOut" }}
         />
       </svg>
-      <span className="absolute text-[11px] font-bold text-slate-700 dark:text-slate-100">{children ?? `${v}%`}</span>
+      <span className="absolute text-[11px] font-bold text-slate-700 dark:text-gray-100">{children ?? `${v}%`}</span>
     </div>
   );
 };
 
 export const ProgressBar: React.FC<{ value: number; color: string; className?: string }> = ({ value, color, className = "" }) => (
-  <div className={`h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-700 ${className}`} role="progressbar" aria-label={`${value}% done`} aria-valuenow={value} aria-valuemin={0} aria-valuemax={100}>
+  <div className={`h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-gray-700/50 ${className}`} role="progressbar" aria-label={`${value}% done`} aria-valuenow={value} aria-valuemin={0} aria-valuemax={100}>
     <motion.div className="h-full rounded-full" style={{ backgroundColor: color }} initial={{ width: 0 }} animate={{ width: `${value}%` }} transition={{ duration: 0.6 }} />
   </div>
 );
@@ -184,7 +184,7 @@ export const DocChips: React.FC<{ docs: Record<DocType, boolean>; pending?: bool
               ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
               : warn
                 ? "bg-red-100 text-red-700 animate-pulse dark:bg-red-500/15 dark:text-red-300"
-                : "bg-slate-100 text-slate-400 dark:bg-slate-700/60 dark:text-slate-500"
+                : "bg-slate-100 text-slate-400 dark:bg-gray-700/50 dark:text-gray-500"
           }`}
         >
           <Icon className="h-3.5 w-3.5" aria-hidden />
@@ -198,7 +198,7 @@ export const DocChips: React.FC<{ docs: Record<DocType, boolean>; pending?: bool
 export const Spinner: React.FC<{ className?: string }> = ({ className = "h-5 w-5" }) => <Loader2 className={`animate-spin ${className}`} aria-hidden />;
 
 export const Skeleton: React.FC<{ className?: string }> = ({ className = "" }) => (
-  <div className={`animate-pulse rounded-xl bg-slate-200/70 dark:bg-slate-700/50 ${className}`} />
+  <div className={`animate-pulse rounded-xl bg-slate-200/70 dark:bg-gray-700/40 ${className}`} />
 );
 
 export const FieldError: React.FC<{ message?: string | null; id?: string }> = ({ message, id }) =>
@@ -209,17 +209,29 @@ export const FieldError: React.FC<{ message?: string | null; id?: string }> = ({
     </p>
   ) : null;
 
+/* Tokens shared with the rest of the MIS (ui/Button, ui/Input, officeHours/ohUi): rounded-full
+ * blue buttons, rounded-2xl inputs with a soft blue focus ring, rounded-3xl cards, translucent
+ * gray surfaces in dark mode. */
 export const inputCls =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
-export const inputErrCls = "border-red-400 focus:border-red-500 focus:ring-red-500/15 dark:border-red-500";
-export const labelCls = "mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300";
+  "w-full min-h-[44px] rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100 dark:placeholder:text-gray-500 dark:hover:border-gray-600";
+export const inputErrCls = "!border-red-400 focus:!border-red-500 focus:!ring-red-500/15 dark:!border-red-500/70";
+export const labelCls = "mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700 dark:text-gray-200";
 export const primaryBtn =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/30 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700 hover:shadow-md hover:shadow-blue-600/25 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none dark:focus-visible:ring-offset-gray-900";
 export const secondaryBtn =
-  "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/20 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700";
+  "inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100 dark:hover:bg-gray-700/50";
 export const ghostBtn =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:text-slate-300 dark:hover:bg-slate-700";
-export const cardCls = "rounded-2xl border border-slate-200/80 bg-white shadow-soft dark:border-slate-700 dark:bg-slate-800";
+  "inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-white";
+export const iconBtn =
+  "inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700/50 dark:hover:text-white";
+export const cardCls = "rounded-3xl border border-slate-200 bg-white shadow-soft dark:border-gray-700/30 dark:bg-gray-800/30";
+/** A chip toggle (filters, view switches): rounded-full, blue when on. */
+export const chipCls = (on: boolean) =>
+  `inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+    on
+      ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20"
+      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-300 dark:hover:bg-gray-700/50"
+  }`;
 
 /** Drop files here or click: native drag events, keyboard reachable, touch falls back to the picker. */
 export const Dropzone: React.FC<{
@@ -275,23 +287,23 @@ export const Dropzone: React.FC<{
         error
           ? "border-red-300 bg-red-50/60 dark:border-red-500/50 dark:bg-red-500/5"
           : over
-            ? "scale-[1.01] border-brand-500 bg-brand-50 dark:bg-brand-500/10"
-            : "border-slate-200 bg-slate-50/60 hover:border-brand-500/60 hover:bg-brand-50/40 dark:border-slate-600 dark:bg-slate-800/40 dark:hover:bg-slate-700/40"
+            ? "scale-[1.01] border-blue-500 bg-blue-50 dark:bg-blue-500/10"
+            : "border-slate-200 bg-slate-50/60 hover:border-blue-500/60 hover:bg-blue-50/40 dark:border-gray-700/60 dark:bg-gray-800/40 dark:hover:bg-gray-700/40"
       } ${disabled ? "pointer-events-none opacity-50" : ""}`}
     >
       <input ref={input} type="file" className="hidden" accept={accept} multiple={multiple} onChange={(e) => (take(e.target.files), (e.target.value = ""))} />
       {busy ? (
         <>
           <ProgressRing value={progress ?? 0} size={compact ? 32 : 44} />
-          <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Uploading…</span>
+          <span className="text-xs font-medium text-slate-600 dark:text-gray-300">Uploading…</span>
         </>
       ) : (
         <>
-          <motion.span animate={over ? { y: -4, scale: 1.1 } : { y: 0, scale: 1 }} className={`flex items-center justify-center rounded-full ${compact ? "h-8 w-8" : "h-11 w-11"} bg-white text-brand-600 shadow-sm dark:bg-slate-700 dark:text-brand-200`}>
+          <motion.span animate={over ? { y: -4, scale: 1.1 } : { y: 0, scale: 1 }} className={`flex items-center justify-center rounded-full ${compact ? "h-8 w-8" : "h-11 w-11"} bg-white text-blue-600 shadow-sm dark:bg-gray-700/50 dark:text-blue-200`}>
             <Icon className={compact ? "h-4 w-4" : "h-5 w-5"} aria-hidden />
           </motion.span>
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-100">{label}</span>
-          {hint && <span className="text-[11px] text-slate-500 dark:text-slate-400">{hint}</span>}
+          <span className="text-sm font-semibold text-slate-800 dark:text-white">{label}</span>
+          {hint && <span className="text-xs text-slate-600 dark:text-gray-300">{hint}</span>}
         </>
       )}
       {error && <span role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">{error}</span>}
@@ -319,9 +331,9 @@ export const fmtBytes = (n: number) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(
 /** An illustration for empty states — a small SVG constellation, no words needed. */
 export const EmptyArt: React.FC<{ icon?: React.ElementType; className?: string }> = ({ icon: Icon = Lightbulb, className = "" }) => (
   <div className={`relative mx-auto h-24 w-24 ${className}`} aria-hidden>
-    <motion.div className="absolute inset-0 rounded-full bg-gradient-to-br from-brand-100 to-orange-100 dark:from-brand-500/20 dark:to-orange-500/10" animate={{ scale: [1, 1.06, 1] }} transition={{ repeat: Infinity, duration: 3 }} />
-    <div className="absolute inset-3 flex items-center justify-center rounded-full bg-white shadow-soft dark:bg-slate-800">
-      <Icon className="h-9 w-9 text-brand-600 dark:text-brand-200" />
+    <motion.div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-100 to-orange-100 dark:from-blue-500/20 dark:to-orange-500/10" animate={{ scale: [1, 1.06, 1] }} transition={{ repeat: Infinity, duration: 3 }} />
+    <div className="absolute inset-3 flex items-center justify-center rounded-full bg-white shadow-soft dark:bg-gray-800/40">
+      <Icon className="h-9 w-9 text-blue-600 dark:text-blue-200" />
     </div>
     <motion.span className="absolute -right-1 top-2 h-3 w-3 rounded-full bg-orange-400" animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 2.2 }} />
     <motion.span className="absolute bottom-1 left-0 h-2 w-2 rounded-full bg-emerald-400" animate={{ y: [0, 3, 0] }} transition={{ repeat: Infinity, duration: 2.8 }} />

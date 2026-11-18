@@ -18,14 +18,14 @@ const Tile: React.FC<{ m: Media; cover: boolean; canEdit: boolean; onOpen: () =>
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: m.id, disabled: !canEdit });
   const Icon = KIND_ICON[m.kind] ?? FileText;
   return (
-    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`group relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 ${isDragging ? "z-10 opacity-60 shadow-float" : ""}`} {...attributes} {...listeners}>
-      <button type="button" onClick={onOpen} className="absolute inset-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/40" aria-label={`Open ${m.caption || m.name}`}>
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`group relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-gray-700/40 dark:bg-gray-800/40 ${isDragging ? "z-10 opacity-60 shadow-float" : ""}`} {...attributes} {...listeners}>
+      <button type="button" onClick={onOpen} className="absolute inset-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40" aria-label={`Open ${m.caption || m.name}`}>
         {m.kind === "image" ? (
           <img src={fileUrl(m.assetId, m.hasThumb ? "thumb" : "original")} alt={m.caption ?? ""} loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-2">
-            <Icon className="h-10 w-10 text-brand-500" aria-hidden />
-            <span className="line-clamp-2 text-center text-[11px] font-semibold text-slate-600 dark:text-slate-300">{m.name}</span>
+            <Icon className="h-10 w-10 text-blue-500" aria-hidden />
+            <span className="line-clamp-2 text-center text-[11px] font-semibold text-slate-600 dark:text-gray-300">{m.name}</span>
             <span className="text-[10px] text-slate-400">{fmtBytes(m.size)}</span>
           </div>
         )}
@@ -35,9 +35,9 @@ const Tile: React.FC<{ m: Media; cover: boolean; canEdit: boolean; onOpen: () =>
       {canEdit && (
         <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100" onPointerDown={(e) => e.stopPropagation()}>
           {m.kind === "image" && !cover && (
-            <button type="button" onClick={onCover} aria-label="Make cover" className="rounded-full bg-white/90 p-1.5 text-amber-500 shadow hover:bg-white dark:bg-slate-900/90"><Star className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={onCover} aria-label="Make cover" className="rounded-full bg-white/90 p-1.5 text-amber-500 shadow hover:bg-white dark:bg-gray-900/90"><Star className="h-3.5 w-3.5" /></button>
           )}
-          <button type="button" onClick={onDelete} aria-label="Delete" className="rounded-full bg-white/90 p-1.5 text-red-600 shadow hover:bg-white dark:bg-slate-900/90"><Trash2 className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={onDelete} aria-label="Delete" className="rounded-full bg-white/90 p-1.5 text-red-600 shadow hover:bg-white dark:bg-gray-900/90"><Trash2 className="h-3.5 w-3.5" /></button>
         </div>
       )}
     </div>
@@ -134,7 +134,7 @@ const GalleryPanel: React.FC<{ p: ProjectDetail; onChanged: () => void }> = ({ p
               {caption !== null ? (
                 <>
                   <input autoFocus value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={200} className={`${inputCls} flex-1 !bg-white/90 !text-slate-800`} aria-label="Caption" />
-                  <button type="button" aria-label="Save caption" className="rounded-lg bg-emerald-500 p-2" onClick={async () => {
+                  <button type="button" aria-label="Save caption" className="rounded-full bg-emerald-500 p-2" onClick={async () => {
                     await sideProjectsApi.updateMedia(p.id, current.id, { caption }).catch((e) => showToast(failure(e).message, "error"));
                     setCaption(null);
                     onChanged();
@@ -143,8 +143,8 @@ const GalleryPanel: React.FC<{ p: ProjectDetail; onChanged: () => void }> = ({ p
               ) : (
                 <>
                   <span className="flex-1 truncate px-2 text-sm">{current.caption || current.name}</span>
-                  {p.rights.edit && <button type="button" aria-label="Edit caption" className="rounded-lg p-2 hover:bg-white/10" onClick={() => setCaption(current.caption ?? "")}><Pencil className="h-4 w-4" /></button>}
-                  <a href={fileUrl(current.assetId, "original", true)} aria-label="Download" className="rounded-lg p-2 hover:bg-white/10"><Download className="h-4 w-4" /></a>
+                  {p.rights.edit && <button type="button" aria-label="Edit caption" className="rounded-full p-2 hover:bg-white/10" onClick={() => setCaption(current.caption ?? "")}><Pencil className="h-4 w-4" /></button>}
+                  <a href={fileUrl(current.assetId, "original", true)} aria-label="Download" className="rounded-full p-2 hover:bg-white/10"><Download className="h-4 w-4" /></a>
                 </>
               )}
             </div>
