@@ -84,6 +84,20 @@ if (config.nodeEnv !== "test") {
   setTimeout(runMentorshipSweep, 90_000);
   setInterval(runMentorshipSweep, 3 * 60 * 60 * 1000).unref();
 
+  // Student side projects: stale-project nudges and concept reminders (idempotent; each
+  // nudge is an event row, so twice a day never sends twice).
+  const runSideProjectsSweep = tenantJob("side-projects-sweep", async (tenant) => {
+    try {
+      const { sweepSideProjects } = await import("./services/sideProjects/sweep");
+      const r = await sweepSideProjects();
+      if (r.stale || r.conceptPending) logger.info(`[side-projects] t${tenant.tid} sweep: ${r.stale} stale, ${r.conceptPending} concept pending`);
+    } catch (error) {
+      logger.error("[side-projects] sweep failed", { error, tid: tenant.tid });
+    }
+  });
+  setTimeout(runSideProjectsSweep, 4 * 60_000);
+  setInterval(runSideProjectsSweep, 12 * 60 * 60 * 1000).unref();
+
   // My AI: once a day, re-check people's own AI keys used in the last 30 days, so a revoked
   // key or an empty account shows up in My AI before the next call fails.
   const runKeySweep = tenantJob("my-ai-key-sweep", async (tenant) => {

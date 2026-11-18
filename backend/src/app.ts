@@ -45,6 +45,7 @@ import staffCoverRoutes from "./routes/staffCover";
 import earlyWarningRoutes from "./routes/earlyWarning";
 import competencyRoutes from "./routes/competency";
 import safeguardingRoutes from "./routes/safeguarding";
+import sideProjectsRoutes from "./routes/sideProjects";
 import desktopRoutes from "./routes/desktop";
 import { desktopToolsRouter } from "./routes/desktopTools";
 import { authenticate } from "./middleware/auth";
@@ -171,6 +172,7 @@ for (const path of [
 app.use("/elearning", requireFeature("feature.elearning"));
 app.use("/office-hours", requireFeature("feature.office_hours"));
 app.use("/safeguarding", requireFeature("feature.safeguarding"));
+app.use("/side-projects", requireFeature("feature.student_projects"));
 app.use("/mentorship", requireFeature("feature.mentorship"));
 app.use("/competency", requireFeature("feature.competency_map"));
 // Connecting a channel needs the feature; disconnecting never does (a downgrade keeps the way out).
@@ -249,6 +251,7 @@ app.use("/cover", staffCoverRoutes);
 app.use("/early-warning", earlyWarningRoutes);
 app.use("/competency", competencyRoutes);
 app.use("/safeguarding", safeguardingRoutes);
+app.use("/side-projects", sideProjectsRoutes);
 
 app.post("/test-post", (req, res) =>
   res.json({ success: true, message: "Root POST test works" }),

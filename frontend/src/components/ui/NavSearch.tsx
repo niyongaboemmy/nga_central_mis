@@ -73,6 +73,11 @@ const SEARCH_ITEMS: SearchItem[] = [
     requiredPermission: Permissions.EARLY_WARNING_VIEW,
   },
   {
+    label: "My projects",
+    path: "/my-projects",
+    requiredPermission: Permissions.SIDE_PROJECTS_MANAGE_OWN,
+  },
+  {
     label: "Safeguarding",
     path: "/safeguarding",
     requiredPermission: Permissions.SAFEGUARDING_MANAGE,

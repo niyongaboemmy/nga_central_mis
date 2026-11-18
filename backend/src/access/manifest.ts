@@ -31,7 +31,7 @@ const SCHOOL_ONLY = { scopeable: false };
 export const MIS_MANIFEST = defineManifest({
   app: "mis",
   name: "Central MIS",
-  version: "2026.11.11",
+  version: "2026.11.18",
   capabilities: {
     // People & accounts
     MANAGE_USERS: W("Create, update and deactivate users", "PEOPLE"),
@@ -166,6 +166,13 @@ export const MIS_MANIFEST = defineManifest({
     // Safeguarding concerns and wellbeing check-ins (nga-desktop NEXT_FEATURES_ANALYSIS §3 #5).
     // Restricted and audited; holders are alerted to every new concern.
     SAFEGUARDING_MANAGE: W("See and act on safeguarding concerns", "WELFARE", { ...SCHOOL_ONLY, restricted: true }),
+    // Student side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §4). MANAGE_OWN is legacy-visible
+    // (students reach routes through the legacy STUDENT role); the rest are v2-only. No role
+    // keyword in any name. Seeded by migration 128.
+    SIDE_PROJECTS_MANAGE_OWN: W("Run your own side projects (board, documents, media, progress)", "ACADEMICS", SCHOOL_ONLY),
+    SIDE_PROJECTS_VIEW: R("See students' side projects in your area", "ACADEMICS", ["summary", "detail"]),
+    SIDE_PROJECTS_REVIEW: W("Review side projects (feedback, changes, verify completion)", "ACADEMICS"),
+    SIDE_PROJECTS_MANAGE_ANY: W("Manage every side project (import, correct, archive, categories)", "ACADEMICS", { ...SCHOOL_ONLY, restricted: true }),
     // Early warning: risk signals from Tendo/Task Mentor and interventions, in your scope.
     EARLY_WARNING_VIEW: R("See early-warning signals and log interventions", "WELFARE", ["detail"]),
     // Staff absence and cover: approve absences, assign cover teachers.

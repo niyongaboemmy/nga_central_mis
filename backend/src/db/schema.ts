@@ -2107,7 +2107,7 @@ export const FileAsset = mysqlTable("FileAsset", {
   owner_user_id: bigint("owner_user_id", { mode: "number" })
     .notNull()
     .references(() => User.user_id, { onDelete: "cascade" }),
-  scope: mysqlEnum("scope", ["COURSE", "RUN_REFERENCE", "SUBJECT", "SUBMISSION"]).notNull(),
+  scope: mysqlEnum("scope", ["COURSE", "RUN_REFERENCE", "SUBJECT", "SUBMISSION", "PROJECT"]).notNull(),
   course_id: bigint("course_id", { mode: "number" }).references(() => Course.course_id, { onDelete: "set null" }),
   subject_id: bigint("subject_id", { mode: "number" }),
   original_name: varchar("original_name", { length: 255 }).notNull(),

@@ -1,0 +1,159 @@
+import React, { useState } from "react";
+import { Github, ExternalLink, Images, MessageCircle, Users, MoreHorizontal, Mail, Target } from "lucide-react";
+import { fileUrl, type ProjectCard as Card, type Status } from "../../api/sideProjects";
+import UserAvatar from "../ui/UserAvatar";
+import { CATEGORY_ICON, DocChips, HealthDot, ProgressBar, ReviewBadge, STATUS_META, STATUS_ORDER, statusColor, timeAgo, useIsDark } from "./ui";
+
+export interface ProjectCardProps {
+  card: Card & { student?: { id: number; name: string; regNumber: string | null; avatar: string | null }; class?: { name: string } | null };
+  onOpen: (id: number) => void;
+  onMove?: (id: number, to: Status) => void;
+  dragging?: boolean;
+  showStudent?: boolean;
+}
+
+/** One project on a board: cover, identity, progress and what's attached, as glyphs. */
+const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dragging, showStudent }) => {
+  const dark = useIsDark();
+  const [menu, setMenu] = useState(false);
+  const CatIcon = CATEGORY_ICON[card.category?.icon ?? "sparkles"] ?? CATEGORY_ICON.sparkles;
+  const accent = card.category?.color ?? statusColor(card.status, dark);
+  const invited = card.myRole === "INVITED";
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition dark:bg-slate-800 ${
+        dragging ? "rotate-[1.5deg] scale-[1.02] border-brand-400 shadow-float" : "border-slate-200/80 hover:-translate-y-0.5 hover:shadow-soft dark:border-slate-700"
+      } ${invited ? "ring-2 ring-dashed ring-brand-300" : ""}`}
+    >
+      <button type="button" onClick={() => onOpen(card.id)} className="block w-full text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/30" aria-label={`Open ${card.title}`}>
+        <div className="relative h-24 w-full overflow-hidden" style={{ background: `linear-gradient(135deg, ${accent}26, ${accent}0d)` }}>
+          {card.coverAssetId ? (
+            <img src={fileUrl(card.coverAssetId, "thumb")} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <CatIcon className="h-10 w-10 opacity-70" style={{ color: accent }} aria-hidden />
+            </div>
+          )}
+          <div className="absolute left-2 top-2 flex gap-1">
+            {card.category && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-slate-700 shadow-sm backdrop-blur dark:bg-slate-900/80 dark:text-slate-100">
+                <CatIcon className="h-3 w-3" style={{ color: card.category.color }} aria-hidden />
+                {card.category.name}
+              </span>
+            )}
+          </div>
+          <div className="absolute right-2 top-2 flex gap-1">
+            <ReviewBadge state={card.reviewState} compact />
+            {invited && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                <Mail className="h-3 w-3" aria-hidden /> Invite
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="space-y-2 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="line-clamp-2 text-sm font-bold leading-snug text-slate-800 dark:text-slate-50">{card.title}</h3>
+            <HealthDot health={card.health} />
+          </div>
+          {showStudent && card.student && (
+            <div className="flex items-center gap-1.5">
+              <UserAvatar name={card.student.name} src={card.student.avatar} userId={card.student.id} size={20} decorative />
+              <span className="truncate text-xs text-slate-600 dark:text-slate-300">{card.student.name}</span>
+              {card.class && <span className="truncate text-[10px] text-slate-500 dark:text-slate-400">· {card.class.name}</span>}
+            </div>
+          )}
+          {card.techTags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {card.techTags.slice(0, 3).map((t) => (
+                <span key={t} className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                  {t}
+                </span>
+              ))}
+              {card.techTags.length > 3 && <span className="text-[10px] text-slate-500">+{card.techTags.length - 3}</span>}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <ProgressBar value={card.progress} color={statusColor(card.status, dark)} />
+            <span className="w-8 text-right text-[11px] font-bold tabular-nums text-slate-600 dark:text-slate-300">{card.progress}%</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <DocChips docs={card.docs} pending={card.conceptPending} />
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+              {card.milestones.total > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-[11px]" title="Milestones done">
+                  <Target className="h-3.5 w-3.5" aria-hidden />
+                  {card.milestones.done}/{card.milestones.total}
+                </span>
+              )}
+              {card.githubUrl && <Github className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" aria-label="GitHub" />}
+              {card.accessUrl && <ExternalLink className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" aria-label="Live link" />}
+              {card.mediaCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-[11px]" title="Files">
+                  <Images className="h-3.5 w-3.5" aria-hidden />
+                  {card.mediaCount}
+                </span>
+              )}
+              {card.commentCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-[11px]" title="Feedback">
+                  <MessageCircle className="h-3.5 w-3.5" aria-hidden />
+                  {card.commentCount}
+                </span>
+              )}
+              {card.memberCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 text-[11px]" title="Team">
+                  <Users className="h-3.5 w-3.5" aria-hidden />
+                  {card.memberCount + 1}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400">{timeAgo(card.lastActivityAt)}</div>
+        </div>
+      </button>
+      {onMove && !invited && (
+        <div className="absolute bottom-2 right-2">
+          <button
+            type="button"
+            aria-label={`Move ${card.title}`}
+            aria-haspopup="menu"
+            aria-expanded={menu}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenu((m) => !m);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="rounded-lg p-1 text-slate-400 opacity-0 transition hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-slate-700"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+          {menu && (
+            <div role="menu" className="absolute bottom-8 right-0 z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-float dark:border-slate-600 dark:bg-slate-800" onPointerDown={(e) => e.stopPropagation()}>
+              {STATUS_ORDER.filter((s) => s !== card.status).map((s) => {
+                const M = STATUS_META[s];
+                return (
+                  <button
+                    key={s}
+                    role="menuitem"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenu(false);
+                      onMove(card.id, s);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-700"
+                  >
+                    <M.icon className="h-4 w-4" style={{ color: statusColor(s, dark) }} aria-hidden />
+                    {M.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ProjectCardView;
