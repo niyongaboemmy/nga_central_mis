@@ -1174,3 +1174,18 @@ describe("project abstract (migration 136)", () => {
     expect((await api().patch(`/side-projects/${p}`).set(as(alice)).send({ abstract: "" })).body.field).toBe("abstract");
   });
 });
+
+describe("tasks can go to any teammate, invited or accepted", () => {
+  it("assigns an invited teammate, refuses someone off the team", async () => {
+    const p = await createProject(alice, "Invite then assign");
+    expect((await api().post(`/side-projects/${p}/members`).set(as(alice)).send({ userId: bob })).status).toBe(200); // still INVITED
+    const item = await api().post(`/side-projects/${p}/plan/items`).set(as(alice)).send({ title: "Sign-in", kind: "FEATURE" });
+    expect(item.status, JSON.stringify(item.body)).toBe(200);
+    const toInvited = await api().post(`/side-projects/${p}/tasks`).set(as(alice)).send({ planItemId: item.body.data.id, title: "Build the sign-in form", assigneeId: bob });
+    expect(toInvited.status, JSON.stringify(toInvited.body)).toBe(200);
+    const plan = (await api().get(`/side-projects/${p}/plan`).set(as(alice))).body.data;
+    expect(plan.tasks.find((t: any) => t.title === "Build the sign-in form")?.assigneeId).toBe(bob);
+    const off = await api().post(`/side-projects/${p}/tasks`).set(as(alice)).send({ planItemId: item.body.data.id, title: "Ask Carol", assigneeId: carol });
+    expect(off.status).toBe(400);
+  });
+});

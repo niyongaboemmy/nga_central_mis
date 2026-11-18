@@ -128,13 +128,18 @@ export const TaskModal: React.FC<{
           </SelectField>
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Assignee" htmlFor="tk-who" icon={UserRound} error={errors.assigneeId} hint={manage ? undefined : "Only managers assign others"}>
+          <Field
+            label="Assignee"
+            htmlFor="tk-who"
+            icon={UserRound}
+            error={errors.assigneeId}
+            hint={!manage ? "Only managers assign others" : team.length < 2 ? "Invite teammates under Team to assign them work" : undefined}
+          >
             <SelectField id="tk-who" className={selectCls} value={f.assigneeId} disabled={!manage && !!task} onChange={(e) => set("assigneeId", e.target.value)}>
               {manage && <option value="">Unassigned</option>}
               {team.filter((m) => manage || m.id === meId).map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name}
-                  {m.id === meId ? " (me)" : ""}
+                  {`${m.name}${m.id === meId ? " (me)" : ""}${m.role ? ` · ${m.role}` : ""}${m.invited ? " · invited" : ""}`}
                 </option>
               ))}
             </SelectField>

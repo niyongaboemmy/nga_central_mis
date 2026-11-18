@@ -34,11 +34,14 @@ const hoursOf = (raw: unknown, field: string, max: number): number | null => {
   return h;
 };
 
-/** Everyone on the team: the owner and accepted teammates. */
+/**
+ * Who can be given work: the owner and every teammate, accepted or still invited (they are
+ * notified of the task, which also prompts them to accept). Editing still needs acceptance.
+ */
 async function teamIds(projectId: number): Promise<number[]> {
   const r = await many(sql`
     SELECT owner_user_id AS id FROM SideProject WHERE project_id = ${projectId}
-    UNION SELECT user_id FROM SideProjectMember WHERE project_id = ${projectId} AND status = 'ACCEPTED'`);
+    UNION SELECT user_id FROM SideProjectMember WHERE project_id = ${projectId} AND status IN ('ACCEPTED', 'INVITED')`);
   return r.map((x) => Number(x.id));
 }
 /** The people who plan and assign: the owner and teammates marked manager. */
