@@ -9,6 +9,8 @@ import { CAP, inList, many, one } from "./core";
 
 const studentLink = (id: number) => `/my-projects?project=${id}`;
 const staffLink = (id: number) => (id ? `/projects-monitor?project=${id}` : "/projects-monitor?tab=supervising");
+/** Supervisors land on their Assigned projects page (migration 131). */
+const supervisorLink = (id: number) => (id ? `/assigned-projects?project=${id}` : "/assigned-projects");
 
 async function send(userIds: number[], kind: string, title: string, body: string, link: string, projectId: number, actorId: number | null) {
   const seen = new Set<number>();
@@ -73,8 +75,10 @@ export async function onCreated(projectId: number, actorId: number) {
   try {
     const h = await head(projectId);
     if (!h) return;
-    const staff = [Number(h.sup) || 0, ...(await classTeachersOf(projectId))];
-    await send(staff, "side_project_created", `New project: ${h.title}`, `${h.student} started a new side project.`, staffLink(projectId), projectId, actorId);
+    const sup = Number(h.sup) || 0;
+    const teachers = (await classTeachersOf(projectId)).filter((id) => id !== sup);
+    await send([sup], "side_project_created", `New project: ${h.title}`, `${h.student} started a new side project.`, supervisorLink(projectId), projectId, actorId);
+    await send(teachers, "side_project_created", `New project: ${h.title}`, `${h.student} started a new side project.`, staffLink(projectId), projectId, actorId);
   } catch {
     /* never fail the action */
   }
@@ -84,7 +88,9 @@ export async function onStatus(projectId: number, actorId: number, to: string) {
   try {
     const h = await head(projectId);
     if (!h || to !== "COMPLETED") return;
-    await send([Number(h.sup) || 0, ...(await leads())], "side_project_completed", `Completed: ${h.title}`, `${h.student} completed a project. It is waiting for verification.`, staffLink(projectId), projectId, actorId);
+    const sup = Number(h.sup) || 0;
+    await send([sup], "side_project_completed", `Completed: ${h.title}`, `${h.student} completed a project. It is waiting for verification.`, supervisorLink(projectId), projectId, actorId);
+    await send((await leads()).filter((id) => id !== sup), "side_project_completed", `Completed: ${h.title}`, `${h.student} completed a project. It is waiting for verification.`, staffLink(projectId), projectId, actorId);
   } catch {
     /* ignore */
   }
@@ -113,7 +119,9 @@ export async function onStudentReply(projectId: number, actorId: number) {
       WHERE c.project_id = ${projectId} AND c.deleted_at IS NULL
         AND c.author_id NOT IN (SELECT owner_user_id FROM SideProject WHERE project_id = ${projectId})
         AND c.author_id NOT IN (SELECT user_id FROM SideProjectMember WHERE project_id = ${projectId})`);
-    await send([Number(h.sup) || 0, ...r.map((x) => Number(x.id))], "side_project_reply", `Reply on ${h.title}`, `${h.student} replied to the feedback.`, staffLink(projectId), projectId, actorId);
+    const sup = Number(h.sup) || 0;
+    await send([sup], "side_project_reply", `Reply on ${h.title}`, `${h.student} replied to the feedback.`, supervisorLink(projectId), projectId, actorId);
+    await send(r.map((x) => Number(x.id)).filter((id) => id !== sup), "side_project_reply", `Reply on ${h.title}`, `${h.student} replied to the feedback.`, staffLink(projectId), projectId, actorId);
   } catch {
     /* ignore */
   }
@@ -134,14 +142,15 @@ export async function onSupervisor(projectId: number, actorId: number, superviso
   try {
     const h = await head(projectId);
     if (!h) return;
-    await send([supervisorId], "side_project_supervisor", `You supervise ${h.title}`, `${h.student}'s project now lists you as supervisor.`, staffLink(projectId), projectId, actorId);
+    await send([supervisorId], "side_project_supervisor", `You supervise ${h.title}`, `${h.student}'s project now lists you as supervisor.`, supervisorLink(projectId), projectId, actorId);
   } catch {
     /* ignore */
   }
 }
 
+/** `staff` recipients are supervisors (sweep digests and stage nudges): their Assigned page. */
 export async function notifyMany(userIds: number[], kind: string, title: string, body: string, projectId: number, staff: boolean) {
-  await send(userIds, kind, title, body, staff ? staffLink(projectId) : studentLink(projectId), projectId, null);
+  await send(userIds, kind, title, body, staff ? supervisorLink(projectId) : studentLink(projectId), projectId, null);
 }
 
 export { CAP, inList };

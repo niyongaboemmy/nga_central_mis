@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Github, ExternalLink, Images, MessageCircle, Users, MoreHorizontal, Mail, Target } from "lucide-react";
+import { Github, ExternalLink, Images, MessageCircle, Users, MoreHorizontal, Mail, Target, Timer, PauseCircle } from "lucide-react";
 import { fileUrl, type ProjectCard as Card, type Status } from "../../api/sideProjects";
 import UserAvatar from "../ui/UserAvatar";
-import { CATEGORY_ICON, DocChips, HealthDot, ProgressBar, ReviewBadge, STATUS_META, STATUS_ORDER, statusColor, timeAgo, useIsDark } from "./ui";
+import { CATEGORY_ICON, DocChips, HealthDot, ProgressBar, ReviewBadge, STATUS_META, STATUS_ORDER, dayWord, pathStage, statusColor, timeAgo, useIsDark } from "./ui";
 
 export interface ProjectCardProps {
   card: Card & { student?: { id: number; name: string; regNumber: string | null; avatar: string | null }; class?: { name: string } | null };
@@ -12,12 +12,47 @@ export interface ProjectCardProps {
   showStudent?: boolean;
 }
 
+/** Days in the current stage and what is left of its window, as one small chip. */
+export const StageChip: React.FC<{ card: Pick<Card, "status" | "stage" | "pausedFrom"> }> = ({ card }) => {
+  const t = card.stage;
+  if (!t || card.status === "COMPLETED") return null;
+  if (card.status === "ON_HOLD") {
+    const from = STATUS_META[pathStage(card.status, card.pausedFrom)];
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-gray-700/50 dark:text-gray-200" title={`Paused during ${from.label}`}>
+        <PauseCircle className="h-3 w-3" aria-hidden />
+        {t.daysIn !== null ? `${dayWord(t.daysIn)} paused` : "Paused"} · {from.label}
+      </span>
+    );
+  }
+  const over = t.overrunDays > 0;
+  const soon = !over && t.daysLeft !== null && t.daysLeft <= 2;
+  const cls = over
+    ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+    : soon
+      ? "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200"
+      : "bg-slate-100 text-slate-600 dark:bg-gray-700/50 dark:text-gray-300";
+  const left = over ? `${dayWord(t.overrunDays)} over` : t.daysLeft !== null ? (t.daysLeft === 0 ? "due today" : `${dayWord(t.daysLeft)} left`) : null;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums ${cls}`} title={`${dayWord(t.daysIn ?? 0)} in ${STATUS_META[card.status].label}${t.plannedEnd ? `, planned to end ${t.plannedEnd}` : ""}`}>
+      <Timer className="h-3 w-3" aria-hidden />
+      {t.daysIn !== null ? `Day ${t.daysIn + 1}` : STATUS_META[card.status].label}
+      {left && <span className="font-medium">· {left}</span>}
+    </span>
+  );
+};
+
+/** The stages a card's menu offers: not where it is, never Completed while paused, never pause a finished one. */
+export const moveTargets = (status: Status) =>
+  STATUS_ORDER.filter((s) => s !== status && !(status === "ON_HOLD" && s === "COMPLETED") && !(status === "COMPLETED" && s === "ON_HOLD"));
+
 /** One project on a board: cover, identity, progress and what's attached, as glyphs. */
 const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dragging, showStudent }) => {
   const dark = useIsDark();
   const [menu, setMenu] = useState(false);
   const CatIcon = CATEGORY_ICON[card.category?.icon ?? "sparkles"] ?? CATEGORY_ICON.sparkles;
-  const accent = card.category?.color ?? statusColor(card.status, dark);
+  const stage = pathStage(card.status, card.pausedFrom);
+  const accent = card.category?.color ?? statusColor(stage, dark);
   const invited = card.myRole === "INVITED";
   return (
     <div
@@ -74,7 +109,7 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
             </div>
           )}
           <div className="flex items-center gap-2">
-            <ProgressBar value={card.progress} color={statusColor(card.status, dark)} />
+            <ProgressBar value={card.progress} color={statusColor(stage, dark)} />
             <span className="w-8 text-right text-[11px] font-bold tabular-nums text-slate-600 dark:text-gray-300">{card.progress}%</span>
           </div>
           <div className="flex items-center justify-between">
@@ -108,7 +143,10 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
               )}
             </div>
           </div>
-          <div className="text-[10px] text-slate-500 dark:text-gray-400">{timeAgo(card.lastActivityAt)}</div>
+          <div className="flex flex-wrap items-center gap-1.5 pr-7">
+            <StageChip card={card} />
+            <span className="text-[10px] text-slate-500 dark:text-gray-400">{timeAgo(card.lastActivityAt)}</span>
+          </div>
         </div>
       </button>
       {onMove && !invited && (
@@ -128,8 +166,8 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
             <MoreHorizontal className="h-4 w-4" />
           </button>
           {menu && (
-            <div role="menu" className="absolute bottom-8 right-0 z-20 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700/60 dark:bg-gray-800" onPointerDown={(e) => e.stopPropagation()}>
-              {STATUS_ORDER.filter((s) => s !== card.status).map((s) => {
+            <div role="menu" className="absolute bottom-8 right-0 z-20 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700/60 dark:bg-gray-800" onPointerDown={(e) => e.stopPropagation()}>
+              {moveTargets(card.status).map((s) => {
                 const M = STATUS_META[s];
                 return (
                   <button
@@ -144,7 +182,7 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
                     className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-700/50"
                   >
                     <M.icon className="h-4 w-4" style={{ color: statusColor(s, dark) }} aria-hidden />
-                    {M.label}
+                    {s === "ON_HOLD" ? "Put on hold" : card.status === "ON_HOLD" ? `Resume in ${M.label}` : M.label}
                   </button>
                 );
               })}

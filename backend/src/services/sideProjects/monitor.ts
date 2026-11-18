@@ -3,7 +3,8 @@ import * as XLSX from "xlsx";
 import { ScopeEntry } from "../../vendor/nga-access";
 import { getCurrentAcademicYearId } from "../../utils/academicYear";
 import { avatarUrls } from "../avatar/urls";
-import { fullName, many, one, STATUSES } from "./core";
+import { fullName, inList, many, one, STAGES, STATUSES, type Status } from "./core";
+import { ensureStageLogs } from "./stages";
 import { projectFrom, scopeCondition } from "./access";
 import { cardColumns, shapeCard } from "./projects";
 
@@ -32,6 +33,8 @@ export interface MonitorFilters {
   q?: string | null;
   archived?: boolean;
   supervisedBy?: number | null;
+  /** projects this user supervises or is on the team of (not their own) */
+  assignedTo?: number | null;
   /** STUDENT = students' projects, STAFF = everyone else's (teachers, staff, parents). */
   ownerType?: "STUDENT" | "STAFF" | null;
 }
@@ -65,7 +68,14 @@ const MAX_ROWS = 5000;
 
 async function loadRows(scope: ScopeEntry | null, f: MonitorFilters) {
   const from = await projectFrom();
-  const conds: SQL[] = [sql`sp.deleted_at IS NULL`, f.supervisedBy ? sql`sp.supervisor_user_id = ${f.supervisedBy}` : scopeCondition(scope)];
+  const conds: SQL[] = [
+    sql`sp.deleted_at IS NULL`,
+    f.assignedTo
+      ? sql`(sp.owner_user_id <> ${f.assignedTo} AND (sp.supervisor_user_id = ${f.assignedTo} OR EXISTS (SELECT 1 FROM SideProjectMember am WHERE am.project_id = sp.project_id AND am.user_id = ${f.assignedTo} AND am.status = 'ACCEPTED')))`
+      : f.supervisedBy
+        ? sql`sp.supervisor_user_id = ${f.supervisedBy}`
+        : scopeCondition(scope),
+  ];
   conds.push(f.archived ? sql`sp.archived_at IS NOT NULL` : sql`sp.archived_at IS NULL`);
   if (f.yearId) conds.push(f.yearMode === "started" ? sql`sp.academic_year_id = ${f.yearId}` : sql`(sp.last_active_year_id = ${f.yearId} OR sp.academic_year_id = ${f.yearId})`);
   if (f.programId) conds.push(sql`g.program_id = ${f.programId}`);
@@ -94,7 +104,9 @@ async function loadRows(scope: ScopeEntry | null, f: MonitorFilters) {
            up.registration_number AS regNumber, up.user_type AS ownerType, ${fullName("up")} AS studentName, u.avatar_version AS avatarVersion,
            cg.class_group_id AS classId, cg.name AS className, g.grade_id AS gradeId, g.name AS gradeName,
            pr.program_id AS programId, pr.name AS programName,
-           sp.academic_year_id AS yearId, ay.name AS yearName, ${fullName("sv")} AS supervisorName
+           sp.academic_year_id AS yearId, ay.name AS yearName, ${fullName("sv")} AS supervisorName,
+           ${f.assignedTo ? sql`IF(sp.supervisor_user_id = ${f.assignedTo}, 'SUPERVISOR', 'MEMBER')` : sql`NULL`} AS relation,
+           (SELECT DATE_FORMAT(MAX(COALESCE(ru.work_date, DATE(ru.created_at))), '%Y-%m-%d') FROM SideProjectUpdate ru WHERE ru.project_id = sp.project_id) AS lastReport
     ${from}
     LEFT JOIN SideProjectCategory c ON c.category_id = sp.category_id
     LEFT JOIN AcademicYear ay ON ay.academic_year_id = sp.academic_year_id
@@ -115,6 +127,8 @@ async function loadRows(scope: ScopeEntry | null, f: MonitorFilters) {
     class: x.classId ? { id: Number(x.classId), name: x.className, gradeId: Number(x.gradeId), grade: x.gradeName, programId: Number(x.programId), program: x.programName } : null,
     year: x.yearId ? { id: Number(x.yearId), name: x.yearName } : null,
     supervisor: x.supervisorId ? { id: Number(x.supervisorId), name: x.supervisorName } : null,
+    relation: (x.relation as "SUPERVISOR" | "MEMBER" | null) ?? null,
+    lastReport: (x.lastReport as string | null) ?? null,
   }));
   if (f.health) out = out.filter((p) => p.health === f.health);
   return out;
@@ -130,6 +144,7 @@ const SORTS: Record<string, (a: MonitorRow, b: MonitorRow) => number> = {
   class: (a, b) => String(a.class?.name ?? "~").localeCompare(String(b.class?.name ?? "~")),
   progress: (a, b) => b.progress - a.progress,
   status: (a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status),
+  stage: (a, b) => b.stage.overrunDays - a.stage.overrunDays || (b.stage.daysIn ?? -1) - (a.stage.daysIn ?? -1),
 };
 
 export async function listProjects(scope: ScopeEntry | null, f: MonitorFilters, opts: { sort?: string; dir?: string; page?: number; pageSize?: number }) {
@@ -181,13 +196,13 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
   const rows = await loadRows(scope, f);
   const windows = await termWindows();
   const inWin = (iso: string | null, w: { from: string; to: string } | null) => !!iso && !!w && iso.slice(0, 10) >= w.from && iso.slice(0, 10) <= w.to;
-  const byStatus = { IDEA: 0, IN_PROGRESS: 0, COMPLETED: 0 } as Record<string, number>;
+  const byStatus = { IDEA: 0, PLANNING: 0, IN_PROGRESS: 0, TESTING: 0, COMPLETED: 0, ON_HOLD: 0 } as Record<string, number>;
   const health: Record<string, number> = {};
   const review: Record<string, number> = {};
   const owners = new Set<number>();
   const categories = new Map<string, { name: string; color: string; count: number }>();
   const tech = new Map<string, { tag: string; count: number }>();
-  const classes = new Map<string, { classId: number | null; name: string; grade: string | null; students: Set<number>; IDEA: number; IN_PROGRESS: number; COMPLETED: number }>();
+  const classes = new Map<string, { classId: number | null; name: string; grade: string | null; students: Set<number> } & Record<Status, number>>();
   const studentOwners = new Set<number>();
   let staffProjects = 0;
   let completedNow = 0,
@@ -221,7 +236,7 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
     }
     const staff = p.student.type !== "STUDENT";
     const key = staff ? "staff" : p.class ? String(p.class.id) : "none";
-    const cl = classes.get(key) ?? { classId: staff ? null : p.class?.id ?? null, name: staff ? "Staff & others" : p.class?.name ?? "No class", grade: p.class?.grade ?? null, students: new Set<number>(), IDEA: 0, IN_PROGRESS: 0, COMPLETED: 0 };
+    const cl = classes.get(key) ?? { classId: staff ? null : p.class?.id ?? null, name: staff ? "Staff & others" : p.class?.name ?? "No class", grade: p.class?.grade ?? null, students: new Set<number>(), IDEA: 0, PLANNING: 0, IN_PROGRESS: 0, TESTING: 0, COMPLETED: 0, ON_HOLD: 0 };
     cl.students.add(p.student.id);
     cl[p.status] += 1;
     classes.set(key, cl);
@@ -269,15 +284,24 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
     }
   }
 
-  let byClass = [...classes.values()].map((c) => ({ classId: c.classId, name: c.name, grade: c.grade, students: c.students.size, IDEA: c.IDEA, IN_PROGRESS: c.IN_PROGRESS, COMPLETED: c.COMPLETED }));
+  const statusCounts = (c: Record<string, any>) => Object.fromEntries(STATUSES.map((st) => [st, Number(c[st] ?? 0)])) as Record<Status, number>;
+  const sumStatus = (c: Record<string, any>) => STATUSES.reduce((acc, st) => acc + Number(c[st] ?? 0), 0);
+  let byClass = [...classes.values()].map((c) => ({ classId: c.classId, name: c.name, grade: c.grade, students: c.students.size, ...statusCounts(c) }));
   if (depth === "summary") {
     const small = byClass.filter((c) => c.students < 5);
     byClass = byClass.filter((c) => c.students >= 5);
     if (small.length) {
-      byClass.push(small.reduce((acc, c) => ({ ...acc, students: acc.students + c.students, IDEA: acc.IDEA + c.IDEA, IN_PROGRESS: acc.IN_PROGRESS + c.IN_PROGRESS, COMPLETED: acc.COMPLETED + c.COMPLETED }), { classId: null, name: "Other", grade: null, students: 0, IDEA: 0, IN_PROGRESS: 0, COMPLETED: 0 }));
+      byClass.push(
+        small.reduce(
+          (acc, c) => ({ ...acc, students: acc.students + c.students, ...Object.fromEntries(STATUSES.map((st) => [st, acc[st] + c[st]])) }),
+          { classId: null, name: "Other", grade: null, students: 0, ...statusCounts({}) } as (typeof byClass)[number],
+        ),
+      );
     }
   }
-  byClass.sort((a, b) => b.IDEA + b.IN_PROGRESS + b.COMPLETED - (a.IDEA + a.IN_PROGRESS + a.COMPLETED));
+  byClass.sort((a, b) => sumStatus(b) - sumStatus(a));
+  const stageInsights = await stagesInsight(rows, depth);
+  const reporting = await reportingInsight(rows, depth);
 
   const population = await studentsInScope(f.supervisedBy ? null : scope, f);
   const attentionScore = (p: MonitorRow) =>
@@ -331,6 +355,8 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
     byCategory: [...categories.values()].sort((a, b) => b.count - a.count),
     topTech: [...tech.values()].sort((a, b) => b.count - a.count).slice(0, 12),
     ...detailLists,
+    stages: stageInsights,
+    reporting,
   };
 }
 
@@ -351,6 +377,10 @@ export async function exportRows(scope: ScopeEntry | null, f: MonitorFilters, fo
     Review: p.reviewState,
     "Progress %": p.progress,
     Health: p.health,
+    "Days in stage": p.stage.daysIn ?? "",
+    "Stage due": p.stage.plannedEnd ?? "",
+    "Stage overrun (days)": p.stage.overrunDays || "",
+    "Last report": p.lastReport ?? "",
     Concept: p.docs.CONCEPT ? "yes" : p.conceptPending ? "pending" : "no",
     SRS: p.docs.SRS ? "yes" : "no",
     "Implementation plan": p.docs.IMPLEMENTATION_PLAN ? "yes" : "no",
@@ -382,4 +412,99 @@ export async function filterOptions(scope: ScopeEntry | null) {
     many(sql`SELECT category_id AS id, name, color, icon, slug FROM SideProjectCategory WHERE is_active = 1 ORDER BY sort`),
   ]);
   return { years: years.map((y) => ({ ...y, isCurrent: Number(y.isCurrent) === 1 })), classes, categories };
+}
+
+/**
+ * Time per stage across the population: average actual days (finished and ongoing stays) vs
+ * average planned days, how many projects are in each stage now and how many overran, the
+ * bottleneck (largest actual/planned ratio) and the projects stuck longest beyond their plan.
+ */
+async function stagesInsight(rows: MonitorRow[], depth: "summary" | "detail") {
+  const ids = rows.map((r) => r.id);
+  await ensureStageLogs(ids.slice(0, 2000));
+  const actual = ids.length
+    ? await many(sql`
+        SELECT stage, project_id AS id, SUM(TIMESTAMPDIFF(SECOND, entered_at, COALESCE(left_at, UTC_TIMESTAMP()))) / 86400 AS days
+        FROM SideProjectStageLog WHERE project_id IN (${inList(ids.slice(0, 3000))})
+        GROUP BY stage, project_id`)
+    : [];
+  const planned = ids.length
+    ? await many(sql`
+        SELECT stage, AVG(DATEDIFF(planned_end, planned_start) + 1) AS days, COUNT(*) AS n
+        FROM SideProjectStage WHERE project_id IN (${inList(ids.slice(0, 3000))}) GROUP BY stage`)
+    : [];
+  const stages = STAGES.map((stage) => {
+    const a = actual.filter((x) => x.stage === stage).map((x) => Number(x.days));
+    const pl = planned.find((x) => x.stage === stage);
+    const now = rows.filter((r) => (r.status === "ON_HOLD" ? r.pausedFrom : r.status) === stage);
+    return {
+      stage,
+      avgActualDays: a.length ? Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 10) / 10 : 0,
+      avgPlannedDays: pl ? Math.round(Number(pl.days) * 10) / 10 : null,
+      samples: a.length,
+      now: now.length,
+      overrunNow: now.filter((r) => r.status !== "ON_HOLD" && r.stage.overrunDays > 0).length,
+    };
+  });
+  const onHold = actual.filter((x) => x.stage === "ON_HOLD").map((x) => Number(x.days));
+  const ratio = (s: (typeof stages)[number]) => (s.avgPlannedDays ? s.avgActualDays / s.avgPlannedDays : 0);
+  const bottleneck = [...stages].filter((s) => s.samples > 0 && s.avgPlannedDays).sort((a, b) => ratio(b) - ratio(a))[0] ?? null;
+  const stuck =
+    depth === "detail"
+      ? rows
+          .filter((r) => r.status !== "COMPLETED" && r.status !== "ON_HOLD" && r.stage.daysIn !== null)
+          .sort((a, b) => b.stage.overrunDays - a.stage.overrunDays || (b.stage.daysIn ?? 0) - (a.stage.daysIn ?? 0))
+          .slice(0, 8)
+      : [];
+  return {
+    stages,
+    onHold: { now: rows.filter((r) => r.status === "ON_HOLD").length, avgDays: onHold.length ? Math.round((onHold.reduce((x, y) => x + y, 0) / onHold.length) * 10) / 10 : 0 },
+    bottleneck: bottleneck && ratio(bottleneck) > 1 ? { stage: bottleneck.stage, ratio: Math.round(ratio(bottleneck) * 100) / 100 } : null,
+    stuck,
+  };
+}
+
+/** Reporting habits: reports and hours this week, who reported, and working projects gone quiet. */
+async function reportingInsight(rows: MonitorRow[], depth: "summary" | "detail") {
+  const ids = rows.map((r) => r.id);
+  const per = ids.length
+    ? await many(sql`
+        SELECT project_id AS id,
+               SUM(COALESCE(work_date, DATE(created_at)) >= DATE_SUB(UTC_DATE(), INTERVAL 6 DAY)) AS week,
+               SUM(IF(COALESCE(work_date, DATE(created_at)) >= DATE_SUB(UTC_DATE(), INTERVAL 6 DAY), COALESCE(hours, 0), 0)) AS hours,
+               DATE_FORMAT(MAX(COALESCE(work_date, DATE(created_at))), '%Y-%m-%d') AS last
+        FROM SideProjectUpdate WHERE project_id IN (${inList(ids.slice(0, 3000))}) GROUP BY project_id`)
+    : [];
+  const by = new Map(per.map((p) => [Number(p.id), p]));
+  const working = rows.filter((r) => ["PLANNING", "IN_PROGRESS", "TESTING"].includes(r.status));
+  const today = new Date().toISOString().slice(0, 10);
+  const daysSince = (d: string | null) => (d ? Math.floor((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86_400_000) : null);
+  const quiet = working
+    .map((r) => ({ row: r, last: (by.get(r.id)?.last as string | undefined) ?? null }))
+    .filter((x) => x.last === null || (daysSince(x.last) ?? 0) >= 14);
+  return {
+    reportsThisWeek: per.reduce((s, p) => s + Number(p.week), 0),
+    hoursThisWeek: Math.round(per.reduce((s, p) => s + Number(p.hours), 0) * 10) / 10,
+    // of the working projects (the ring's denominator), how many reported in the last 7 days
+    projectsReportedThisWeek: working.filter((r) => Number(by.get(r.id)?.week ?? 0) > 0).length,
+    workingProjects: working.length,
+    quietCount: quiet.length,
+    quiet: depth === "detail" ? quiet.slice(0, 8).map((x) => ({ ...x.row, lastReport: x.last, daysSinceReport: daysSince(x.last) })) : [],
+  };
+}
+
+/** The Assigned projects page: everything this user supervises or helps build, with counts. */
+export async function assignedProjects(userId: number, f: MonitorFilters) {
+  const rows = await loadRows(null, { ...f, assignedTo: userId });
+  const counts = {
+    total: rows.length,
+    supervising: rows.filter((r) => r.relation === "SUPERVISOR").length,
+    member: rows.filter((r) => r.relation === "MEMBER").length,
+    awaitingReview: rows.filter((r) => r.relation === "SUPERVISOR" && r.reviewState === "AWAITING_VERIFICATION").length,
+    overdue: rows.filter((r) => r.health === "OVERDUE").length,
+    stale: rows.filter((r) => r.health === "STALE").length,
+    paused: rows.filter((r) => r.status === "ON_HOLD").length,
+    completed: rows.filter((r) => r.status === "COMPLETED").length,
+  };
+  return { counts, rows: rows.slice(0, 600) };
 }

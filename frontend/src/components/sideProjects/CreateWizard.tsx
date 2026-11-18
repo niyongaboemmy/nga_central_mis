@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Calendar, Check, Clock, Download, FileCheck2, FileText, FileUp, Github, Globe, Image as ImageIcon, Lightbulb, Link2, Paperclip, PenLine, Rocket, Sparkles, Target, Trash2, UserCheck, Users, Wand2, X,
+  ArrowLeft, ArrowRight, Calendar, CalendarRange, Check, Flag, GanttChartSquare, Clock, Download, FileCheck2, FileText, FileUp, Github, Globe, Image as ImageIcon, Lightbulb, Link2, Paperclip, PenLine, Rocket, Sparkles, Target, Trash2, UserCheck, Users, Wand2, X,
 } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type Status } from "../../api/sideProjects";
 import { CategoryPicker, PersonPicker, TagInput, checkGithub, checkHttps } from "./fields";
 import { Field, FormModal, FormSection, IconInput, OptionCards, TextArea } from "./form";
+import PlanEditor, { MIN_PROJECT_DAYS, addDays, clampEnds, defaultEnds, endsToDates, spanDays } from "./PlanEditor";
 import { CATEGORY_ICON, Dropzone, ProgressRing, STATUS_META, Spinner, fmtBytes, inputCls, primaryBtn, secondaryBtn, statusColor, useIsDark } from "./ui";
 
 const DOC_ACCEPT = ".pdf,.doc,.docx,.odt,.md,.txt,.ppt,.pptx";
@@ -13,7 +14,8 @@ const STEPS = [
   { key: "basics", icon: Lightbulb, label: "The idea", caption: "Title, problem, category" },
   { key: "concept", icon: FileCheck2, label: "Concept note", caption: "Upload or write it" },
   { key: "attachments", icon: Paperclip, label: "Attachments", caption: "Optional · now or later" },
-  { key: "launch", icon: Rocket, label: "Links & plan", caption: "All optional" },
+  { key: "timeline", icon: GanttChartSquare, label: "Timeline", caption: "Start, closing, stages" },
+  { key: "launch", icon: Rocket, label: "Links & team", caption: "All optional" },
 ] as const;
 
 export interface WizardProps {
@@ -26,15 +28,27 @@ export interface WizardProps {
 
 type Errors = Partial<Record<string, string>>;
 
-const addMonths = (n: number) => {
+const todayIso = () => {
   const d = new Date();
-  d.setMonth(d.getMonth() + n);
-  return d.toISOString().slice(0, 10);
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString().slice(0, 10);
 };
+/** The same day n months after `from` (end of month when it doesn't exist), minus one day. */
+const plusMonths = (from: string, n: number) => {
+  const d = new Date(`${from}T00:00:00Z`);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + n);
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, last));
+  return addDays(d.toISOString().slice(0, 10), -1);
+};
+/** Where a new project may start (the server takes Idea, Planning or Building). */
+const START_IN: Status[] = ["IDEA", "PLANNING", "IN_PROGRESS"];
+const startable = (s: Status): Status => (START_IN.includes(s) ? s : "IN_PROGRESS");
 
 /** Step band: three segments that fill as you go, each a button back to a finished step. */
 const StepBand: React.FC<{ step: number; onGo: (i: number) => void }> = ({ step, onGo }) => (
-  <ol className="grid grid-cols-4 gap-2" aria-label="Steps">
+  <ol className="grid grid-cols-5 gap-2" aria-label="Steps">
     {STEPS.map((s, i) => {
       const state = i < step ? "done" : i === step ? "now" : "next";
       return (
@@ -58,8 +72,8 @@ const StepBand: React.FC<{ step: number; onGo: (i: number) => void }> = ({ step,
                 {state === "done" ? <Check className="h-3.5 w-3.5" /> : i + 1}
               </span>
               <span className="min-w-0">
-                <span className={`block truncate text-xs font-semibold ${state === "next" ? "text-slate-400 dark:text-gray-500" : "text-slate-800 group-hover:text-blue-700 dark:text-gray-100"}`}>{s.label}</span>
-                <span className="hidden truncate text-[11px] text-slate-500 sm:block dark:text-gray-400">{s.caption}</span>
+                <span className={`hidden truncate text-xs font-semibold sm:block ${state === "next" ? "text-slate-400 dark:text-gray-500" : "text-slate-800 group-hover:text-blue-700 dark:text-gray-100"}`}>{s.label}</span>
+                <span className="hidden truncate text-[11px] text-slate-500 lg:block dark:text-gray-400">{s.caption}</span>
               </span>
             </span>
           </button>
@@ -114,14 +128,14 @@ const Preview: React.FC<{
             ))}
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-700/60">
-            <motion.div className="h-full rounded-full" style={{ backgroundColor: statusColor(status, dark) }} animate={{ width: status === "IN_PROGRESS" ? "10%" : "0%" }} />
+            <motion.div className="h-full rounded-full" style={{ backgroundColor: statusColor(status, dark) }} animate={{ width: status === "IN_PROGRESS" ? "40%" : status === "PLANNING" ? "15%" : "0%" }} />
           </div>
           <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
             <span className={`inline-flex h-6 w-6 items-center justify-center rounded-lg ${conceptReady ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-slate-100 dark:bg-gray-700/60"}`} title="Concept note">
               <FileCheck2 className="h-3.5 w-3.5" aria-hidden />
             </span>
             {([["SRS", srs], ["Plan", plan]] as const).map(([l, on]) => (
-              <span key={l} className={`ml-1 inline-flex h-6 items-center rounded-lg px-1.5 text-[10px] font-bold ${on ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-gray-700/60 dark:text-gray-400"}`} title={l}>
+              <span key={l} className={`ml-1 inline-flex h-6 items-center rounded-lg px-1.5 text-[10px] font-bold ${on ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-gray-700/60 dark:text-gray-300"}`} title={l}>
                 {l}
               </span>
             ))}
@@ -223,7 +237,9 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   const [written, setWritten] = useState({ users: "", solution: "", impact: "" });
   const [github, setGithub] = useState("");
   const [access, setAccess] = useState("");
+  const [start, setStart] = useState(todayIso);
   const [target, setTarget] = useState("");
+  const [ends, setEnds] = useState<number[]>([]);
   const [supervisor, setSupervisor] = useState<{ id: number; name: string } | null>(null);
   const [status, setStatus] = useState<Status>(initialStatus);
   const [errors, setErrors] = useState<Errors>({});
@@ -249,9 +265,11 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       setWritten({ users: "", solution: "", impact: "" });
       setGithub("");
       setAccess("");
+      setStart(todayIso());
       setTarget("");
+      setEnds([]);
       setSupervisor(null);
-      setStatus(initialStatus === "COMPLETED" ? "IN_PROGRESS" : initialStatus);
+      setStatus(startable(initialStatus));
       setErrors({});
       setDone(false);
     }
@@ -262,6 +280,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
     { label: "A title", ok: title.trim().length >= 3 },
     { label: "The problem it solves", ok: problem.trim().length >= 30 },
     { label: "A concept note", ok: conceptReady },
+    { label: "Start and closing dates", ok: !!start && spanDays(start, target) >= MIN_PROJECT_DAYS },
   ];
 
   const check = (s: number): Errors => {
@@ -280,6 +299,11 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       }
     }
     if (s === 3) {
+      if (!start) e.startDate = "Choose the start date";
+      if (!target) e.targetDate = "Choose the closing date";
+      else if (start && spanDays(start, target) < MIN_PROJECT_DAYS) e.targetDate = `At least ${MIN_PROJECT_DAYS} days after the start`;
+    }
+    if (s === 4) {
       const g = checkGithub(github);
       if (g) e.githubUrl = g;
       const a = checkHttps(access);
@@ -299,11 +323,12 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   };
 
   const submit = async () => {
-    const all = { ...check(0), ...check(1), ...check(3) };
+    const all = { ...check(0), ...check(1), ...check(3), ...check(4) };
     setErrors(all);
     if (Object.keys(all).length) {
       if (all.title || all.problemStatement) setStep(0);
       else if (Object.keys(all).some((k) => k.startsWith("concept"))) setStep(1);
+      else if (all.startDate || all.targetDate) setStep(3);
       return;
     }
     setBusy(true);
@@ -316,7 +341,9 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
         techTags: tags,
         githubUrl: github.trim() || undefined,
         accessUrl: access.trim() || undefined,
-        targetDate: target || undefined,
+        startDate: start,
+        targetDate: target,
+        stagePlan: ends.length === 3 ? endsToDates(start, ends) : undefined,
         supervisorId: supervisor?.id,
         status,
       };
@@ -347,6 +374,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       setErrors({ [f.field ?? "form"]: f.message });
       if (f.field === "title" || f.field === "problemStatement") setStep(0);
       else if (f.field?.startsWith("concept") || f.field === "file") setStep(1);
+      else if (f.field === "startDate" || f.field === "targetDate" || f.field?.startsWith("plan")) setStep(3);
     } finally {
       setBusy(false);
       setPhase(null);
@@ -370,11 +398,23 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   const err = (k: string) => errors[k];
   const variants = useMemo(() => ({ enter: (d: number) => ({ x: d * 32, opacity: 0 }), center: { x: 0, opacity: 1 }, exit: (d: number) => ({ x: d * -32, opacity: 0 }) }), []);
   const category = categories.find((c) => c.id === categoryId) ?? null;
-  const quickDates: Array<[string, string]> = [
-    ["1 month", addMonths(1)],
-    ["3 months", addMonths(3)],
-    ["6 months", addMonths(6)],
-  ];
+  const quickDates: Array<[string, string]> = start
+    ? [
+        ["2 weeks", addDays(start, 13)],
+        ["1 month", plusMonths(start, 1)],
+        ["3 months", plusMonths(start, 3)],
+        ["6 months", plusMonths(start, 6)],
+      ]
+    : [];
+  /** New dates keep the stage proportions the person chose. */
+  const redate = (s0: string, t0: string) => {
+    const oldTotal = spanDays(start, target);
+    const total = spanDays(s0, t0);
+    if (total < MIN_PROJECT_DAYS) return setEnds([]);
+    if (ends.length === 3 && oldTotal >= MIN_PROJECT_DAYS) setEnds(clampEnds(ends.map((e) => ((e + 1) / oldTotal) * total - 1), total));
+    else setEnds(defaultEnds(total));
+  };
+  const LAST = STEPS.length - 1;
 
   const footer = done ? null : (
     <>
@@ -382,12 +422,12 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
         <ArrowLeft className="h-4 w-4" /> {step === 0 ? "Cancel" : "Back"}
       </button>
       <div className="flex items-center gap-2">
-        <span className="hidden text-xs text-slate-500 sm:inline dark:text-gray-400">Step {step + 1} of 4</span>
+        <span className="hidden text-xs text-slate-500 sm:inline dark:text-gray-400">Step {step + 1} of {STEPS.length}</span>
         {step === 2 && attachCount === 0 ? (
           <button type="button" className={primaryBtn} onClick={() => go(step + 1)}>
             <Clock className="h-4 w-4" /> Do it later &amp; continue
           </button>
-        ) : step < 3 ? (
+        ) : step < LAST ? (
           <button type="button" className={primaryBtn} onClick={() => go(step + 1)}>
             Continue{step === 2 ? ` with ${attachCount}` : ""} <ArrowRight className="h-4 w-4" />
           </button>
@@ -416,7 +456,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       size="xl"
       icon={Wand2}
       title="New project"
-      subtitle={done ? "All set" : "Four quick steps. Only the idea and the concept note are required."}
+      subtitle={done ? "All set" : "Five quick steps. The idea, the concept note and the dates are required."}
       band={done ? undefined : <StepBand step={step} onGo={go} />}
       footer={footer}
     >
@@ -563,6 +603,52 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
 
                 {step === 3 && (
                   <>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Start date" htmlFor="sp-start" error={err("startDate")}>
+                        <IconInput
+                          id="sp-start"
+                          icon={CalendarRange}
+                          type="date"
+                          value={start}
+                          invalid={!!err("startDate")}
+                          onChange={(e) => (setStart(e.target.value), redate(e.target.value, target), setErrors((x) => ({ ...x, startDate: undefined })))}
+                          className="[color-scheme:light] dark:[color-scheme:dark]"
+                        />
+                      </Field>
+                      <Field label="Closing date" htmlFor="sp-target" error={err("targetDate")}>
+                        <IconInput
+                          id="sp-target"
+                          icon={Flag}
+                          type="date"
+                          value={target}
+                          min={start || undefined}
+                          invalid={!!err("targetDate")}
+                          onChange={(e) => (setTarget(e.target.value), redate(start, e.target.value), setErrors((x) => ({ ...x, targetDate: undefined })))}
+                          className="[color-scheme:light] dark:[color-scheme:dark]"
+                        />
+                        <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Quick durations">
+                          {quickDates.map(([label, d]) => (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => (setTarget(d), redate(start, d), setErrors((x) => ({ ...x, targetDate: undefined })))}
+                              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${target === d ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-300"}`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </Field>
+                    </div>
+                    <FormSection title="Stages" icon={GanttChartSquare}>
+                      <p className="-mt-1 text-xs text-slate-500 dark:text-gray-400">Drag the handles to give each stage its days. You can change this later.</p>
+                      <PlanEditor start={start} target={target} ends={ends} onChange={setEnds} disabled={busy} />
+                    </FormSection>
+                  </>
+                )}
+
+                {step === 4 && (
+                  <>
                     <FormSection title="Links" icon={Link2}>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Field label="GitHub repository" htmlFor="sp-gh" error={err("githubUrl")}>
@@ -573,32 +659,20 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
                         </Field>
                       </div>
                     </FormSection>
-                    <FormSection title="Plan" icon={Calendar}>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Target date" htmlFor="sp-target">
-                          <IconInput id="sp-target" icon={Calendar} type="date" value={target} onChange={(e) => setTarget(e.target.value)} className="[color-scheme:light] dark:[color-scheme:dark]" />
-                          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Quick dates">
-                            {quickDates.map(([label, d]) => (
-                              <button key={label} type="button" onClick={() => setTarget(d)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${target === d ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-300"}`}>
-                                + {label}
-                              </button>
-                            ))}
-                          </div>
-                        </Field>
-                        <Field label="Supervisor" icon={UserCheck}>
-                          <PersonPicker value={supervisor} onChange={(p) => setSupervisor(p)} search={sideProjectsApi.supervisors} placeholder="Search a teacher" error={err("supervisorId")} />
-                        </Field>
-                      </div>
+                    <FormSection title="Supervision" icon={UserCheck}>
+                      <Field label="Supervisor" optional>
+                        <PersonPicker value={supervisor} onChange={(p) => setSupervisor(p)} search={sideProjectsApi.supervisors} placeholder="Search a teacher" error={err("supervisorId")} />
+                      </Field>
                     </FormSection>
                     <FormSection title="Start in" icon={Rocket}>
                       <OptionCards
                         label="Start in"
                         value={status}
                         onChange={setStatus}
-                        options={(["IDEA", "IN_PROGRESS"] as Status[]).map((s) => ({
+                        options={START_IN.map((s) => ({
                           value: s,
                           title: STATUS_META[s].label,
-                          caption: s === "IDEA" ? "Still planning" : "Work has started",
+                          caption: s === "IDEA" ? "Shaping the idea" : s === "PLANNING" ? "Designing the solution" : "Work has started",
                           icon: STATUS_META[s].icon,
                           color: statusColor(s, dark),
                         }))}

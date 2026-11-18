@@ -6,7 +6,8 @@ import {
 } from "lucide-react";
 import { fileUrl, type Health, type MonitorRow, type Status, type Summary } from "../../../api/sideProjects";
 import UserAvatar from "../../ui/UserAvatar";
-import { HEALTH_META, ReviewBadge, STATUS_META, STATUS_ORDER, statusColor, timeAgo, useIsDark, cardCls, CATEGORY_ICON } from "../ui";
+import { ReportingInsights, StageInsights } from "./Insights";
+import { STATUS_SOLID, HEALTH_META, ReviewBadge, STATUS_META, STATUS_ORDER, statusColor, timeAgo, useIsDark, cardCls, CATEGORY_ICON } from "../ui";
 
 export type DrillFilter = Partial<{ ownerType: "STUDENT" | "STAFF"; status: Status; review: string; health: Health; missing: string; hasGithub: string; hasAccess: string; classId: number }>;
 
@@ -20,7 +21,7 @@ const useChartTokens = () => {
     grid: dark ? "#334155" : "#e2e8f0",
     axis: dark ? "#cbd5e1" : "#475569",
     s1: dark ? "#3987e5" : "#2a78d6",
-    s3: dark ? "#199e70" : "#1baf7a",
+    s3: dark ? "#0ca30c" : "#008300",
   };
 };
 
@@ -99,7 +100,7 @@ const Pipeline: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void }> = ({
               animate={{ flexGrow: n / total }}
               transition={{ duration: 0.7 }}
               className="flex min-w-[2.5rem] basis-0 items-center justify-center gap-1.5 text-sm font-bold text-white transition hover:brightness-110"
-              style={{ backgroundColor: statusColor(st, dark) }}
+              style={{ backgroundColor: STATUS_SOLID[st] }}
             >
               <M.icon className="h-4 w-4" aria-hidden /> {n}
             </motion.button>
@@ -167,8 +168,8 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         <Tile icon={FolderKanban} value={s.totals.projects} label="Projects" delay={0} onClick={detail ? () => onDrill({}) : undefined} />
-        <Tile icon={Users} value={s.totals.participation !== null ? `${s.totals.participation}%` : s.totals.students} label={s.totals.participation !== null ? `${s.totals.studentOwners} of ${s.totals.population} students` : "Owners"} tone="text-teal-700 bg-teal-50 dark:bg-teal-500/15 dark:text-teal-200" delay={0.03} />
-        <Tile icon={BadgeCheck} value={s.totals.completedThisTerm} label={`Completed · ${s.totals.termLabel}`} delta={delta} tone="text-emerald-700 bg-emerald-50 dark:bg-emerald-500/15 dark:text-emerald-200" delay={0.06} onClick={detail ? () => onDrill({ status: "COMPLETED" }) : undefined} />
+        <Tile icon={Users} value={s.totals.participation !== null ? `${s.totals.participation}%` : s.totals.students} label={s.totals.participation !== null ? `${s.totals.studentOwners} of ${s.totals.population} students` : "Owners"} tone="text-blue-700 bg-blue-50 dark:bg-blue-500/15 dark:text-blue-200" delay={0.03} />
+        <Tile icon={BadgeCheck} value={s.totals.completedThisTerm} label={`Completed · ${s.totals.termLabel}`} delta={delta} tone="text-green-700 bg-green-50 dark:bg-green-500/15 dark:text-green-200" delay={0.06} onClick={detail ? () => onDrill({ status: "COMPLETED" }) : undefined} />
         <Tile icon={Hourglass} value={s.totals.awaitingVerification} label="Awaiting verification" tone="text-blue-700 bg-blue-50 dark:bg-blue-500/15 dark:text-blue-200" delay={0.09} onClick={detail ? () => onDrill({ review: "AWAITING_VERIFICATION" }) : undefined} />
         <Tile icon={PauseCircle} value={s.totals.stale} label="No recent activity" tone="text-amber-700 bg-amber-50 dark:bg-amber-500/15 dark:text-amber-200" delay={0.12} onClick={detail ? () => onDrill({ health: "STALE" }) : undefined} />
         <Tile icon={Clock3} value={s.totals.overdue} label="Overdue" tone="text-red-700 bg-red-50 dark:bg-red-500/15 dark:text-red-200" delay={0.15} onClick={detail ? () => onDrill({ health: "OVERDUE" }) : undefined} />
@@ -183,6 +184,15 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
       <Panel title="Pipeline" icon={FolderKanban}>
         <Pipeline s={s} onDrill={drill} />
       </Panel>
+
+      {s.stages && s.reporting && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <StageInsights s={s} onOpen={onOpen} detail={detail} />
+          </div>
+          <ReportingInsights s={s} onOpen={onOpen} detail={detail} />
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Started vs completed" icon={TrendingUp} className="lg:col-span-2" action={<button type="button" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700/50" aria-pressed={table} aria-label="Show as table" onClick={() => setTable((v) => !v)}><Table2 className="h-4 w-4" /></button>}>
@@ -237,13 +247,13 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
                     <YAxis type="category" dataKey="label" width={110} tick={{ fontSize: 11, fill: t.axis }} axisLine={false} tickLine={false} />
                     <Tooltip content={<Tip />} cursor={{ fill: t.dark ? "#33415555" : "#f1f5f9" }} />
                     {STATUS_ORDER.map((st, i) => (
-                      <Bar key={st} dataKey={st} name={STATUS_META[st].label} stackId="s" fill={statusColor(st, t.dark)} stroke={t.dark ? "#1e293b" : "#fff"} strokeWidth={2} radius={i === 2 ? [0, 4, 4, 0] : 0} cursor={detail ? "pointer" : undefined}
+                      <Bar key={st} dataKey={st} name={STATUS_META[st].label} stackId="s" fill={statusColor(st, t.dark)} stroke={t.dark ? "#1e293b" : "#fff"} strokeWidth={2} radius={i === STATUS_ORDER.length - 1 ? [0, 4, 4, 0] : 0} cursor={detail ? "pointer" : undefined}
                         onClick={(d: any) => detail && d?.classId && onDrill({ classId: d.classId, status: st })} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-2 flex gap-3 text-xs text-slate-600 dark:text-gray-300">
+              <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-600 dark:text-gray-300">
                 {STATUS_ORDER.map((st) => <span key={st} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: statusColor(st, t.dark) }} />{STATUS_META[st].label}</span>)}
               </div>
             </>

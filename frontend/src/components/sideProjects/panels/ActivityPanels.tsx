@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Archive, ArchiveRestore, BadgeCheck, CheckCircle2, FilePlus2, Images, MessageSquareWarning, PlusCircle, Send, ShieldCheck, Target, UserCheck, UserMinus, UserPlus, Users, Wrench, X, Bell, ArrowRightLeft, Trash2, Mail, Check,
+  Archive, ArchiveRestore, BadgeCheck, CheckCircle2, FilePlus2, Images, MessageSquareWarning, PlusCircle, Send, ShieldCheck, Target, UserCheck, UserMinus, UserPlus, Users, Wrench, X, Bell, ArrowRightLeft, Trash2, Mail, Check, GanttChartSquare,
 } from "lucide-react";
 import { failure, sideProjectsApi, type ProjectDetail, type Status } from "../../../api/sideProjects";
 import { useToast } from "../../../contexts/ToastContext";
@@ -19,7 +19,8 @@ const EVENT_ICON: Record<string, { icon: React.ElementType; color: string }> = {
   MEDIA_REMOVED: { icon: Trash2, color: "#94a3b8" },
   MILESTONE: { icon: Target, color: "#0ca30c" },
   REVIEW: { icon: ShieldCheck, color: "#2563eb" },
-  SUPERVISOR: { icon: UserCheck, color: "#0d9488" },
+  SUPERVISOR: { icon: UserCheck, color: "#2563eb" },
+  PLAN: { icon: GanttChartSquare, color: "#2a78d6" },
   ARCHIVE: { icon: Archive, color: "#94a3b8" },
   RESTORE: { icon: ArchiveRestore, color: "#3b6cff" },
   MEMBER_INVITED: { icon: Mail, color: "#3b6cff" },
@@ -29,7 +30,10 @@ const EVENT_ICON: Record<string, { icon: React.ElementType; color: string }> = {
   MEMBER_DECLINED: { icon: X, color: "#94a3b8" },
   NUDGE_STALE: { icon: Bell, color: "#fab219" },
   NUDGE_CONCEPT: { icon: Bell, color: "#d03b3b" },
+  NUDGE_STAGE: { icon: Bell, color: "#d03b3b" },
 };
+
+const shortDate = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" });
 
 const describe = (e: ProjectDetail["events"][number]) => {
   switch (e.type) {
@@ -44,6 +48,12 @@ const describe = (e: ProjectDetail["events"][number]) => {
       return e.toValue === "VERIFIED" ? "Verified" : e.toValue === "CHANGES_REQUESTED" ? "Changes requested" : "Answered";
     case "MILESTONE":
       return e.note ?? "";
+    case "PLAN": {
+      const [a, b] = String(e.toValue ?? "").split("..");
+      return a && b ? `Plan ${shortDate(a)} – ${shortDate(b)}` : "Plan updated";
+    }
+    case "NUDGE_STAGE":
+      return e.toValue ? `${STATUS_META[e.toValue as Status]?.label ?? e.toValue} past its plan` : "Stage past its plan";
     default:
       return "";
   }

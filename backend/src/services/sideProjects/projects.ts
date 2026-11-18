@@ -9,6 +9,8 @@ import { ProjectAccess } from "./access";
 import { avatarUrls } from "../avatar/urls";
 import * as v from "./validate";
 import { addDocument, documentsOf, mediaOf, storeProjectFiles, Upload, writtenConceptFile, docKindsFor } from "./files";
+import { daysBetween, defaultPlan, ensureStageLogs, loadLogs, loadPlan, periodView, planFromEnds, recordStageChange, rescalePlan, savePlan } from "./stages";
+import { reportsOf } from "./progress";
 
 /**
  * Side projects: create, edit, board, lifecycle and the one detail shape both the student
@@ -78,6 +80,8 @@ async function ownerSnapshot(ownerId: number) {
 
 export interface CreateInput extends BasicsInput {
   status?: unknown;
+  /** [ideaEnd, planningEnd, buildingEnd] or {IDEA, PLANNING, IN_PROGRESS}: stage boundaries */
+  stagePlan?: unknown;
   concept?: Upload | null;
   conceptWritten?: unknown;
 }
@@ -97,12 +101,18 @@ export async function createProject(ownerId: number, by: number, input: CreateIn
   const start = v.date(input.startDate, "startDate");
   const target = v.date(input.targetDate, "targetDate");
   checkDates(start, target);
+  if (!opts.conceptPending) {
+    if (!start) fail(400, "VALIDATION", "Choose the start date", "startDate");
+    if (!target) fail(400, "VALIDATION", "Choose the closing date", "targetDate");
+  }
+  // The stage plan: the boundaries the person chose, or the default split.
+  const plan = start && target ? (input.stagePlan ? planFromEnds(start, target, parseEnds(input.stagePlan)) : defaultPlan(start, target)) : null;
   const supervisor = await validSupervisor(input.supervisorId);
   const links = v.links(input.links);
   const statusRaw = String(input.status ?? "IDEA").toUpperCase();
   if (!(STATUSES as readonly string[]).includes(statusRaw)) fail(400, "VALIDATION", "Unknown status", "status");
   let status = statusRaw as Status;
-  if (status === "COMPLETED" && !opts.allowAnyStatus) fail(400, "SKIP_NOT_ALLOWED", "New projects start as an idea or in progress", "status");
+  if (!opts.allowAnyStatus && !["IDEA", "PLANNING", "IN_PROGRESS"].includes(status)) fail(400, "SKIP_NOT_ALLOWED", "New projects start as an idea, in planning or in building", "status");
 
   let written: { problem: string; users: string; solution: string; impact: string } | null = null;
   if (!input.concept && input.conceptWritten) {
@@ -151,6 +161,9 @@ export async function createProject(ownerId: number, by: number, input: CreateIn
   }
   if (conceptAsset) await addDocument(projectId, "CONCEPT", conceptAsset, by, source);
   if (links.length) await replaceLinks(projectId, links);
+  if (plan) await savePlan(projectId, plan);
+  await db.execute(sql`INSERT INTO SideProjectStageLog (project_id, stage, entered_at) VALUES (${projectId}, ${status}, UTC_TIMESTAMP())`);
+  await db.execute(sql`UPDATE SideProject SET stage_entered_at = UTC_TIMESTAMP() WHERE project_id = ${projectId}`);
   await recordEvent(projectId, by, by === ownerId ? "CREATED" : "CREATED_FOR", null, status, null);
   return projectId;
 }
@@ -174,6 +187,12 @@ export async function updateBasics(a: ProjectAccess, by: number, input: BasicsIn
   checkDates(start, target);
   if (input.startDate !== undefined) set.push(sql`start_date = ${start}`);
   if (input.targetDate !== undefined) set.push(sql`target_date = ${target}`);
+  if ((input.startDate !== undefined || input.targetDate !== undefined) && start && target) {
+    const old = await loadPlan(Number(p.project_id));
+    const startChanged = ymdOrNull(p.start_date) !== start;
+    const targetChanged = ymdOrNull(p.target_date) !== target;
+    if (!old.length || startChanged || targetChanged) await savePlan(Number(p.project_id), old.length ? rescalePlan(old, start, target) : defaultPlan(start, target));
+  }
   if (input.supervisorId !== undefined) {
     const sup = await validSupervisor(input.supervisorId);
     set.push(sql`supervisor_user_id = ${sup}`);
@@ -212,7 +231,7 @@ export async function moveProject(a: ProjectAccess, by: number, body: { to?: unk
   const p = a.project;
   const to = String(body.to ?? "").toUpperCase() as Status;
   const r = transition(
-    { status: p.status, review_state: p.review_state, archived: !!p.archived_at, hasConcept: await hasConcept(Number(p.project_id)) },
+    { status: p.status, review_state: p.review_state, archived: !!p.archived_at, hasConcept: await hasConcept(Number(p.project_id)), paused_from: p.paused_from ?? null },
     { to, outcomeSummary: body.outcomeSummary as string, reason: body.reason as string, correction: opts.correction },
   );
   if (!r.ok) return fail(409, r.code, r.message, r.field);
@@ -221,6 +240,7 @@ export async function moveProject(a: ProjectAccess, by: number, body: { to?: unk
   await db.execute(sql`
     UPDATE SideProject SET
       status = ${r.status},
+      paused_from = ${r.paused_from},
       review_state = ${r.review_state},
       started_at = ${r.setStarted ? sql`COALESCE(started_at, UTC_TIMESTAMP())` : sql`started_at`},
       completed_at = ${r.setCompleted ? sql`UTC_TIMESTAMP()` : r.clearCompleted ? null : sql`completed_at`},
@@ -229,10 +249,40 @@ export async function moveProject(a: ProjectAccess, by: number, body: { to?: unk
       outcome_summary = ${r.outcomeSummary !== undefined ? r.outcomeSummary : sql`outcome_summary`},
       board_position = ${position ?? sql`board_position`}
     WHERE project_id = ${p.project_id}`);
+  await ensureStageLogs([Number(p.project_id)]);
+  await recordStageChange(Number(p.project_id), r.status);
   if (!opts.correction) await touch(Number(p.project_id), yearId);
   else await db.execute(sql`UPDATE SideProject SET updated_at = UTC_TIMESTAMP() WHERE project_id = ${p.project_id}`);
   await recordEvent(Number(p.project_id), by, opts.correction ? "CORRECTION" : "STATUS", p.status, r.status, r.note);
   return { from: p.status as Status, to: r.status, reviewState: r.review_state };
+}
+
+/** The team (or the lead) moves the stage boundaries or the project's dates. */
+export async function updatePlan(a: ProjectAccess, by: number, body: { startDate?: unknown; targetDate?: unknown; stagePlan?: unknown }) {
+  const p = a.project;
+  const start = v.date(body.startDate ?? ymdOrNull(p.start_date), "startDate");
+  const target = v.date(body.targetDate ?? ymdOrNull(p.target_date), "targetDate");
+  if (!start) fail(400, "VALIDATION", "Choose the start date", "startDate");
+  if (!target) fail(400, "VALIDATION", "Choose the closing date", "targetDate");
+  checkDates(start, target);
+  const plan = body.stagePlan ? planFromEnds(start as string, target as string, parseEnds(body.stagePlan)) : defaultPlan(start as string, target as string);
+  await db.execute(sql`UPDATE SideProject SET start_date = ${start}, target_date = ${target}, updated_at = UTC_TIMESTAMP() WHERE project_id = ${p.project_id}`);
+  await savePlan(Number(p.project_id), plan);
+  await recordEvent(Number(p.project_id), by, "PLAN", null, `${start}..${target}`, plan.map((r) => `${r.stage}:${r.end}`).join(" "));
+  return plan;
+}
+
+const ymdOrNull = (d: any): string | null => (d ? (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10)) : null);
+
+/** Stage boundaries from the client: an array [ideaEnd, planningEnd, buildingEnd] or an object by stage. */
+function parseEnds(raw: unknown): Array<string | null> {
+  const val = typeof raw === "string" ? v.safeJson(raw) : raw;
+  if (Array.isArray(val)) return val.map((x) => (x == null ? null : String(x)));
+  if (val && typeof val === "object") {
+    const o = val as Record<string, unknown>;
+    return ["IDEA", "PLANNING", "IN_PROGRESS"].map((k) => (o[k] == null ? null : String(o[k])));
+  }
+  return fail(400, "VALIDATION", "The stage plan is invalid", "stagePlan");
 }
 
 /** Saves one column's order after a drag (ids the viewer may edit only). */
@@ -287,6 +337,9 @@ export const cardColumns = sql`
   sp.progress_mode AS progressMode, sp.progress_manual AS progressManual, sp.tech_tags AS techTags,
   sp.github_url AS githubUrl, sp.access_url AS accessUrl, sp.cover_asset_id AS coverAssetId,
   sp.concept_pending AS conceptPending, sp.owner_user_id AS ownerId, sp.supervisor_user_id AS supervisorId,
+  sp.paused_from AS pausedFrom, ${iso("sp.stage_entered_at")} AS stageEnteredAt,
+  (SELECT DATE_FORMAT(st.planned_end, '%Y-%m-%d') FROM SideProjectStage st WHERE st.project_id = sp.project_id AND st.stage = IF(sp.status = 'ON_HOLD', sp.paused_from, sp.status)) AS stageEnd,
+  (SELECT DATE_FORMAT(st.planned_start, '%Y-%m-%d') FROM SideProjectStage st WHERE st.project_id = sp.project_id AND st.stage = IF(sp.status = 'ON_HOLD', sp.paused_from, sp.status)) AS stageStart,
   ${ymd("sp.target_date")} AS targetDate, ${iso("sp.last_activity_at")} AS lastActivityAt,
   ${iso("sp.created_at")} AS createdAt, ${iso("sp.completed_at")} AS completedAt, ${iso("sp.verified_at")} AS verifiedAt,
   ${iso("sp.archived_at")} AS archivedAt,
@@ -299,6 +352,18 @@ export const cardColumns = sql`
   (SELECT u2.blockers IS NOT NULL AND u2.blockers <> '' FROM SideProjectUpdate u2 WHERE u2.project_id = sp.project_id ORDER BY u2.created_at DESC, u2.update_id DESC LIMIT 1) AS lastBlocked,
   (SELECT COUNT(*) FROM SideProjectComment cm WHERE cm.project_id = sp.project_id AND cm.deleted_at IS NULL) AS commentCount,
   (SELECT COUNT(*) FROM SideProjectMember mb WHERE mb.project_id = sp.project_id AND mb.status = 'ACCEPTED') AS memberCount`;
+
+/** How long the project has been in its current stage, and how long the plan gives it. */
+export function stageTiming(r: any, now: Date) {
+  const today = now.toISOString().slice(0, 10);
+  const entered = r.stageEnteredAt as string | null;
+  const daysIn = entered ? Math.max(0, Math.floor((now.getTime() - Date.parse(entered)) / 86_400_000)) : null;
+  const end = (r.stageEnd as string | null) ?? null;
+  const start = (r.stageStart as string | null) ?? null;
+  const daysLeft = end && r.status !== "COMPLETED" ? daysBetween(today, end) : null;
+  const planned = start && end ? daysBetween(start, end) + 1 : null;
+  return { enteredAt: entered, daysIn, plannedEnd: end, plannedDays: planned, daysLeft, overrunDays: daysLeft !== null && daysLeft < 0 ? -daysLeft : 0 };
+}
 
 export function shapeCard(r: any, now = new Date()) {
   const tags = (() => {
@@ -317,8 +382,10 @@ export function shapeCard(r: any, now = new Date()) {
     status: r.status as Status,
     boardPosition: Number(r.boardPosition || 0),
     reviewState: r.reviewState,
-    progress: progressOf({ status: r.status, progress_mode: r.progressMode, progress_manual: r.progressManual == null ? null : Number(r.progressManual) }, ms),
-    health: healthOf({ status: r.status, last_activity_at: r.lastActivityAt, target_date: r.targetDate }, { overdueMilestones: Number(r.msOverdue || 0), lastUpdateBlocked: Number(r.lastBlocked || 0) === 1 }, now, limits().staleDays),
+    progress: progressOf({ status: r.status, paused_from: r.pausedFrom, progress_mode: r.progressMode, progress_manual: r.progressManual == null ? null : Number(r.progressManual) }, ms),
+    health: healthOf({ status: r.status, last_activity_at: r.lastActivityAt, target_date: r.targetDate, stage_end: r.status === "ON_HOLD" ? null : r.stageEnd }, { overdueMilestones: Number(r.msOverdue || 0), lastUpdateBlocked: Number(r.lastBlocked || 0) === 1 }, now, limits().staleDays),
+    pausedFrom: (r.pausedFrom as Status) || null,
+    stage: stageTiming(r, now),
     milestones: ms,
     techTags: tags,
     githubUrl: r.githubUrl || null,
@@ -359,6 +426,7 @@ export async function myProjects(userId: number, opts: { archived?: boolean } = 
 
 export async function projectDetail(a: ProjectAccess) {
   const id = Number(a.project.project_id);
+  await ensureStageLogs([id]);
   const row = await one(sql`
     SELECT ${cardColumns}, sp.problem_statement AS problemStatement, sp.description, sp.outcome_summary AS outcomeSummary,
            ${ymd("sp.start_date")} AS startDate, ${iso("sp.started_at")} AS startedAt,
@@ -384,11 +452,7 @@ export async function projectDetail(a: ProjectAccess) {
     mediaOf(id),
     many(sql`SELECT link_id AS id, kind, label, url FROM SideProjectLink WHERE project_id = ${id} ORDER BY sort, link_id`),
     many(sql`SELECT milestone_id AS id, title, ${ymd("due_date")} AS dueDate, ${iso("done_at")} AS doneAt, sort FROM SideProjectMilestone WHERE project_id = ${id} ORDER BY sort, milestone_id`),
-    many(sql`
-      SELECT u.update_id AS id, u.did, u.next_steps AS nextSteps, u.blockers, u.mood, ${iso("u.created_at")} AS createdAt,
-             u.author_id AS authorId, ${fullName("p")} AS author
-      FROM SideProjectUpdate u LEFT JOIN UserProfile p ON p.user_id = u.author_id
-      WHERE u.project_id = ${id} ORDER BY u.created_at DESC, u.update_id DESC LIMIT 100`),
+    reportsOf(id),
     many(sql`
       SELECT c.comment_id AS id, c.kind, c.body, ${iso("c.created_at")} AS createdAt, c.author_id AS authorId, ${fullName("p")} AS author,
              p.user_type AS authorType
@@ -404,6 +468,13 @@ export async function projectDetail(a: ProjectAccess) {
       FROM SideProjectMember m JOIN UserProfile p ON p.user_id = m.user_id WHERE m.project_id = ${id} ORDER BY m.added_at`),
   ]);
   const card = shapeCard(row);
+  const [plan, logs] = await Promise.all([loadPlan(id), loadLogs(id)]);
+  const period = periodView(
+    { status: row.status, paused_from: row.pausedFrom ?? null, start_date: row.startDate || null, target_date: row.targetDate || null, created_at: row.createdAt },
+    plan,
+    logs,
+    new Date(),
+  );
   return {
     ...card,
     problemStatement: row.problemStatement,
@@ -430,6 +501,9 @@ export async function projectDetail(a: ProjectAccess) {
     comments,
     events,
     members,
+    period,
+    /** every actual stay in a stage, oldest first (the Gantt draws these) */
+    stays: logs.map((l) => ({ stage: l.stage, enteredAt: l.entered_at, leftAt: l.left_at })),
     rights: { edit: a.canEdit, owner: a.isOwner, review: a.canReview, manageAny: a.manageAny, supervisor: a.isSupervisor },
   };
 }

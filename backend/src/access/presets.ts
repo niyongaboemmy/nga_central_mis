@@ -482,7 +482,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Baseline for every teacher (own calendar, own records). Teaching power comes from Subject/Class Teacher grants.",
     category: "Teaching",
     scopes: ["SELF"],
-    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "OFFICE_HOURS_MANAGE_OWN", "VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN"],
+    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "OFFICE_HOURS_MANAGE_OWN", "VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", ["SIDE_PROJECTS_ASSIGNED", "detail"]],
   },
   {
     key: "support_staff",
@@ -491,7 +491,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Baseline for non-teaching staff.",
     category: "Operations",
     scopes: ["SELF"],
-    caps: ["VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN"],
+    caps: ["VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", ["SIDE_PROJECTS_ASSIGNED", "detail"]],
   },
   {
     key: "student",

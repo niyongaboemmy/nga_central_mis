@@ -93,6 +93,7 @@
     { "key": "mis.families_import", "label": "Import parents", "module": "Platform", "patterns": ["/families/import"] },
     { "key": "mis.wellbeing", "label": "Wellbeing", "module": "Platform", "patterns": ["/wellbeing"] },
     { "key": "mis.my_projects", "label": "My projects", "module": "Learning", "patterns": ["/my-projects"] },
+    { "key": "mis.assigned_projects", "label": "Assigned projects", "module": "Learning", "patterns": ["/assigned-projects"] },
     { "key": "mis.projects_monitor", "label": "Student projects", "module": "Platform", "patterns": ["/projects-monitor"] },
     { "key": "mis.code_playground", "label": "Code Playground", "module": "E-learning", "patterns": ["/code-playground"] },
     { "key": "mis.desktop_tools", "label": "Desktop tools", "module": "Platform", "patterns": ["/desktop-tools"] },

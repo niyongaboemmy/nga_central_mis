@@ -598,3 +598,45 @@ Not only students run projects: every user (teachers, staff, admins, parents, st
 | Import | Owners are matched by registration number **or email** (the template has both columns). |
 | Navigation | "My projects" moved to the Workspace section for everyone. The monitor is now called "All projects". |
 | Colours | No violet, purple or indigo anywhere in the feature (the primary colour is blue). Migration 129 recolours the seeded "Mobile app" and "Other" categories (`#14b8a6`, `#0284c7`) when nobody changed them. |
+
+## 13. Stages, period management, reporting and Assigned projects (2026-11-18, migration 131)
+
+**Stages.** `IDEA → PLANNING → IN_PROGRESS ("Building") → TESTING → COMPLETED`, plus `ON_HOLD`, a pause
+that remembers where it came from (`SideProject.paused_from`). Rules (`lifecycle.ts`):
+
+- forward moves may skip Planning and Testing, but nothing reaches Completed before Building;
+- pausing needs a reason and isn't allowed once completed;
+- a paused project resumes in any working stage, never straight to Completed;
+- leaving Idea needs the concept note, as before.
+
+**Periods.** A project now has required start and closing dates (at least 4 days apart):
+
+- `SideProjectStage` holds the planned window of each working stage. The default split is 10/20/50/20 %, and the team drags the boundaries (create wizard step 4, or Overview → Edit plan). New dates keep the proportions.
+- `SideProjectStageLog` records every real stay (`entered_at`/`left_at`). Projects from before 131 get their history rebuilt from STATUS events on first read.
+- The drawer shows a 5-segment stage track ("day X of Y", overruns, Pause/Resume) and an Overview Gantt (planned band, actual bars, red beyond plan, today line).
+- Cards show a "Day N · X days left / over" chip.
+- The sweep nudges the team and the supervisor once per stay when a stage passes its plan (`NUDGE_STAGE`).
+
+**Reports.** `SideProjectUpdate` gains `work_date` (today back to 60 days, never future), `hours` (0.5–24 in half hours), `stage` and `edited_at`. Up to 3 PDFs per report go in `SideProjectUpdateFile`.
+
+- The Progress tab lists recordings first, grouped by day, with filters.
+- "New report" opens a modal. Authors (or MANAGE_ANY) can edit, remove PDFs or delete.
+- `GET /:id/activity` feeds the Overview "Daily work" contribution calendar: reports count double, other work once, plus streaks.
+
+**Monitoring.** The summary adds:
+
+- `stages`: average actual vs planned days per stage, the number in each stage now and overrunning, the bottleneck (largest actual/planned ratio above 1), and the projects longest in their stage;
+- `reporting`: reports and hours this week, working projects reported, and the ones quiet for 14+ days.
+
+The list has a sortable "Time in stage" column. The export adds days in stage, stage due, overrun and last report.
+
+**Assigned projects.** `/assigned-projects` with the `SIDE_PROJECTS_ASSIGNED` permission. Migration 131 grants it to every role except students' and parents', and it is legacy-visible.
+
+- It lists projects the user supervises or is an accepted team member of (not their own).
+- Attention tiles act as filters, and the page has role/stage filters, sorting, and card or board views.
+- Supervised projects open the review drawer; team projects open on My projects.
+- Supervisor notifications now link here.
+
+**Navigation.** One sidebar group, "Projects": My projects (default), Assigned projects (staff with the permission, with a badge for how many they supervise) and All projects (`SIDE_PROJECTS_VIEW`). My projects also shows an "Assigned to me" shortcut.
+
+**Deploy.** Run `131_side_projects_stages_reports.sql` with the migrate workflow before (or with) the backend deploy. It changes the status ENUM, adds the columns and tables, and seeds the permission.

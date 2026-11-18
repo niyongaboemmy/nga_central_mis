@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Archive, ArchiveRestore, Clock, FileStack, Images, LayoutGrid, MessagesSquare, MoreVertical, Target, Trash2, Users, Wrench, X, GraduationCap, Hash, CalendarRange, Check } from "lucide-react";
+import { Archive, ArchiveRestore, Clock, FileStack, Images, LayoutGrid, MessagesSquare, MoreVertical, Target, Trash2, Users, Wrench, X, GraduationCap, Hash, CalendarRange, Maximize2, Minimize2 } from "lucide-react";
 import { failure, fileUrl, sideProjectsApi, type Category, type ProjectDetail, type Status } from "../../api/sideProjects";
 import { useToast } from "../../contexts/ToastContext";
 import { useConfirm } from "../../contexts/ConfirmContext";
@@ -13,7 +13,8 @@ import ProgressPanel from "./panels/ProgressPanel";
 import { FeedbackPanel, InviteBanner, TeamPanel, TimelinePanel } from "./panels/ActivityPanels";
 import { TYPE_LABEL } from "./fields";
 import { MoveDialog } from "./MoveDialog";
-import { GlassRing, STATUS_SOLID, CATEGORY_ICON, HealthDot, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, statusColor, useIsDark } from "./ui";
+import StageTrack from "./StageTrack";
+import { GlassRing, CATEGORY_ICON, HealthDot, ReviewBadge, Skeleton, STATUS_META, pathStage, statusColor, useIsDark } from "./ui";
 
 type Tab = "overview" | "documents" | "gallery" | "progress" | "timeline" | "feedback" | "team";
 
@@ -41,6 +42,23 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
   const [correct, setCorrect] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const [moveErr, setMoveErr] = useState<string | null>(null);
+  // Maximised: the sheet takes the whole screen (remembered on this device).
+  const [max, setMax] = useState(() => {
+    try {
+      return localStorage.getItem("sp.drawer.max") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleMax = () =>
+    setMax((m) => {
+      try {
+        localStorage.setItem("sp.drawer.max", m ? "0" : "1");
+      } catch {
+        /* private mode */
+      }
+      return !m;
+    });
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -127,7 +145,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
   };
 
   const CatIcon = CATEGORY_ICON[p?.category?.icon ?? "sparkles"] ?? CATEGORY_ICON.sparkles;
-  const accent = p?.category?.color ?? (p ? statusColor(p.status, dark) : "#3b6cff");
+  const accent = p?.category?.color ?? (p ? statusColor(pathStage(p.status, p.pausedFrom), dark) : "#2a78d6");
 
   return createPortal(
     <AnimatePresence>
@@ -139,7 +157,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
             aria-modal="true"
             data-drawer
             aria-label={p?.title ?? "Project"}
-            className="relative flex h-full w-full max-w-3xl flex-col overflow-hidden border-l border-slate-200 bg-slate-50 dark:border-gray-700/50 dark:bg-gray-900"
+            className={`relative flex h-full w-full flex-col overflow-hidden border-l border-slate-200 bg-slate-50 transition-[max-width] duration-300 ease-out dark:border-gray-700/50 dark:bg-gray-900 ${max ? "max-w-full" : "max-w-3xl"}`}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -180,6 +198,9 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
                         )}
                       </div>
                     )}
+                    <button type="button" aria-label={max ? "Restore size" : "Maximise"} title={max ? "Restore size" : "Maximise"} aria-pressed={max} onClick={toggleMax} className="hidden h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-inset ring-white/25 backdrop-blur-md transition hover:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white md:flex">
+                      {max ? <Minimize2 className="h-[18px] w-[18px]" /> : <Maximize2 className="h-[18px] w-[18px]" />}
+                    </button>
                     <button type="button" aria-label="Close" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-inset ring-white/25 backdrop-blur-md transition hover:rotate-90 hover:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
                       <X className="h-[18px] w-[18px]" />
                     </button>
@@ -246,40 +267,8 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
                     </div>
                   </div>
 
-                  {/* Status: one segmented track */}
-                  <ol className="relative grid grid-cols-3 gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800" aria-label="Status">
-                    {STATUS_ORDER.map((s, i) => {
-                      const M = STATUS_META[s];
-                      const idx = STATUS_ORDER.indexOf(p.status);
-                      const current = s === p.status;
-                      const done = i < idx;
-                      const clickable = ((mode === "student" && p.rights.edit) || (mode === "staff" && p.rights.manageAny)) && !current;
-                      return (
-                        <li key={s} className="relative">
-                          {current && <motion.span layoutId="sp-status" className="absolute inset-0 rounded-full " style={{ backgroundColor: STATUS_SOLID[s] }} transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
-                          <button
-                            type="button"
-                            disabled={!clickable}
-                            onClick={() => stepTo(s)}
-                            aria-current={current ? "step" : undefined}
-                            title={clickable ? `Move to ${M.label}` : M.label}
-                            className={`relative flex h-9 w-full items-center justify-center gap-1.5 rounded-full text-xs font-bold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                              current ? "text-white" : done ? `${M.text} hover:bg-white dark:hover:bg-gray-700` : "text-slate-600 hover:bg-white hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
-                            } disabled:cursor-default`}
-                          >
-                            {done ? (
-                              <span className="flex h-4 w-4 items-center justify-center rounded-full text-white" style={{ backgroundColor: statusColor(s, dark) }}>
-                                <Check className="h-2.5 w-2.5" aria-hidden />
-                              </span>
-                            ) : (
-                              <M.icon className="h-3.5 w-3.5" aria-hidden />
-                            )}
-                            <span>{M.label}</span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ol>
+                  {/* Stages: one segmented track with the days of each */}
+                  <StageTrack p={p} canMove={(mode === "student" && p.rights.edit) || (mode === "staff" && p.rights.manageAny)} onStep={stepTo} />
                   {mode === "staff" && p.rights.manageAny && (
                     <p className="-mt-2 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-gray-400">
                       <Wrench className="h-3 w-3" aria-hidden /> Status changes made here are logged as corrections.
@@ -307,7 +296,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
                           <t.icon className="relative h-4 w-4" aria-hidden />
                           <span className="relative">{t.label}</span>
                           {t.count !== undefined && t.count > 0 && (
-                            <span className={`relative min-w-[18px] rounded-full px-1.5 text-center text-[10px] tabular-nums ${on ? "bg-white/25 text-white" : "bg-slate-200/80 text-slate-600 dark:bg-gray-700 dark:text-gray-300"}`}>{t.count}</span>
+                            <span className={`relative min-w-[18px] rounded-full px-1.5 text-center text-[10px] tabular-nums ${on ? "bg-blue-800 text-white" : "bg-slate-200/80 text-slate-600 dark:bg-gray-700 dark:text-gray-300"}`}>{t.count}</span>
                           )}
                         </button>
                       );
@@ -317,7 +306,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5">
+            <div className={`flex-1 overflow-y-auto p-5 ${max ? "lg:px-10" : ""}`}>
               {error ? (
                 <p className="mt-10 text-center text-sm font-medium text-red-600">{error}</p>
               ) : !p ? (
@@ -328,12 +317,12 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
                 </div>
               ) : (
                 <AnimatePresence mode="wait">
-                  <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-3">
+                  <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className={`space-y-3 ${max ? "mx-auto max-w-6xl" : ""}`}>
                     {invited && <InviteBanner p={p} onDone={(ok) => (ok ? changed() : (onChanged(), onClose()))} />}
-                    {tab === "overview" && <OverviewPanel p={p} categories={categories} onSaved={changed} staff={mode === "staff"} />}
+                    {tab === "overview" && <OverviewPanel p={p} categories={categories} onSaved={changed} staff={mode === "staff"} wide={max} />}
                     {tab === "documents" && <DocumentsPanel p={p} onChanged={changed} />}
                     {tab === "gallery" && <GalleryPanel p={p} onChanged={changed} />}
-                    {tab === "progress" && <ProgressPanel p={p} onChanged={changed} />}
+                    {tab === "progress" && <ProgressPanel p={p} meId={meId} onChanged={changed} wide={max} />}
                     {tab === "feedback" && <FeedbackPanel p={p} staff={mode === "staff"} onChanged={changed} />}
                     {tab === "team" && <TeamPanel p={p} meId={meId} onChanged={changed} onLeft={() => (onChanged(), onClose())} />}
                     {tab === "timeline" && <TimelinePanel p={p} />}

@@ -12,7 +12,7 @@ import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { BarChart3, CalendarOff, Grid3x3, Target, HeartHandshake, Radar, ShieldAlert, ShieldCheck, UserPlus, Baby } from "lucide-react";
-import { Lightbulb, FolderKanban } from "lucide-react";
+import { Lightbulb, FolderKanban, ClipboardCheck } from "lucide-react";
 import { useSupervisingCount } from "../sideProjects/useSupervising";
 import { BellRing, Bot, CalendarDays, KeyRound, Clock4, Gamepad2, House, SquareTerminal, Users2 } from "lucide-react";
 
@@ -86,7 +86,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const selectedYearId = useOptionalAcademicPeriod()?.selectedYearId;
   const mentorship = useMentorshipRole(user?.user?.user_id, selectedYearId);
   const userType = String(user?.profile?.user_type ?? "").toUpperCase();
-  const supervising = useSupervisingCount(userType !== "STUDENT" && userType !== "PARENT" && !!user && !access.can("SIDE_PROJECTS_VIEW"));
+  const supervising = useSupervisingCount(userType !== "STUDENT" && userType !== "PARENT" && !!user);
 
   const hasPermission = (perm?: string | string[]) => {
     if (!perm) return true;
@@ -773,13 +773,36 @@ const Sidebar: React.FC<SidebarProps> = ({
       userTypes: ["STUDENT"],
     },
     {
-      // Student side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §6).
-      label: "My projects",
+      // Side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §6, §13): one group. The group
+      // opens on My projects; staff also get Assigned projects (migration 131), and leads the
+      // school-wide monitor.
+      label: "Projects",
       path: "/my-projects",
       section: "workspace",
       icon: <Lightbulb className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      // Everyone may own projects (migration 129 gives every role SIDE_PROJECTS_MANAGE_OWN).
-      requiredPermission: Permissions.SIDE_PROJECTS_MANAGE_OWN,
+      children: [
+        {
+          label: "My projects",
+          path: "/my-projects",
+          icon: <Lightbulb className="w-3.5 h-3.5" />,
+          // Everyone may own projects (migration 129 gives every role SIDE_PROJECTS_MANAGE_OWN).
+          requiredPermission: Permissions.SIDE_PROJECTS_MANAGE_OWN,
+        },
+        {
+          label: "Assigned projects",
+          path: "/assigned-projects",
+          icon: <ClipboardCheck className="w-3.5 h-3.5" />,
+          requiredPermission: Permissions.SIDE_PROJECTS_ASSIGNED,
+          userTypes: ["TEACHER", "STAFF", "ADMIN"],
+          badge: supervising || undefined,
+        },
+        {
+          label: "All projects",
+          path: "/projects-monitor",
+          icon: <FolderKanban className="w-3.5 h-3.5" />,
+          requiredCapability: "SIDE_PROJECTS_VIEW",
+        },
+      ],
     },
     {
       label: "Wellbeing",
@@ -808,22 +831,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       section: "oversight",
       icon: <Radar className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredCapability: "EARLY_WARNING_VIEW",
-    },
-    {
-      label: "All projects",
-      path: "/projects-monitor",
-      section: "oversight",
-      icon: <FolderKanban className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredCapability: "SIDE_PROJECTS_VIEW",
-    },
-    {
-      // Supervisors without SIDE_PROJECTS_VIEW still reach the projects they supervise.
-      label: "Supervised projects",
-      path: "/projects-monitor",
-      section: "oversight",
-      icon: <FolderKanban className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      when: supervising > 0,
-      badge: supervising || undefined,
     },
     {
       label: "Safeguarding",
@@ -920,8 +927,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     (!item.children || item.children.some(isVisible));
 
   /** A group is "in" when the current page is one of its children (or below one). */
-  const groupHas = (item: NavItem) =>
-    !!item.path && (location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
+  const under = (path?: string) => !!path && (location.pathname === path || location.pathname.startsWith(`${path}/`));
+  const groupHas = (item: NavItem) => under(item.path) || !!item.children?.some((c) => under(c.path));
   const childActive = (child: NavItem, group: NavItem) =>
     child.path === group.path ? location.pathname === child.path : !!child.path && (location.pathname === child.path || location.pathname.startsWith(`${child.path}/`));
 
@@ -1018,6 +1025,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <span className="flex-shrink-0 opacity-80">{child.icon}</span>
                     <span className="truncate">{child.label}</span>
+                    {child.badge ? (
+                      <span className="ml-auto min-w-[1.25rem] rounded-full bg-blue-600 px-1.5 text-center text-[10px] font-semibold leading-5 text-white tabular-nums">{child.badge}</span>
+                    ) : null}
                   </button>
                 </li>
               );

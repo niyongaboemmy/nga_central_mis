@@ -30,6 +30,9 @@ const rows = (r: unknown): any[] => (Array.isArray(r) && Array.isArray(r[0]) ? r
 
 const viewers = new Map<number, Partial<Viewer>>();
 const owners = new Set<number>();
+const assignedOk = new Set<number>();
+const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+const DATES = { startDate: day(0), targetDate: day(60) };
 
 const app = express();
 app.use(express.json());
@@ -44,6 +47,7 @@ app.use(
     },
     (req: any, res, next) => (owners.has(Number(req.user.userId)) ? next() : res.status(403).json({ message: "Forbidden" })),
     async (req: any) => ({ userId: Number(req.user.userId), summary: null, detail: null, review: null, manageAny: false, ...(viewers.get(Number(req.user.userId)) ?? {}) }),
+    (req: any, res, next) => (assignedOk.has(Number(req.user.userId)) ? next() : res.status(403).json({ message: "Forbidden" })),
   ),
 );
 const as = (id: number) => ({ "X-Test-User": String(id) });
@@ -75,6 +79,8 @@ async function createProject(owner: number, title: string, extra: Record<string,
     .set(as(owner))
     .field("title", title)
     .field("problemStatement", PROBLEM)
+    .field("startDate", DATES.startDate)
+    .field("targetDate", DATES.targetDate)
     .field("techTags", JSON.stringify(["Arduino", "C++"]))
     .field("categoryId", String((rows(await db.execute(sql`SELECT category_id FROM SideProjectCategory WHERE slug = 'iot'`)))[0].category_id))
     .field(extra)
@@ -155,7 +161,7 @@ describe("permissions and seeding", () => {
 
   it("migration 128 seeded the permissions, the student and super-admin grants and the categories", async () => {
     const perms = rows(await db.execute(sql`SELECT name, depths, scopeable, restricted FROM Permission WHERE name LIKE 'SIDE_PROJECTS_%' ORDER BY name`));
-    expect(perms.map((p) => p.name)).toEqual(["SIDE_PROJECTS_MANAGE_ANY", "SIDE_PROJECTS_MANAGE_OWN", "SIDE_PROJECTS_REVIEW", "SIDE_PROJECTS_VIEW"]);
+    expect(perms.map((p) => p.name)).toEqual(["SIDE_PROJECTS_ASSIGNED", "SIDE_PROJECTS_MANAGE_ANY", "SIDE_PROJECTS_MANAGE_OWN", "SIDE_PROJECTS_REVIEW", "SIDE_PROJECTS_VIEW"]);
     const grants = rows(await db.execute(sql`
       SELECT r.name AS role, p.name AS perm FROM RolePermission rp JOIN Role r ON r.role_id = rp.role_id JOIN Permission p ON p.perm_id = rp.perm_id
       WHERE p.name LIKE 'SIDE_PROJECTS_%' AND r.name IN ('STUDENT', 'SUPER_ADMIN')`));
@@ -218,16 +224,16 @@ describe("student projects", () => {
   let p1: number;
 
   it("refuses a project without a concept note, and without a real problem statement", async () => {
-    const noConcept = await api().post("/side-projects").set(as(alice)).send({ title: "No concept", problemStatement: PROBLEM });
+    const noConcept = await api().post("/side-projects").set(as(alice)).send({ title: "No concept", problemStatement: PROBLEM, ...DATES });
     expect(noConcept.status).toBe(400);
     expect(noConcept.body).toMatchObject({ code: "CONCEPT_REQUIRED", field: "concept" });
-    const shortProblem = await api().post("/side-projects").set(as(alice)).field("title", "Short").field("problemStatement", "too short").attach("concept", pdf(), "c.pdf");
+    const shortProblem = await api().post("/side-projects").set(as(alice)).field("title", "Short").field("problemStatement", "too short").field(DATES).attach("concept", pdf(), "c.pdf");
     expect(shortProblem.status).toBe(400);
     expect(shortProblem.body.field).toBe("problemStatement");
-    const badFile = await api().post("/side-projects").set(as(alice)).field("title", "Bad file").field("problemStatement", PROBLEM).attach("concept", Buffer.from("MZ..."), "setup.exe");
+    const badFile = await api().post("/side-projects").set(as(alice)).field("title", "Bad file").field("problemStatement", PROBLEM).field(DATES).attach("concept", Buffer.from("MZ..."), "setup.exe");
     expect(badFile.status).toBe(400);
     expect(badFile.body.code).toBe("FILE_REFUSED");
-    const badGit = await api().post("/side-projects").set(as(alice)).field("title", "Bad git").field("problemStatement", PROBLEM).field("githubUrl", "https://example.com/x").attach("concept", pdf(), "c.pdf");
+    const badGit = await api().post("/side-projects").set(as(alice)).field("title", "Bad git").field("problemStatement", PROBLEM).field(DATES).field("githubUrl", "https://example.com/x").attach("concept", pdf(), "c.pdf");
     expect(badGit.body.field).toBe("githubUrl");
   });
 
@@ -244,7 +250,7 @@ describe("student projects", () => {
     expect(d.techTags).toEqual(["Arduino", "C++"]);
     const board = await api().get("/side-projects/mine").set(as(alice));
     expect(board.body.data.map((c: any) => c.id)).toContain(p1);
-    const dup = await api().post("/side-projects").set(as(alice)).field("title", "smart  IRRIGATION").field("problemStatement", PROBLEM).attach("concept", pdf(), "c.pdf");
+    const dup = await api().post("/side-projects").set(as(alice)).field("title", "smart  IRRIGATION").field("problemStatement", PROBLEM).field(DATES).attach("concept", pdf(), "c.pdf");
     expect(dup.status).toBe(409);
     expect(dup.body.code).toBe("DUPLICATE_TITLE");
   });
@@ -253,7 +259,7 @@ describe("student projects", () => {
     const r = await api()
       .post("/side-projects")
       .set(as(alice))
-      .send({ title: "Library finder", problemStatement: PROBLEM, conceptWritten: { users: "Students looking for books", solution: "A web app that indexes the school library shelves by QR code.", impact: "Books found in seconds" } });
+      .send({ title: "Library finder", problemStatement: PROBLEM, ...DATES, conceptWritten: { users: "Students looking for books", solution: "A web app that indexes the school library shelves by QR code.", impact: "Books found in seconds" } });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     created.push(r.body.data.id);
     const d = (await api().get(`/side-projects/${r.body.data.id}`).set(as(alice))).body.data;
@@ -508,6 +514,154 @@ describe("projects for everyone (not only students)", () => {
     const csv = `email,title,status\n${u.email},Teachers' lab booking,Idea\n`;
     const r = await api().post("/side-projects/admin/import?dryRun=0").set(as(lead)).attach("file", Buffer.from(csv), "list.csv");
     expect(r.body.data).toMatchObject({ valid: 1, invalid: 0 });
+  });
+});
+
+describe("stages and period management", () => {
+  let sp: number;
+  it("requires the start and closing dates and builds a default stage plan", async () => {
+    const noDates = await api().post("/side-projects").set(as(carol)).field("title", "No dates").field("problemStatement", PROBLEM).attach("concept", pdf(), "c.pdf");
+    expect(noDates.status).toBe(400);
+    expect(noDates.body.field).toBe("startDate");
+    const tooShort = await api().post("/side-projects").set(as(carol)).field("title", "Too short").field("problemStatement", PROBLEM).field({ startDate: day(0), targetDate: day(1) }).attach("concept", pdf(), "c.pdf");
+    expect(tooShort.body.field).toBe("targetDate");
+    sp = await createProject(carol, "Stage tracker");
+    const d = (await api().get(`/side-projects/${sp}`).set(as(carol))).body.data;
+    expect(d.period.stages.map((x: any) => x.stage)).toEqual(["IDEA", "PLANNING", "IN_PROGRESS", "TESTING"]);
+    expect(d.period.stages[0]).toMatchObject({ plannedStart: DATES.startDate, state: "current" });
+    expect(d.period.stages[3].plannedEnd).toBe(DATES.targetDate);
+    const planned = d.period.stages.map((x: any) => x.plannedDays);
+    expect(planned.reduce((a: number, b: number) => a + b, 0)).toBe(61);
+    expect(planned[2]).toBeGreaterThan(planned[1]);
+    expect(d.stage.plannedEnd).toBe(d.period.stages[0].plannedEnd);
+    // the Gantt draws every real stay: one open stay in Idea so far
+    expect(d.stays).toHaveLength(1);
+    expect(d.stays[0]).toMatchObject({ stage: "IDEA", leftAt: null });
+  });
+
+  it("moves through Planning, pauses with a reason, resumes and logs every stay", async () => {
+    expect((await api().post(`/side-projects/${sp}/transition`).set(as(carol)).send({ to: "PLANNING" })).status).toBe(200);
+    const noReason = await api().post(`/side-projects/${sp}/transition`).set(as(carol)).send({ to: "ON_HOLD" });
+    expect(noReason.body.code).toBe("REASON_REQUIRED");
+    expect((await api().post(`/side-projects/${sp}/transition`).set(as(carol)).send({ to: "ON_HOLD", reason: "Exams week" })).status).toBe(200);
+    let d = (await api().get(`/side-projects/${sp}`).set(as(carol))).body.data;
+    expect(d).toMatchObject({ status: "ON_HOLD", pausedFrom: "PLANNING", health: "PAUSED" });
+    expect(d.period.paused).toBe(true);
+    const done = await api().post(`/side-projects/${sp}/transition`).set(as(carol)).send({ to: "COMPLETED", outcomeSummary: "x".repeat(30) });
+    expect(done.body.code).toBe("RESUME_FIRST");
+    expect((await api().post(`/side-projects/${sp}/transition`).set(as(carol)).send({ to: "TESTING" })).status).toBe(200);
+    d = (await api().get(`/side-projects/${sp}`).set(as(carol))).body.data;
+    expect(d.pausedFrom).toBeNull();
+    expect(d.period.stages.find((x: any) => x.stage === "IN_PROGRESS").state).toBe("skipped");
+    expect(d.period.stages.find((x: any) => x.stage === "TESTING").state).toBe("current");
+    const logs = rows(await db.execute(sql`SELECT stage, left_at IS NULL AS open FROM SideProjectStageLog WHERE project_id = ${sp} ORDER BY log_id`));
+    expect(logs.map((l) => l.stage)).toEqual(["IDEA", "PLANNING", "ON_HOLD", "TESTING"]);
+    expect(logs.filter((l) => Number(l.open) === 1)).toHaveLength(1);
+    const fromIdea = transition({ status: "IDEA", review_state: "NONE", archived: false, hasConcept: true }, { to: "COMPLETED", outcomeSummary: "x".repeat(30) });
+    expect(fromIdea).toMatchObject({ ok: false, code: "SKIP_NOT_ALLOWED" });
+  });
+
+  it("edits the plan with validation and flags a stage past its window as overdue", async () => {
+    const bad = await api().put(`/side-projects/${sp}/plan`).set(as(carol)).send({ stagePlan: [day(10), day(5), day(40)] });
+    expect(bad.status).toBe(400);
+    expect(bad.body.field).toBe("plan.PLANNING");
+    const ok = await api().put(`/side-projects/${sp}/plan`).set(as(carol)).send({ startDate: day(-30), targetDate: day(30), stagePlan: [day(-25), day(-15), day(-5)] });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body.data.plan.map((r: any) => r.end)).toEqual([day(-25), day(-15), day(-5), day(30)]);
+    await db.execute(sql`UPDATE SideProjectStage SET planned_end = ${day(-2)} WHERE project_id = ${sp} AND stage = 'TESTING'`);
+    const d = (await api().get(`/side-projects/${sp}`).set(as(carol))).body.data;
+    expect(d.health).toBe("OVERDUE");
+    expect(d.period.stages.find((x: any) => x.stage === "TESTING").overrunDays).toBe(2);
+    expect(d.stage.overrunDays).toBe(2);
+    expect((await api().put(`/side-projects/${sp}/plan`).set(as(bob)).send({ stagePlan: [day(-25), day(-15), day(-5)] })).status).toBe(404);
+  });
+
+  it("gives admins time per stage, the bottleneck and stuck projects", async () => {
+    const s = (await api().get("/side-projects/monitor/summary").set(as(lead))).body.data;
+    expect(s.stages.stages.map((x: any) => x.stage)).toEqual(["IDEA", "PLANNING", "IN_PROGRESS", "TESTING"]);
+    expect(s.stages.stuck.some((r: any) => r.id === sp)).toBe(true);
+    expect(s.totals.byStatus).toHaveProperty("PLANNING");
+    expect(s.totals.byStatus).toHaveProperty("ON_HOLD");
+    expect(s.reporting).toHaveProperty("reportsThisWeek");
+    const list = await api().get("/side-projects/monitor/projects?sort=stage&pageSize=200").set(as(lead));
+    expect(list.body.data.rows[0].stage).toHaveProperty("daysIn");
+  });
+});
+
+describe("progress reports and activity", () => {
+  let rp: number, reportId: number;
+  it("records a report with a PDF, refuses other files and future dates", async () => {
+    rp = await createProject(alice, "Report tracker");
+    const future = await api().post(`/side-projects/${rp}/updates`).set(as(alice)).field("did", "Did a lot of work").field("workDate", day(2));
+    expect(future.body.field).toBe("workDate");
+    const png = await api().post(`/side-projects/${rp}/updates`).set(as(alice)).field("did", "Did a lot of work").attach("files", Buffer.from("x"), "photo.png");
+    expect(png.status).toBe(400);
+    const ok = await api().post(`/side-projects/${rp}/updates`).set(as(alice)).field("did", "Wired the sensors and wrote the first test").field("hours", "2.5").field("workDate", day(-1)).field("mood", "4").attach("files", pdf(), "notes.pdf");
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    reportId = ok.body.data.id;
+    const d = (await api().get(`/side-projects/${rp}`).set(as(alice))).body.data;
+    const r = d.updates.find((u: any) => u.id === reportId);
+    expect(r).toMatchObject({ hours: 2.5, workDate: day(-1), stage: "IDEA" });
+    expect(r.files).toHaveLength(1);
+    expect((await api().get(`/side-projects/files/${r.files[0].assetId}`).set(as(alice))).status).toBe(200);
+  });
+
+  it("edits a report: fields, removes a PDF and adds another; only the author may", async () => {
+    const d0 = (await api().get(`/side-projects/${rp}`).set(as(alice))).body.data;
+    const oldAsset = d0.updates.find((u: any) => u.id === reportId).files[0].assetId;
+    const res = await api().patch(`/side-projects/${rp}/updates/${reportId}`).set(as(alice)).field("did", "Wired the sensors, wrote two tests").field("hours", "3").field("workDate", day(-1)).field("removeFiles", JSON.stringify([oldAsset])).attach("files", pdf(), "v2.pdf");
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const r = (await api().get(`/side-projects/${rp}`).set(as(alice))).body.data.updates.find((u: any) => u.id === reportId);
+    expect(r).toMatchObject({ did: "Wired the sensors, wrote two tests", hours: 3 });
+    expect(r.editedAt).toBeTruthy();
+    expect(r.files.map((f: any) => f.name)).toEqual(["v2.pdf"]);
+    await api().post(`/side-projects/${rp}/members`).set(as(alice)).send({ regNumber: `SPB${bob}` });
+    await api().post(`/side-projects/invitations/${rp}`).set(as(bob)).send({ accept: true });
+    const notMine = await api().patch(`/side-projects/${rp}/updates/${reportId}`).set(as(bob)).field("did", "Hijacked report text");
+    expect(notMine.status).toBe(403);
+  });
+
+  it("returns daily activity with streaks for the contribution graph", async () => {
+    await api().post(`/side-projects/${rp}/updates`).set(as(alice)).field("did", "Second day of work on it").field("hours", "1");
+    const a = (await api().get(`/side-projects/${rp}/activity?days=90`).set(as(alice))).body.data;
+    expect(a.days).toBe(90);
+    expect(a.activity.find((x: any) => x.date === day(-1))).toMatchObject({ reports: 1, hours: 3 });
+    expect(a.stats.reports).toBe(2);
+    expect(a.stats.currentStreak).toBeGreaterThanOrEqual(2);
+    expect((await api().get(`/side-projects/${rp}/activity`).set(as(outsider))).status).toBe(404);
+  });
+
+  it("deletes a report with its files", async () => {
+    expect((await api().delete(`/side-projects/${rp}/updates/${reportId}`).set(as(alice))).status).toBe(200);
+    const links = rows(await db.execute(sql`SELECT COUNT(*) AS n FROM SideProjectUpdateFile WHERE update_id = ${reportId}`));
+    expect(Number(links[0].n)).toBe(0);
+  });
+});
+
+describe("assigned projects", () => {
+  it("migration 131 grants SIDE_PROJECTS_ASSIGNED to every role except students' and parents'", async () => {
+    const text = fs.readFileSync(path.join(__dirname, "../../migrations/131_side_projects_stages_reports.sql"), "utf8");
+    const at = text.indexOf("INSERT INTO `RolePermission`");
+    await db.execute(sql.raw(text.slice(at, text.indexOf(";", at))));
+    const [r] = rows(await db.execute(sql`
+      SELECT (SELECT COUNT(*) FROM Role WHERE name NOT IN ('STUDENT','PARENT') AND (preset_key IS NULL OR preset_key NOT IN ('student','parent'))) AS eligible,
+             (SELECT COUNT(DISTINCT rp.role_id) FROM RolePermission rp JOIN Permission p ON p.perm_id = rp.perm_id JOIN Role ro ON ro.role_id = rp.role_id
+               WHERE p.name = 'SIDE_PROJECTS_ASSIGNED' AND ro.name NOT IN ('STUDENT','PARENT')) AS holders,
+             (SELECT COUNT(*) FROM RolePermission rp JOIN Permission p ON p.perm_id = rp.perm_id JOIN Role ro ON ro.role_id = rp.role_id
+               WHERE p.name = 'SIDE_PROJECTS_ASSIGNED' AND ro.name IN ('STUDENT','PARENT')) AS students`));
+    expect(Number(r.holders)).toBe(Number(r.eligible));
+    expect(Number(r.students)).toBe(0);
+  });
+
+  it("lists what I supervise and what I help build, with counts; needs the permission", async () => {
+    assignedOk.add(supervisor);
+    const res = await api().get("/side-projects/assigned").set(as(supervisor));
+    expect(res.status).toBe(200);
+    expect(res.body.data.counts.supervising).toBeGreaterThanOrEqual(1);
+    expect(res.body.data.rows.every((r: any) => r.relation === "SUPERVISOR" || r.relation === "MEMBER")).toBe(true);
+    expect(res.body.data.rows.some((r: any) => r.relation === "MEMBER")).toBe(true); // the staff project's team
+    expect(res.body.data.rows.every((r: any) => r.student.id !== supervisor)).toBe(true);
+    expect((await api().get("/side-projects/assigned").set(as(outsider))).status).toBe(403);
   });
 });
 
