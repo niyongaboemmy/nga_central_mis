@@ -235,7 +235,7 @@ const ReportModal: React.FC<{ p: ProjectDetail; open: boolean; report: Report | 
                       type="button"
                       onClick={() => setRemove((r) => (gone ? r.filter((id) => id !== x.assetId) : [...r, x.assetId]))}
                       aria-label={gone ? `Keep ${x.name}` : `Remove ${x.name}`}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-slate-900 dark:hover:bg-gray-700"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-slate-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
                     >
                       {gone ? <RotateCcw className="h-4 w-4" /> : <X className="h-4 w-4" />}
                     </button>
@@ -247,7 +247,7 @@ const ReportModal: React.FC<{ p: ProjectDetail; open: boolean; report: Report | 
                   <PdfGlyph />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-gray-100">{x.name}</span>
                   <span className="text-[11px] tabular-nums text-slate-500 dark:text-gray-400">{fmtBytes(x.size)}</span>
-                  <button type="button" onClick={() => setFiles((cur) => cur.filter((_, j) => j !== i))} aria-label={`Remove ${x.name}`} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-slate-900 dark:hover:bg-gray-700">
+                  <button type="button" onClick={() => setFiles((cur) => cur.filter((_, j) => j !== i))} aria-label={`Remove ${x.name}`} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-slate-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">
                     <X className="h-4 w-4" />
                   </button>
                 </motion.div>

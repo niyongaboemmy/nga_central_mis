@@ -17,6 +17,18 @@ export const CAP = {
   CLASSIFY: "SIDE_PROJECTS_CLASSIFY",
 } as const;
 
+/** Teams, plan and tasks (migration 133). */
+export const TEAM_MODES = ["PERSONAL", "TEAM"] as const;
+export type TeamMode = (typeof TEAM_MODES)[number];
+export const ROLE_KEYS = ["LEAD", "DEVELOPER", "DESIGNER", "TESTER", "RESEARCHER", "ANALYST", "DOCUMENTER", "OTHER"] as const;
+export type RoleKey = (typeof ROLE_KEYS)[number];
+export const PLAN_STATUSES = ["BACKLOG", "PLANNED", "IN_PROGRESS", "IN_REVIEW", "BLOCKED", "DONE", "CANCELLED"] as const;
+export type PlanStatus = (typeof PLAN_STATUSES)[number];
+export const TASK_STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "BLOCKED", "DONE", "CANCELLED"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+export const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
+export type Priority = (typeof PRIORITIES)[number];
+
 /** Classification (migration 132). Students' projects are always STUDENT. */
 export const KINDS = ["STUDENT", "DELIVERY_STUDIO", "INDIVIDUAL"] as const;
 export type Kind = (typeof KINDS)[number];

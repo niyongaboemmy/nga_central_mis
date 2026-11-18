@@ -28,7 +28,7 @@ const PageHeader: React.FC<{
     initial={{ opacity: 0, y: 6 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.2 }}
-    className="rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-gray-700/40 dark:bg-gray-800/30"
+    className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 dark:border-gray-800 dark:bg-gray-900/60"
   >
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">

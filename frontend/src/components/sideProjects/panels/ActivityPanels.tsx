@@ -137,7 +137,7 @@ export const FeedbackPanel: React.FC<{ p: ProjectDetail; staff: boolean; onChang
         <div className="mt-2 flex flex-wrap justify-end gap-2">
           {canReview && (
             <>
-              <button type="button" className={`${secondaryBtn} !border-amber-300 !text-amber-800 dark:!text-amber-200`} disabled={!!busy} onClick={() => send("CHANGES_REQUESTED")}>
+              <button type="button" className={`${secondaryBtn} !border-amber-300 !text-amber-800 dark:!border-amber-500/50 dark:!text-amber-200`} disabled={!!busy} onClick={() => send("CHANGES_REQUESTED")}>
                 {busy === "CHANGES_REQUESTED" ? <Spinner className="h-4 w-4" /> : <MessageSquareWarning className="h-4 w-4" />} Request changes
               </button>
               {p.status === "COMPLETED" && p.reviewState !== "VERIFIED" && (

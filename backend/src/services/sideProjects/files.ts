@@ -232,6 +232,7 @@ export async function assetOfProject(projectId: number, assetId: number) {
       EXISTS (SELECT 1 FROM SideProjectDocument d WHERE d.project_id = ${projectId} AND d.asset_id = a.asset_id)
       OR EXISTS (SELECT 1 FROM SideProjectMedia m WHERE m.project_id = ${projectId} AND m.asset_id = a.asset_id AND m.deleted_at IS NULL)
       OR EXISTS (SELECT 1 FROM SideProjectUpdateFile uf JOIN SideProjectUpdate u ON u.update_id = uf.update_id WHERE u.project_id = ${projectId} AND uf.asset_id = a.asset_id)
+      OR EXISTS (SELECT 1 FROM SideProject sl WHERE sl.project_id = ${projectId} AND sl.logo_asset_id = a.asset_id)
     )`);
 }
 
@@ -241,6 +242,7 @@ export async function projectOfAsset(assetId: number): Promise<number | null> {
     SELECT project_id FROM SideProjectDocument WHERE asset_id = ${assetId}
     UNION SELECT project_id FROM SideProjectMedia WHERE asset_id = ${assetId} AND deleted_at IS NULL
     UNION SELECT u.project_id FROM SideProjectUpdateFile uf JOIN SideProjectUpdate u ON u.update_id = uf.update_id WHERE uf.asset_id = ${assetId}
+    UNION SELECT project_id FROM SideProject WHERE logo_asset_id = ${assetId}
     LIMIT 1`);
   return r ? Number(r.project_id) : null;
 }
@@ -256,4 +258,39 @@ export async function streamAsset(res: Response, a: any, variantRaw: unknown, op
 
 export async function manifestOf(a: any) {
   return previewManifest({ name: a.original_name, storage_path: a.storage_path, sha256: a.sha256, size: a.size_bytes, preview_status: a.preview_status, preview_error: a.preview_error, page_count: a.page_count });
+}
+
+/**
+ * Project branding (migration 133): an optional logo and cover image (PNG/JPG/WebP; no SVG).
+ * The cover joins the gallery and becomes its cover; the logo is the project's own mark.
+ */
+export async function setBranding(projectId: number, by: number, which: "cover" | "logo", file: Upload | null | undefined) {
+  if (!file) fail(400, "VALIDATION", "Choose an image", "file");
+  if (/\.svg$/i.test(file!.originalname)) {
+    await cleanup([file!]);
+    fail(400, "FILE_REFUSED", "Use a PNG, JPG or WebP image", "file");
+  }
+  const [asset] = await storeProjectFiles(projectId, by, [file!], ["image"]);
+  await ensureImageThumb(asset);
+  if (which === "cover") {
+    await addMedia(projectId, [asset], by, ["Cover"]);
+    await db.execute(sql`UPDATE SideProject SET cover_asset_id = ${asset.asset_id}, updated_at = UTC_TIMESTAMP() WHERE project_id = ${projectId}`);
+  } else {
+    const old = await one(sql`SELECT logo_asset_id FROM SideProject WHERE project_id = ${projectId}`);
+    await db.execute(sql`UPDATE SideProject SET logo_asset_id = ${asset.asset_id}, updated_at = UTC_TIMESTAMP() WHERE project_id = ${projectId}`);
+    if (old?.logo_asset_id) await db.execute(sql`UPDATE FileAsset SET deleted_at = UTC_TIMESTAMP() WHERE asset_id = ${old.logo_asset_id}`);
+  }
+  await recordEvent(projectId, by, which === "cover" ? "COVER" : "LOGO", null, String(asset.asset_id));
+  return { assetId: Number(asset.asset_id) };
+}
+
+export async function clearBranding(projectId: number, by: number, which: "cover" | "logo") {
+  if (which === "cover") {
+    await db.execute(sql`UPDATE SideProject SET cover_asset_id = NULL, updated_at = UTC_TIMESTAMP() WHERE project_id = ${projectId}`);
+  } else {
+    const old = await one(sql`SELECT logo_asset_id FROM SideProject WHERE project_id = ${projectId}`);
+    await db.execute(sql`UPDATE SideProject SET logo_asset_id = NULL, updated_at = UTC_TIMESTAMP() WHERE project_id = ${projectId}`);
+    if (old?.logo_asset_id) await db.execute(sql`UPDATE FileAsset SET deleted_at = UTC_TIMESTAMP() WHERE asset_id = ${old.logo_asset_id}`);
+  }
+  await recordEvent(projectId, by, which === "cover" ? "COVER" : "LOGO", "removed", null);
 }

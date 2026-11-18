@@ -138,7 +138,7 @@ const MilestoneRow: React.FC<{
           type="button"
           aria-label={`Delete ${m.title}`}
           onClick={onDelete}
-          className="rounded-full p-1 text-slate-300 opacity-0 transition hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
+          className="rounded-full p-1 text-slate-300 opacity-0 transition hover:text-red-600 focus:opacity-100 group-hover:opacity-100 dark:text-gray-600 dark:hover:text-red-400"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -301,7 +301,7 @@ const ProgressPanel: React.FC<{
                 onClick={() => setShowAdd(true)}
                 aria-label="Add milestone"
                 title="Add milestone"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-700 transition hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25"
               >
                 <Plus className="h-4 w-4" />
               </button>

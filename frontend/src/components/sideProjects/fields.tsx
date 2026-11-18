@@ -55,7 +55,7 @@ export const CategoryPicker: React.FC<{ categories: Category[]; value: number | 
           whileTap={{ scale: 0.95 }}
           onClick={() => onChange(on ? null : c.id)}
           className={`group relative flex flex-col items-center gap-2 rounded-2xl border-2 px-2 py-3 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-            on ? "bg-white text-slate-900 dark:bg-gray-800/60 dark:text-white" : "border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-slate-300 dark:border-gray-700/60 dark:bg-gray-800/30 dark:text-gray-300"
+            on ? "bg-white text-slate-900 dark:bg-gray-800/60 dark:text-white" : "border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-slate-300 dark:border-gray-700/60 dark:bg-gray-800/30 dark:text-gray-300 dark:hover:border-gray-600"
           }`}
           style={on ? { borderColor: c.color } : undefined}
         >
@@ -166,7 +166,7 @@ export const PersonPicker: React.FC<{
       <div className={`${inputCls} flex items-center gap-2`}>
         <UserAvatar name={value.name} userId={value.id} size={24} decorative />
         <span className="flex-1 truncate font-medium">{value.name}</span>
-        <button type="button" aria-label="Clear" onClick={() => onChange(null)} className="rounded p-0.5 text-slate-400 hover:text-slate-700">
+        <button type="button" aria-label="Clear" onClick={() => onChange(null)} className="rounded p-0.5 text-slate-400 hover:text-slate-700 dark:text-gray-500 dark:hover:text-gray-200">
           <X className="h-4 w-4" />
         </button>
       </div>

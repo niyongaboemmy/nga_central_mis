@@ -106,14 +106,17 @@ export function transition(p: LifecycleProject, input: TransitionInput): Transit
 const STAGE_FLOOR: Record<Exclude<Status, "ON_HOLD">, number> = { IDEA: 0, PLANNING: 15, IN_PROGRESS: 40, TESTING: 80, COMPLETED: 100 };
 const STAGE_CAP: Record<Exclude<Status, "ON_HOLD">, number> = { IDEA: 20, PLANNING: 40, IN_PROGRESS: 99, TESTING: 99, COMPLETED: 100 };
 
-/** Progress shown on a card: milestones when there are some, else the student's slider, else the stage. */
+/** Progress shown on a card: the plan's features, else milestones, else the student's slider, else the stage. */
 export function progressOf(
   p: { status: Status; paused_from?: Status | null; progress_mode: "AUTO" | "MANUAL"; progress_manual: number | null },
   milestones: { total: number; done: number },
+  plan: { total: number; done: number } = { total: 0, done: 0 },
 ): number {
   const stage = pathStage(p.status, p.paused_from);
   if (stage === "COMPLETED") return 100;
   const cap = STAGE_CAP[stage];
+  // An implementation plan (migration 133) drives progress: features done / features.
+  if (p.progress_mode !== "MANUAL" && plan.total > 0) return Math.min(cap, Math.round((plan.done / plan.total) * 100));
   if (p.progress_mode === "MANUAL" || milestones.total === 0) {
     const m = p.progress_manual ?? STAGE_FLOOR[stage];
     return Math.max(0, Math.min(cap, Math.round(Number(m))));

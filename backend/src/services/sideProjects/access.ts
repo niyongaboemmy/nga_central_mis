@@ -97,6 +97,8 @@ export interface ProjectAccess {
   canReview: boolean;
   isSupervisor: boolean;
   manageAny: boolean;
+  /** may plan and assign work: the owner, a teammate the owner made a manager, or the lead (migration 133) */
+  canManage: boolean;
 }
 
 /** Loads one live project with the viewer's rights on it. Unknown or unreachable -> 404. */
@@ -107,6 +109,7 @@ export async function accessProject(projectId: number, viewer: Viewer | { userId
   const p = await one(sql`
     SELECT sp.*, cg.class_group_id AS live_class_id, cg.grade_id AS live_grade_id, g.program_id AS live_program_id,
            (SELECT m.status FROM SideProjectMember m WHERE m.project_id = sp.project_id AND m.user_id = ${v.userId}) AS member_status,
+           (SELECT m.is_manager FROM SideProjectMember m WHERE m.project_id = sp.project_id AND m.user_id = ${v.userId} AND m.status = 'ACCEPTED') AS member_manager,
            ${v.detail ? sql`${scopeCondition(v.detail)}` : sql`0`} AS in_detail,
            ${v.review ? sql`${scopeCondition(v.review)}` : sql`0`} AS in_review
     ${from}
@@ -128,7 +131,12 @@ export async function accessProject(projectId: number, viewer: Viewer | { userId
     canReview: manageAny || isSupervisor || Number(p.in_review) === 1,
     isSupervisor,
     manageAny,
+    canManage: isOwner || manageAny || (isMember && Number(p.member_manager) === 1),
   };
+}
+
+export function assertManage(a: ProjectAccess) {
+  if (!a.canManage) fail(403, "NOT_MANAGER", "Only the project owner or a team manager can do this");
 }
 
 export function assertEdit(a: ProjectAccess) {

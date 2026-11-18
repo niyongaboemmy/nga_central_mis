@@ -102,7 +102,7 @@ const ImportDialog: React.FC<{ open: boolean; onClose: () => void; onDone: () =>
               ["Ready", res.valid, CheckCircle2, "bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200", "text-emerald-600"],
               ["Problems", res.invalid, XCircle, "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300", "text-red-500"],
             ] as const).map(([l, v, Icon, cls, ic], i) => (
-              <motion.div key={l} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} className={`rounded-3xl p-4 ${cls}`}>
+              <motion.div key={l} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }} className={`rounded-2xl p-4 ${cls}`}>
                 <Icon className={`h-5 w-5 ${ic}`} aria-hidden />
                 <p className="mt-2 text-2xl font-extrabold tabular-nums">{v}</p>
                 <p className="text-xs font-semibold">{l}</p>

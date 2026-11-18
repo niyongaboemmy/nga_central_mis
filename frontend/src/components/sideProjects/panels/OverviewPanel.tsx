@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, ExternalLink, Figma, Quote, Tag, Trophy, FileText, Github, Globe, Link2, Pencil, Plus, Store, Trash2, UserCheck, Video, X } from "lucide-react";
+import { Briefcase, Lightbulb, Check, ExternalLink, Figma, Quote, Tag, Trophy, FileText, Github, Globe, Link2, Pencil, Plus, Store, Trash2, UserCheck, Video, X } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type LinkKind, type ProjectDetail } from "../../../api/sideProjects";
 import { useToast } from "../../../contexts/ToastContext";
 import UserAvatar from "../../ui/UserAvatar";
 import StageTimeline from "./StageTimeline";
+import { CUSTOMER_KIND_META, CustomerField, CustomerLogo } from "../customers/CustomerParts";
+import type { Customer } from "../../../api/sideProjects";
 import ContributionGraph from "./ContributionGraph";
 import { CategoryPicker, PersonPicker, TagInput, checkGithub, checkHttps } from "../fields";
 import { Field, FormSection, IconInput, TextArea } from "../form";
@@ -38,6 +40,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
     if (f.problemStatement.trim().length < 30) e.problemStatement = "At least 30 characters";
     const g = checkGithub(f.githubUrl);
     if (g) e.githubUrl = g;
+    if (f.customerMode === "CUSTOMER" && !f.customer) e.customerId = "Choose or register the customer";
     const a = checkHttps(f.accessUrl);
     if (a) e.accessUrl = a;
     f.links.forEach((l, i) => {
@@ -57,6 +60,8 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
         githubUrl: f.githubUrl,
         accessUrl: f.accessUrl,
         supervisorId: f.supervisor?.id ?? null,
+        customerMode: f.customerMode,
+        customerId: f.customerMode === "CUSTOMER" ? (f.customer?.id ?? null) : null,
         links: f.links.filter((l) => l.url.trim()),
       });
       setEdit(false);
@@ -117,7 +122,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
         </section>
 
         {/* Facts */}
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           <FactTile label="Category" icon={Tag}>
             <div className="flex items-center gap-2.5">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: `${catColor}1a`, color: catColor }}>
@@ -132,6 +137,43 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
                     {t}
                   </span>
                 ))}
+              </div>
+            )}
+          </FactTile>
+          <FactTile label="Customer" icon={Briefcase}>
+            {p.customerDetail ? (
+              <div className="flex items-start gap-2.5">
+                <CustomerLogo c={p.customerDetail} size={36} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{p.customerDetail.name}</p>
+                  <p className="truncate text-[11px] text-slate-500 dark:text-gray-400">
+                    {CUSTOMER_KIND_META[p.customerDetail.kind]?.label}
+                    {p.customerDetail.contactName ? ` · ${p.customerDetail.contactName}` : ""}
+                  </p>
+                  {(p.customerDetail.email || p.customerDetail.phone) && (
+                    <p className="mt-1 truncate text-[11px]">
+                      {p.customerDetail.email ? (
+                        <a href={`mailto:${p.customerDetail.email}`} className="font-semibold text-blue-700 hover:underline dark:text-blue-300">{p.customerDetail.email}</a>
+                      ) : (
+                        <a href={`tel:${p.customerDetail.phone}`} className="font-semibold text-blue-700 hover:underline dark:text-blue-300">{p.customerDetail.phone}</a>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+                  <Lightbulb className="h-4 w-4" aria-hidden />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-gray-100">Own initiative</p>
+                  {canEdit && (
+                    <button type="button" onClick={() => setEdit(true)} className="text-[11px] font-semibold text-blue-600 hover:underline dark:text-blue-300">
+                      Set a customer
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </FactTile>
@@ -192,7 +234,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
           </div>
         ) : (
           canEdit && (
-            <button type="button" onClick={() => setEdit(true)} className="flex w-full items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-slate-200 p-4 text-sm font-semibold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-400 dark:hover:bg-blue-500/10">
+            <button type="button" onClick={() => setEdit(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 p-4 text-sm font-semibold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-400 dark:hover:bg-blue-500/10">
               <Link2 className="h-4 w-4" aria-hidden /> Add a GitHub, live or demo link
             </button>
           )
@@ -269,6 +311,10 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
           </div>
         </FormSection>
 
+        <FormSection title="Who is it for?" icon={Briefcase}>
+          <CustomerField mode={f.customerMode} customer={f.customer} error={errors.customerId} onChange={(m, c) => setF((x) => ({ ...x, customerMode: m, customer: c === undefined ? x.customer : c }))} />
+        </FormSection>
+
         <FormSection title="Supervision" icon={UserCheck}>
           <Field label="Supervisor" icon={UserCheck}>
             <PersonPicker value={f.supervisor} onChange={(v) => set("supervisor", v)} search={sideProjectsApi.supervisors} placeholder="Search a teacher" error={errors.supervisorId} />
@@ -316,6 +362,8 @@ function init(p: ProjectDetail) {
     startDate: p.startDate ?? "",
     targetDate: p.targetDate ?? "",
     supervisor: p.supervisor as { id: number; name: string } | null,
+    customerMode: (p.customerMode ?? "OWN") as "OWN" | "CUSTOMER",
+    customer: (p.customerDetail ?? null) as Customer | null,
     links: p.links.map((l) => ({ kind: l.kind, label: l.label, url: l.url })),
   };
 }

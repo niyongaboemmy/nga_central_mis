@@ -154,3 +154,12 @@ export async function notifyMany(userIds: number[], kind: string, title: string,
 }
 
 export { CAP, inList };
+
+/** Task notifications (migration 133): assigned, review requested, blocked, overdue. Open the project's plan. */
+export async function notifyWork(userIds: number[], kind: string, title: string, body: string, projectId: number, actorId: number | null) {
+  try {
+    await send(userIds, kind, title, body, `/my-projects?project=${projectId}&tab=plan`, projectId, actorId);
+  } catch {
+    /* never fail the action */
+  }
+}

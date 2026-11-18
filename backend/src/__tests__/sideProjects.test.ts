@@ -20,6 +20,7 @@ import { buildPdf } from "../test/pdfFixture";
 import { sideProjectsRouter } from "../routes/sideProjects";
 import type { Viewer } from "../services/sideProjects/access";
 import { healthOf, progressOf, transition } from "../services/sideProjects/lifecycle";
+import { rollupStatus } from "../services/sideProjects/work";
 import { backdateActivity, sweepSideProjects } from "../services/sideProjects/sweep";
 import { GITHUB_RE } from "../services/sideProjects/validate";
 import { MIS_MANIFEST } from "../access/manifest";
@@ -130,11 +131,18 @@ afterAll(async () => {
   const ids = rows(await db.execute(sql`SELECT project_id AS id FROM SideProject WHERE owner_user_id IN (${ul})`)).map((r) => Number(r.id));
   if (ids.length) {
     const pl = sql.join(ids.map((i) => sql`${i}`), sql`, `);
-    for (const t of ["SideProjectDocument", "SideProjectMedia", "SideProjectLink", "SideProjectMilestone", "SideProjectUpdate", "SideProjectEvent", "SideProjectComment", "SideProjectMember"]) {
+    const tl = rows(await db.execute(sql`SELECT task_id AS id FROM SideProjectTask WHERE project_id IN (${pl})`)).map((r) => Number(r.id));
+    if (tl.length) {
+      const tj = sql.join(tl.map((i) => sql`${i}`), sql`, `);
+      await db.execute(sql`DELETE FROM SideProjectTaskLog WHERE task_id IN (${tj})`);
+      await db.execute(sql`DELETE FROM SideProjectTaskEvent WHERE task_id IN (${tj})`);
+    }
+    for (const t of ["SideProjectTask", "SideProjectPlanItem", "SideProjectDocument", "SideProjectMedia", "SideProjectLink", "SideProjectMilestone", "SideProjectUpdate", "SideProjectEvent", "SideProjectComment", "SideProjectMember"]) {
       await db.execute(sql`DELETE FROM ${sql.raw(t)} WHERE project_id IN (${pl})`);
     }
     await db.execute(sql`DELETE FROM SideProject WHERE project_id IN (${pl})`);
   }
+  await db.execute(sql`DELETE FROM SideProjectCustomer WHERE created_by IN (${ul})`);
   await db.execute(sql`DELETE FROM FileAsset WHERE owner_user_id IN (${ul})`);
   await db.execute(sql`DELETE FROM Notification WHERE user_id IN (${ul})`);
   await db.execute(sql`DELETE FROM ActivityLog WHERE user_id IN (${ul})`);
@@ -730,6 +738,268 @@ describe("classification (migration 132)", () => {
     expect(list.rows.every((x: any) => x.kind === "DELIVERY_STUDIO")).toBe(true);
     const sum = (await api().get("/side-projects/monitor/summary").set(as(lead))).body.data;
     expect(sum.totals.byKind.DELIVERY_STUDIO).toBeGreaterThan(0);
+  });
+});
+
+describe("teams, implementation plan and tasks (migration 133)", () => {
+  let tp: number;
+  let feature: number;
+  let phase: number;
+  let bobTask: number;
+  let aliceTask: number;
+
+  it("rolls plan status up from tasks (pure rules)", () => {
+    expect(rollupStatus([], "PLANNED")).toBe("PLANNED");
+    expect(rollupStatus([], "BACKLOG")).toBe("BACKLOG");
+    expect(rollupStatus(["TODO", "TODO"], "PLANNED")).toBe("PLANNED");
+    expect(rollupStatus(["TODO", "IN_PROGRESS"], "PLANNED")).toBe("IN_PROGRESS");
+    expect(rollupStatus(["TODO", "DONE"], "PLANNED")).toBe("IN_PROGRESS");
+    expect(rollupStatus(["BLOCKED", "TODO"], "PLANNED")).toBe("BLOCKED");
+    expect(rollupStatus(["IN_REVIEW", "DONE"], "PLANNED")).toBe("IN_REVIEW");
+    expect(rollupStatus(["DONE", "DONE", "CANCELLED"], "PLANNED")).toBe("DONE");
+    expect(rollupStatus(["CANCELLED"], "IN_PROGRESS")).toBe("PLANNED");
+  });
+
+  it("invites make a team project; roles, responsibilities and manager rights are set by the owner", async () => {
+    tp = await createProject(alice, "Team delivery");
+    let d = (await api().get(`/side-projects/${tp}`).set(as(alice))).body.data;
+    expect(d.teamMode).toBe("PERSONAL");
+    expect(d.rights.manage).toBe(true);
+    expect((await api().post(`/side-projects/${tp}/members`).set(as(alice)).send({ userId: bob })).status).toBe(200);
+    expect((await api().post(`/side-projects/invitations/${tp}`).set(as(bob)).send({ accept: true })).status).toBe(200);
+    d = (await api().get(`/side-projects/${tp}`).set(as(alice))).body.data;
+    expect(d.teamMode).toBe("TEAM");
+    expect((await api().patch(`/side-projects/${tp}/team`).set(as(alice)).send({ mode: "PERSONAL" })).status).toBe(409);
+    expect((await api().patch(`/side-projects/${tp}/members/${bob}`).set(as(bob)).send({ isManager: true })).status).toBe(403);
+    const r = await api().patch(`/side-projects/${tp}/members/${bob}`).set(as(alice)).send({ roleKey: "DEVELOPER", roleTitle: "Frontend developer", responsibilities: "Sign-in and dashboard screens" });
+    expect(r.status).toBe(200);
+    const bm = (await api().get(`/side-projects/${tp}`).set(as(bob))).body.data;
+    const me = bm.members.find((m: any) => m.id === bob);
+    expect(me).toMatchObject({ roleKey: "DEVELOPER", roleTitle: "Frontend developer", isManager: false });
+    expect(bm.rights).toMatchObject({ edit: true, manage: false });
+    expect((await api().patch(`/side-projects/${tp}/members/${bob}`).set(as(alice)).send({ roleKey: "WIZARD" })).status).toBe(400);
+  });
+
+  it("generates a plan from a template, dated from the stage plan; only managers plan", async () => {
+    expect((await api().post(`/side-projects/${tp}/plan/items`).set(as(bob)).send({ kind: "PHASE", title: "Nope" })).status).toBe(403);
+    const t = (await api().get(`/side-projects/${tp}/plan/templates`).set(as(bob))).body.data;
+    expect(t.suggested).toBe("iot");
+    const g = await api().post(`/side-projects/${tp}/plan/generate`).set(as(alice)).send({ template: "web" });
+    expect(g.status, JSON.stringify(g.body)).toBe(200);
+    expect(g.body.data.created).toBeGreaterThan(10);
+    expect((await api().post(`/side-projects/${tp}/plan/generate`).set(as(alice)).send({ template: "web" })).status).toBe(409);
+    const plan = (await api().get(`/side-projects/${tp}/plan`).set(as(bob))).body.data;
+    const phases = plan.items.filter((i: any) => i.kind === "PHASE");
+    expect(phases.map((p: any) => p.stage)).toEqual(["IDEA", "PLANNING", "IN_PROGRESS", "TESTING"]);
+    const d = (await api().get(`/side-projects/${tp}`).set(as(alice))).body.data;
+    expect(phases[0].dueDate).toBe(d.period.stages[0].plannedEnd);
+    expect(phases[3].dueDate).toBe(DATES.targetDate);
+    phase = phases[2].id;
+    feature = plan.items.find((i: any) => i.parentId === phase).id;
+    expect((await api().get(`/side-projects/${tp}/plan`).set(as(outsider))).status).toBe(404);
+  });
+
+  it("teammates create tasks for themselves; only managers assign others", async () => {
+    const outsiderTask = await api().post(`/side-projects/${tp}/tasks`).set(as(bob)).send({ planItemId: feature, title: "Pick colours", assigneeId: carol });
+    expect(outsiderTask.status).toBe(403);
+    const toAlice = await api().post(`/side-projects/${tp}/tasks`).set(as(bob)).send({ planItemId: feature, title: "Write the API", assigneeId: alice });
+    expect(toAlice.status).toBe(403);
+    expect(toAlice.body.code).toBe("NOT_MANAGER");
+    const noItem = await api().post(`/side-projects/${tp}/tasks`).set(as(bob)).send({ title: "Floating task" });
+    expect(noItem.body.field).toBe("planItemId");
+    const own = await api().post(`/side-projects/${tp}/tasks`).set(as(bob)).send({ planItemId: feature, title: "Build the sign-in page", priority: "HIGH", estimateHours: 4 });
+    expect(own.status, JSON.stringify(own.body)).toBe(200);
+    bobTask = own.body.data.id;
+    const byOwner = await api().post(`/side-projects/${tp}/tasks`).set(as(alice)).send({ planItemId: feature, title: "Design the database", assigneeId: alice, dueDate: day(-2) });
+    aliceTask = byOwner.body.data.id;
+    const notTeam = await api().post(`/side-projects/${tp}/tasks`).set(as(alice)).send({ planItemId: feature, title: "Ask Carol", assigneeId: carol });
+    expect(notTeam.status).toBe(400);
+    const plan = (await api().get(`/side-projects/${tp}/plan`).set(as(bob))).body.data;
+    expect(plan.tasks.find((x: any) => x.id === bobTask)).toMatchObject({ assigneeId: bob, status: "TODO", priority: "HIGH" });
+    expect(plan.tasks.find((x: any) => x.id === aliceTask).overdue).toBe(true);
+  });
+
+  it("moves tasks through their states and rolls the plan up automatically", async () => {
+    expect((await api().post(`/side-projects/${tp}/tasks/${aliceTask}/status`).set(as(bob)).send({ to: "IN_PROGRESS" })).status).toBe(403);
+    expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/status`).set(as(bob)).send({ to: "BLOCKED" })).body.field).toBe("note");
+    expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/status`).set(as(bob)).send({ to: "IN_PROGRESS" })).status).toBe(200);
+    let plan = (await api().get(`/side-projects/${tp}/plan`).set(as(bob))).body.data;
+    expect(plan.items.find((i: any) => i.id === feature).status).toBe("IN_PROGRESS");
+    expect(plan.items.find((i: any) => i.id === phase).status).toBe("IN_PROGRESS");
+    expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/status`).set(as(bob)).send({ to: "IN_REVIEW" })).status).toBe(200);
+    expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/status`).set(as(alice)).send({ to: "DONE" })).status).toBe(200);
+    expect((await api().post(`/side-projects/${tp}/tasks/${aliceTask}/status`).set(as(alice)).send({ to: "CANCELLED" })).status).toBe(200);
+    plan = (await api().get(`/side-projects/${tp}/plan`).set(as(bob))).body.data;
+    expect(plan.items.find((i: any) => i.id === feature).status).toBe("DONE");
+    const t = (await api().get(`/side-projects/${tp}/tasks/${bobTask}`).set(as(bob))).body.data;
+    expect(t.history.map((h: any) => h.toStatus)).toEqual(["DONE", "IN_REVIEW", "IN_PROGRESS", "TODO"]);
+    expect(t.startedAt).toBeTruthy();
+    expect(t.completedAt).toBeTruthy();
+    const card = (await api().get(`/side-projects/${tp}`).set(as(alice))).body.data;
+    expect(card.plan.done).toBe(1);
+    expect(card.progress).toBe(Math.min(20, Math.round((1 / card.plan.total) * 100)));
+  });
+
+  it("manual status takes an item off auto until set back", async () => {
+    expect((await api().patch(`/side-projects/${tp}/plan/items/${feature}`).set(as(alice)).send({ status: "IN_REVIEW" })).status).toBe(200);
+    let it = (await api().get(`/side-projects/${tp}/plan`).set(as(alice))).body.data.items.find((i: any) => i.id === feature);
+    expect(it).toMatchObject({ status: "IN_REVIEW", statusMode: "MANUAL" });
+    expect((await api().patch(`/side-projects/${tp}/plan/items/${feature}`).set(as(alice)).send({ statusMode: "AUTO" })).status).toBe(200);
+    it = (await api().get(`/side-projects/${tp}/plan`).set(as(alice))).body.data.items.find((i: any) => i.id === feature);
+    expect(it).toMatchObject({ status: "DONE", statusMode: "AUTO" });
+  });
+
+  it("logs work on a task (assignee or manager) and counts it", async () => {
+    expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/logs`).set(as(bob)).send({ hours: 2, workDate: day(1) })).body.field).toBe("workDate");
+    expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/logs`).set(as(bob)).send({ hours: 0.3 })).body.field).toBe("hours");
+    expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/logs`).set(as(bob)).send({ hours: 2, note: "Sign-in form" })).status).toBe(200);
+    const t = (await api().get(`/side-projects/${tp}/tasks/${bobTask}`).set(as(bob))).body.data;
+    expect(t.spentHours).toBe(2);
+    expect(t.logs[0]).toMatchObject({ hours: 2, note: "Sign-in form", userId: bob });
+  });
+
+  it("a teammate made manager can assign; managers reassign", async () => {
+    await api().patch(`/side-projects/${tp}/members/${bob}`).set(as(alice)).send({ isManager: true });
+    const r = await api().post(`/side-projects/${tp}/tasks`).set(as(bob)).send({ planItemId: feature, title: "Review the colours", assigneeId: alice });
+    expect(r.status).toBe(200);
+    expect((await api().patch(`/side-projects/${tp}/tasks/${r.body.data.id}`).set(as(bob)).send({ assigneeId: bob })).status).toBe(200);
+    await api().patch(`/side-projects/${tp}/members/${bob}`).set(as(alice)).send({ isManager: false });
+  });
+
+  it("insights: KPIs, burndown, throughput, time in status and one row per teammate", async () => {
+    const d = (await api().get(`/side-projects/${tp}/delivery`).set(as(bob))).body.data;
+    expect(d.kpis.done).toBe(1);
+    expect(d.kpis.byStatus.CANCELLED).toBe(1);
+    expect(d.kpis.avgCycleDays).not.toBeNull();
+    expect(d.burndown).toHaveLength(30);
+    expect(d.throughput).toHaveLength(8);
+    expect(d.throughput[7].done).toBe(1);
+    expect(d.statusTime.map((x: any) => x.status)).toEqual(["TODO", "IN_PROGRESS", "IN_REVIEW", "BLOCKED"]);
+    const b = d.members.find((m: any) => m.id === bob);
+    expect(b).toMatchObject({ done: 1, hoursLogged: 2, roleTitle: "Frontend developer" });
+    expect(d.members.find((m: any) => m.id === alice).owner).toBe(true);
+  });
+
+  it("my tasks lists the caller's tasks across projects", async () => {
+    const mine = (await api().get("/side-projects/my-tasks").set(as(bob))).body.data;
+    expect(mine.some((t: any) => t.id === bobTask && t.projectTitle === "Team delivery" && t.planItemTitle)).toBe(true);
+    expect(mine.every((t: any) => t.assigneeId === bob)).toBe(true);
+  });
+
+  it("deleting a feature moves its tasks to the phase; a phase with features stays", async () => {
+    expect((await api().delete(`/side-projects/${tp}/plan/items/${phase}`).set(as(alice))).status).toBe(409);
+    expect((await api().delete(`/side-projects/${tp}/plan/items/${feature}`).set(as(alice))).status).toBe(200);
+    const plan = (await api().get(`/side-projects/${tp}/plan`).set(as(alice))).body.data;
+    expect(plan.tasks.find((t: any) => t.id === bobTask).planItemId).toBe(phase);
+  });
+
+  it("the monitor summary carries a delivery block, and the sweep nudges overdue tasks", async () => {
+    const sum = (await api().get("/side-projects/monitor/summary").set(as(lead))).body.data;
+    expect(sum.delivery).toBeTruthy();
+    expect(sum.delivery.total).toBeGreaterThan(0);
+    expect(sum.delivery.teamProjects).toBeGreaterThan(0);
+    const late = await api().post(`/side-projects/${tp}/tasks`).set(as(alice)).send({ planItemId: phase, title: "Late one", assigneeId: bob, dueDate: day(-3) });
+    expect(late.status).toBe(200);
+    const { sweepSideProjects } = await import("../services/sideProjects/sweep");
+    const res = await sweepSideProjects();
+    expect(res.tasksOverdue).toBeGreaterThan(0);
+    const n = rows(await db.execute(sql`SELECT COUNT(*) AS n FROM Notification WHERE user_id = ${bob} AND kind = 'side_project_task_overdue'`));
+    expect(Number(n[0].n)).toBeGreaterThan(0);
+  });
+});
+
+describe("customers shared across projects (migration 133)", () => {
+  let cid: number;
+  // Every production role holds SIDE_PROJECTS_MANAGE_OWN (migration 129); the lead too.
+  beforeAll(() => owners.add(lead));
+  const png = async () => (await import("sharp")).default({ create: { width: 40, height: 40, channels: 3, background: "#2a78d6" } }).png().toBuffer();
+
+  it("registers a customer once (with a logo); duplicates are refused", async () => {
+    const r = await api().post("/side-projects/customers").set(as(alice)).field("name", "Kigali Green Farms").field("kind", "COMPANY").field("email", "info@greenfarms.rw").attach("logo", await png(), "logo.png");
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    cid = r.body.data.id;
+    expect(r.body.data).toMatchObject({ name: "Kigali Green Farms", kind: "COMPANY", projects: 0 });
+    expect(r.body.data.logoAssetId).toBeTruthy();
+    const dupe = await api().post("/side-projects/customers").set(as(carol)).field("name", "  kigali   green farms ");
+    expect(dupe.status).toBe(409);
+    expect((await api().post("/side-projects/customers").set(as(carol)).field("name", "Bad mail").field("email", "nope")).body.field).toBe("email");
+    expect((await api().post("/side-projects/customers").set(as(carol)).field("name", "Svg Co").attach("logo", Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'/>"), "logo.svg")).status).toBe(400);
+    const logo = await api().get(`/side-projects/customers/${cid}/logo`).set(as(carol));
+    expect(logo.status).toBe(200);
+    expect(String(logo.headers["content-type"])).toMatch(/image/);
+  });
+
+  it("any project can pick a registered customer", async () => {
+    const list = (await api().get("/side-projects/customers").query({ q: "green" }).set(as(carol))).body.data;
+    expect(list.some((c: any) => c.id === cid)).toBe(true);
+    const missing = await api().post("/side-projects").set(as(carol)).field("title", "No customer chosen").field("problemStatement", PROBLEM).field(DATES).field("customerMode", "CUSTOMER").attach("concept", pdf(), "c.pdf");
+    expect(missing.body.field).toBe("customerId");
+    const p = await createProject(carol, "Farm sensors", { customerMode: "CUSTOMER", customerId: String(cid) });
+    const d = (await api().get(`/side-projects/${p}`).set(as(carol))).body.data;
+    expect(d.customerMode).toBe("CUSTOMER");
+    expect(d.customerDetail).toMatchObject({ id: cid, name: "Kigali Green Farms" });
+    expect(d.customer).toMatchObject({ id: cid, name: "Kigali Green Farms" });
+    const own = await createProject(alice, "Own idea");
+    expect((await api().get(`/side-projects/${own}`).set(as(alice))).body.data.customerMode).toBe("OWN");
+    expect((await api().patch(`/side-projects/${own}`).set(as(alice)).send({ customerMode: "CUSTOMER", customerId: cid })).status).toBe(200);
+    expect((await api().get(`/side-projects/${own}`).set(as(alice))).body.data.customerDetail.id).toBe(cid);
+    expect((await api().get(`/side-projects/customers/${cid}`).set(as(alice))).body.data.projects).toBe(2);
+    const mon = (await api().get("/side-projects/monitor/projects").query({ customerId: cid, pageSize: 50 }).set(as(lead))).body.data;
+    expect(mon.rows.length).toBe(2);
+  });
+
+  it("only the registrar (or the lead) edits; a customer in use is archived, not deleted", async () => {
+    expect((await api().patch(`/side-projects/customers/${cid}`).set(as(carol)).field("phone", "+250 788 000 000")).status).toBe(403);
+    const ok = await api().patch(`/side-projects/customers/${cid}`).set(as(alice)).field("phone", "+250 788 000 000").field("contactName", "Jeanne");
+    expect(ok.status).toBe(200);
+    expect(ok.body.data).toMatchObject({ phone: "+250 788 000 000", contactName: "Jeanne" });
+    const rm = await api().delete(`/side-projects/customers/${cid}`).set(as(alice));
+    expect(rm.body.data.archived).toBe(true);
+    expect((await api().get("/side-projects/customers").set(as(alice))).body.data.some((c: any) => c.id === cid)).toBe(false);
+    const pick = await api().post("/side-projects").set(as(carol)).field("title", "Archived pick").field("problemStatement", PROBLEM).field(DATES).field("customerMode", "CUSTOMER").field("customerId", String(cid)).attach("concept", pdf(), "c.pdf");
+    expect(pick.body.field).toBe("customerId");
+    expect((await api().post(`/side-projects/customers/${cid}/restore`).set(as(lead))).status).toBe(200);
+    const fresh = (await api().post("/side-projects/customers").set(as(carol)).field("name", "Temporary Ltd")).body.data;
+    expect((await api().delete(`/side-projects/customers/${fresh.id}`).set(as(carol))).body.data.archived).toBe(false);
+  });
+});
+
+describe("project cover and logo (migration 133)", () => {
+  const png = async (color = "#2a78d6") => (await import("sharp")).default({ create: { width: 60, height: 60, channels: 3, background: color } }).png().toBuffer();
+  let bp: number;
+  beforeAll(() => owners.add(teacherA));
+
+  it("the team adds an optional logo and cover; others can't, SVG is refused", async () => {
+    bp = await createProject(teacherA, "Branded project");
+    let d = (await api().get(`/side-projects/${bp}`).set(as(teacherA))).body.data;
+    expect(d.logoAssetId).toBeNull();
+    expect(d.coverAssetId).toBeNull();
+    expect((await api().post(`/side-projects/${bp}/branding/logo`).set(as(carol)).attach("file", await png(), "l.png")).status).toBe(404);
+    expect((await api().post(`/side-projects/${bp}/branding/logo`).set(as(teacherA)).attach("file", Buffer.from("<svg/>"), "l.svg")).status).toBe(400);
+    expect((await api().post(`/side-projects/${bp}/branding/banner`).set(as(teacherA)).attach("file", await png(), "l.png")).status).toBe(404);
+    const logo = await api().post(`/side-projects/${bp}/branding/logo`).set(as(teacherA)).attach("file", await png(), "logo.png");
+    expect(logo.status, JSON.stringify(logo.body)).toBe(200);
+    const cover = await api().post(`/side-projects/${bp}/branding/cover`).set(as(teacherA)).attach("file", await png("#eb6834"), "cover.png");
+    expect(cover.status).toBe(200);
+    d = (await api().get(`/side-projects/${bp}`).set(as(teacherA))).body.data;
+    expect(d.logoAssetId).toBe(logo.body.data.assetId);
+    expect(d.coverAssetId).toBe(cover.body.data.assetId);
+    expect(d.media.some((m: any) => m.assetId === cover.body.data.assetId)).toBe(true);
+    expect((await api().get(`/side-projects/files/${d.logoAssetId}`).set(as(teacherA))).status).toBe(200);
+    const mine = (await api().get("/side-projects/mine").set(as(teacherA))).body.data.find((c: any) => c.id === bp);
+    expect(mine.logoAssetId).toBe(d.logoAssetId);
+  });
+
+  it("replacing or removing the logo retires the old file", async () => {
+    const before = (await api().get(`/side-projects/${bp}`).set(as(teacherA))).body.data.logoAssetId;
+    await api().post(`/side-projects/${bp}/branding/logo`).set(as(teacherA)).attach("file", await png("#1baf7a"), "logo2.png");
+    const gone = rows(await db.execute(sql`SELECT deleted_at FROM FileAsset WHERE asset_id = ${before}`));
+    expect(gone[0].deleted_at).not.toBeNull();
+    expect((await api().delete(`/side-projects/${bp}/branding/logo`).set(as(teacherA))).status).toBe(200);
+    expect((await api().delete(`/side-projects/${bp}/branding/cover`).set(as(teacherA))).status).toBe(200);
+    const d = (await api().get(`/side-projects/${bp}`).set(as(teacherA))).body.data;
+    expect(d.logoAssetId).toBeNull();
+    expect(d.coverAssetId).toBeNull();
   });
 });
 

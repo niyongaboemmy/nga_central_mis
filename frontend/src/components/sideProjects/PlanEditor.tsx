@@ -191,7 +191,7 @@ export const PlanEditor: React.FC<{
         })}
       </div>
       {!disabled && (
-        <button type="button" onClick={() => onChange(defaultEnds(total))} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:hover:bg-gray-700/50">
+        <button type="button" onClick={() => onChange(defaultEnds(total))} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700/50">
           <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Suggested split
         </button>
       )}

@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type Kind, type Status } from "../../api/sideProjects";
 import { useSpMe } from "./useMe";
+import { CustomerField } from "./customers/CustomerParts";
+import type { Customer } from "../../api/sideProjects";
 import { CategoryPicker, PersonPicker, TagInput, checkGithub, checkHttps } from "./fields";
 import { Field, FormModal, FormSection, IconInput, OptionCards, TextArea } from "./form";
 import PlanEditor, { MIN_PROJECT_DAYS, addDays, clampEnds, defaultEnds, endsToDates, spanDays } from "./PlanEditor";
@@ -108,7 +110,7 @@ const Preview: React.FC<{
   return (
     <aside className="space-y-4" aria-label="Preview">
       <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">Preview</p>
-      <motion.div layout className="overflow-hidden rounded-3xl border border-slate-200 bg-white dark:border-gray-700/40 dark:bg-gray-800/40">
+      <motion.div layout className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-gray-700/40 dark:bg-gray-800/40">
         <div className="relative h-28 overflow-hidden" style={{ background: `linear-gradient(135deg, ${accent}33, ${accent}0d)` }}>
           {cover && <motion.img key={cover} src={cover} alt="" initial={{ opacity: 0, scale: 1.08 }} animate={{ opacity: 1, scale: 1 }} className="absolute inset-0 h-full w-full object-cover" />}
           <motion.div key={category?.id ?? "none"} initial={{ scale: 0.6, opacity: 0, rotate: -10 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} className="flex h-full items-center justify-center">
@@ -160,7 +162,7 @@ const Preview: React.FC<{
         </div>
       </motion.div>
 
-      <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 dark:border-gray-700/40 dark:bg-gray-800/30">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-gray-700/40 dark:bg-gray-800/30">
         <div className="flex items-center gap-3">
           <ProgressRing value={Math.round((done / checks.length) * 100)} size={48} stroke={5} color={done === checks.length ? "#10b981" : "#2563eb"}>
             {done}/{checks.length}
@@ -185,6 +187,40 @@ const Preview: React.FC<{
         </ul>
       </div>
     </aside>
+  );
+};
+
+/** An optional brand image: drop or pick, see it at once, remove it. PNG/JPG/WebP up to 10 MB. */
+const ImageSlot: React.FC<{ label: string; hint: string; file: File | null; onFile: (f: File | null) => void; shape: "square" | "wide" }> = ({ label, hint, file, onFile, shape }) => {
+  const url = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
+  const [err, setErr] = useState<string | null>(null);
+  const take = (fs: File[]) => {
+    const f = fs[0];
+    if (!f) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(f.type)) return setErr("Use a PNG, JPG or WebP image");
+    if (f.size > 10 * 1048576) return setErr("At most 10 MB");
+    setErr(null);
+    onFile(f);
+  };
+  return (
+    <div>
+      <p className="mb-1.5 text-[13px] font-semibold text-slate-700 dark:text-gray-200">
+        {label} <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-gray-800 dark:text-gray-300">Optional</span>
+      </p>
+      {url ? (
+        <div className={`group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-gray-700 dark:bg-gray-800 ${shape === "square" ? "aspect-square" : "aspect-[3/1]"}`}>
+          <img src={url} alt={`${label} preview`} className="h-full w-full object-cover" />
+          <button type="button" aria-label={`Remove ${label.toLowerCase()}`} onClick={() => onFile(null)} className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-700 transition hover:text-red-600 dark:bg-gray-900/80 dark:text-gray-200 dark:hover:text-red-400">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <div className={shape === "square" ? "aspect-square" : "aspect-[3/1]"}>
+          <Dropzone compact onFiles={take} accept="image/png,image/jpeg,image/webp" label={`Add a ${label.toLowerCase()}`} hint={hint} icon={ImageIcon} error={err} />
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -232,6 +268,8 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   const [srs, setSrs] = useState<File | null>(null);
   const [plan, setPlan] = useState<File | null>(null);
   const [media, setMedia] = useState<File[]>([]);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [mediaErr, setMediaErr] = useState<string | null>(null);
   const [phase, setPhase] = useState<string | null>(null);
   const [attachNote, setAttachNote] = useState<string | null>(null);
@@ -245,6 +283,8 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   const [status, setStatus] = useState<Status>(initialStatus);
   const me = useSpMe();
   const [kind, setKind] = useState<Kind>("INDIVIDUAL");
+  const [customerMode, setCustomerMode] = useState<"OWN" | "CUSTOMER">("OWN");
+  const [customer, setCustomer] = useState<Customer | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -262,6 +302,8 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       setSrs(null);
       setPlan(null);
       setMedia([]);
+      setLogoFile(null);
+      setCoverFile(null);
       setMediaErr(null);
       setPhase(null);
       setAttachNote(null);
@@ -274,6 +316,8 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       setSupervisor(null);
       setStatus(startable(initialStatus));
       setKind("INDIVIDUAL");
+      setCustomerMode("OWN");
+      setCustomer(null);
       setErrors({});
       setDone(false);
     }
@@ -308,6 +352,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       else if (start && spanDays(start, target) < MIN_PROJECT_DAYS) e.targetDate = `At least ${MIN_PROJECT_DAYS} days after the start`;
     }
     if (s === 4) {
+      if (customerMode === "CUSTOMER" && !customer) e.customerId = "Choose or register the customer";
       const g = checkGithub(github);
       if (g) e.githubUrl = g;
       const a = checkHttps(access);
@@ -333,6 +378,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       if (all.title || all.problemStatement) setStep(0);
       else if (Object.keys(all).some((k) => k.startsWith("concept"))) setStep(1);
       else if (all.startDate || all.targetDate) setStep(3);
+      else setStep(4);
       return;
     }
     setBusy(true);
@@ -351,6 +397,8 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
         supervisorId: supervisor?.id,
         status,
         ...(me?.classify ? { kind } : {}),
+        customerMode,
+        customerId: customerMode === "CUSTOMER" ? customer?.id : undefined,
       };
       if (mode === "write") fields.conceptWritten = { problem: problem.trim(), ...written };
       setPhase(mode === "upload" ? "Uploading the concept" : "Creating");
@@ -360,6 +408,8 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
         ...(srs ? ([["SRS", () => sideProjectsApi.uploadDocument(r.id, "SRS", srs, setProgress)]] as Array<[string, () => Promise<unknown>]>) : []),
         ...(plan ? ([["implementation plan", () => sideProjectsApi.uploadDocument(r.id, "IMPLEMENTATION_PLAN", plan, setProgress)]] as Array<[string, () => Promise<unknown>]>) : []),
         ...(media.length ? ([[`${media.length} file${media.length > 1 ? "s" : ""}`, () => sideProjectsApi.uploadMedia(r.id, media, setProgress)]] as Array<[string, () => Promise<unknown>]>) : []),
+        ...(logoFile ? ([["logo", () => sideProjectsApi.setBranding(r.id, "logo", logoFile, setProgress)]] as Array<[string, () => Promise<unknown>]>) : []),
+        ...(coverFile ? ([["cover", () => sideProjectsApi.setBranding(r.id, "cover", coverFile, setProgress)]] as Array<[string, () => Promise<unknown>]>) : []),
       ];
       const failed: string[] = [];
       for (const [i, [label, run]] of jobs.entries()) {
@@ -386,7 +436,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
     }
   };
 
-  const attachCount = (srs ? 1 : 0) + (plan ? 1 : 0) + media.length;
+  const attachCount = (srs ? 1 : 0) + (plan ? 1 : 0) + media.length + (logoFile ? 1 : 0) + (coverFile ? 1 : 0);
   const addMedia = (files: File[]) => {
     setMediaErr(null);
     const video = files.find((f) => /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(f.name));
@@ -398,7 +448,9 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   };
   const previews = useMemo(() => media.map((m) => (m.type.startsWith("image/") ? URL.createObjectURL(m) : null)), [media]);
   useEffect(() => () => previews.forEach((u) => u && URL.revokeObjectURL(u)), [previews]);
-  const coverPreview = previews.find(Boolean) ?? null;
+  const brandCover = useMemo(() => (coverFile ? URL.createObjectURL(coverFile) : null), [coverFile]);
+  useEffect(() => () => void (brandCover && URL.revokeObjectURL(brandCover)), [brandCover]);
+  const coverPreview = brandCover ?? previews.find(Boolean) ?? null;
 
   const err = (k: string) => errors[k];
   const variants = useMemo(() => ({ enter: (d: number) => ({ x: d * 32, opacity: 0 }), center: { x: 0, opacity: 1 }, exit: (d: number) => ({ x: d * -32, opacity: 0 }) }), []);
@@ -589,6 +641,12 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
                         <span className="font-semibold">Optional.</span> Skip it now and add them anytime from the project's <span className="font-semibold">Documents</span> and <span className="font-semibold">Gallery</span> tabs.
                       </p>
                     </div>
+                    <FormSection title="Logo & cover" icon={ImageIcon}>
+                      <div className="grid gap-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                        <ImageSlot label="Logo" hint="Square works best" file={logoFile} onFile={setLogoFile} shape="square" />
+                        <ImageSlot label="Cover image" hint="Wide, at least 1200 px" file={coverFile} onFile={setCoverFile} shape="wide" />
+                      </div>
+                    </FormSection>
                     <FormSection title="Documents" icon={FileText}>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <DocSlot label="SRS" file={srs} onFile={setSrs} accept=".pdf,.doc,.docx,.odt,.md,.txt" template="/templates/projects/srs.md" />
@@ -680,6 +738,9 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
                           <IconInput id="sp-live" icon={Globe} value={access} onChange={(e) => setAccess(e.target.value)} invalid={!!err("accessUrl")} placeholder="https://…" />
                         </Field>
                       </div>
+                    </FormSection>
+                    <FormSection title="Who is it for?" icon={Users}>
+                      <CustomerField mode={customerMode} customer={customer} error={err("customerId")} onChange={(m, c) => (setCustomerMode(m), c !== undefined && setCustomer(c), setErrors((x) => ({ ...x, customerId: undefined })))} />
                     </FormSection>
                     <FormSection title="Supervision" icon={UserCheck}>
                       <Field label="Supervisor" optional>

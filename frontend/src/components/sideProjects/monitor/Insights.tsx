@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, BadgeCheck, Clock3, Flame, GanttChartSquare, NotebookPen, PauseCircle } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Clock3, Flame, GanttChartSquare, ListChecks, NotebookPen, PauseCircle } from "lucide-react";
 import type { MonitorRow, Summary } from "../../../api/sideProjects";
 import UserAvatar from "../../ui/UserAvatar";
 import { StageChip } from "../ProjectCard";
@@ -185,3 +185,69 @@ export const ReportingInsights: React.FC<{ s: Summary; onOpen: (id: number) => v
     </Panel>
   );
 };
+
+/** School-wide delivery of implementation plans and tasks (migration 133). */
+export const DeliveryInsights: React.FC<{ s: Summary; onOpen: (id: number) => void; detail: boolean }> = ({ s, onOpen, detail }) => {
+  const d = s.delivery;
+  if (!d) return null;
+  const planPct = d.planItems ? Math.round((d.planDone / d.planItems) * 100) : 0;
+  const tiles: Array<[string, React.ReactNode, boolean?]> = [
+    ["Projects with a plan", d.withPlan],
+    ["Team projects", d.teamProjects],
+    ["Open tasks", d.open],
+    ["Overdue tasks", d.overdue, d.overdue > 0],
+    ["Blocked tasks", d.blocked, d.blocked > 0],
+    ["Avg cycle time", d.avgCycleDays === null ? "–" : `${d.avgCycleDays}d`],
+    ["On time", d.onTimeRate === null ? "–" : `${d.onTimeRate}%`],
+  ];
+  return (
+    <Panel title="Plans & tasks" icon={ListChecks} action={<span className="text-[11px] font-semibold text-slate-500 dark:text-gray-400">{d.total} tasks in all</span>}>
+      <div className="flex flex-wrap items-center gap-4">
+        <ProgressRing value={planPct} size={64} stroke={6} label={`${planPct}% of planned features done`}>
+          <span className="text-xs">{planPct}%</span>
+        </ProgressRing>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-slate-800 dark:text-white">
+            {d.planDone} of {d.planItems} planned features delivered
+          </p>
+          <div className="mt-2 flex h-2 gap-[2px] overflow-hidden rounded-full bg-slate-100 dark:bg-gray-800" role="img" aria-label={`Tasks: ${d.byStatus.TODO} to do, ${d.byStatus.IN_PROGRESS} in progress, ${d.byStatus.IN_REVIEW} in review, ${d.byStatus.BLOCKED} blocked, ${d.byStatus.DONE} done`}>
+            {(["DONE", "IN_PROGRESS", "IN_REVIEW", "BLOCKED", "TODO"] as const).map((k) =>
+              d.byStatus[k] ? <span key={k} className={`h-full ${TASK_DOT[k]}`} style={{ flexGrow: d.byStatus[k] }} /> : null,
+            )}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600 dark:text-gray-300">
+            {(["DONE", "IN_PROGRESS", "IN_REVIEW", "BLOCKED", "TODO"] as const).map((k) => (
+              <span key={k} className="flex items-center gap-1">
+                <span className={`h-2 w-2 rounded-full ${TASK_DOT[k]}`} aria-hidden /> {TASK_LABEL[k]} {d.byStatus[k]}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+        {tiles.map(([label, value, bad]) => (
+          <div key={label} className="rounded-2xl bg-slate-50 px-3 py-2 dark:bg-gray-800/60">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">{label}</p>
+            <p className={`mt-0.5 text-lg font-extrabold tabular-nums ${bad ? "text-red-700 dark:text-red-300" : "text-slate-900 dark:text-white"}`}>{value}</p>
+          </div>
+        ))}
+      </div>
+      {detail && d.atRisk.length > 0 && (
+        <div className="mt-4 rounded-2xl bg-slate-50 p-2 dark:bg-gray-800/60">
+          <p className="px-2 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-gray-400">At risk</p>
+          {d.atRisk.map((r) => (
+            <button key={r.id} type="button" onClick={() => onOpen(r.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white dark:hover:bg-gray-900">
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800 dark:text-white">{r.title}</span>
+              {r.overdue > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">{r.overdue} overdue</span>}
+              {r.blocked > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">{r.blocked} blocked</span>}
+              <span className="text-[11px] tabular-nums text-slate-500 dark:text-gray-400">{r.open} open</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+};
+
+const TASK_DOT = { TODO: "bg-slate-400 dark:bg-gray-500", IN_PROGRESS: "bg-blue-600 dark:bg-blue-400", IN_REVIEW: "bg-amber-500 dark:bg-amber-400", BLOCKED: "bg-red-600 dark:bg-red-400", DONE: "bg-green-600 dark:bg-green-400" } as const;
+const TASK_LABEL = { TODO: "To do", IN_PROGRESS: "In progress", IN_REVIEW: "In review", BLOCKED: "Blocked", DONE: "Done" } as const;

@@ -11,8 +11,9 @@ import Board from "./Board";
 import ProjectDrawer from "./ProjectDrawer";
 import { StageChip } from "./ProjectCard";
 import PageHeader from "./PageHeader";
+import { ProjectLogo } from "./Branding";
 import {
-  CATEGORY_ICON, EmptyArt, HealthDot, PATH, ReviewBadge, STATUS_META, STATUS_ORDER, Skeleton, cardCls, chipCls, iconBtn, pathStage, primaryBtn, statusColor, timeAgo, useIsDark,
+  EmptyArt, HealthDot, PATH, ReviewBadge, STATUS_META, STATUS_ORDER, Skeleton, cardCls, chipCls, iconBtn, pathStage, primaryBtn, statusColor, timeAgo, useIsDark,
 } from "./ui";
 
 type Relation = "all" | "SUPERVISOR" | "MEMBER";
@@ -59,7 +60,6 @@ const AssignedCard: React.FC<{ r: MonitorRow; onOpen: () => void }> = ({ r, onOp
   const dark = useIsDark();
   const stage = pathStage(r.status, r.pausedFrom);
   const S = STATUS_META[r.status];
-  const CatIcon = CATEGORY_ICON[r.category?.icon ?? "sparkles"] ?? CATEGORY_ICON.sparkles;
   const quiet = daysSince(r.lastReport);
   const working = ["PLANNING", "IN_PROGRESS", "TESTING"].includes(r.status);
   const quietWarn = working && (quiet === null || quiet >= QUIET_DAYS);
@@ -74,9 +74,7 @@ const AssignedCard: React.FC<{ r: MonitorRow; onOpen: () => void }> = ({ r, onOp
       aria-label={`Open ${r.title}`}
     >
       <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: `${r.category?.color ?? statusColor(stage, dark)}1f`, color: r.category?.color ?? statusColor(stage, dark) }}>
-          <CatIcon className="h-5 w-5" aria-hidden />
-        </span>
+        <ProjectLogo logoAssetId={r.logoAssetId} category={r.category} accent={r.category?.color ?? statusColor(stage, dark)} size={44} rounded="rounded-2xl" />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <h3 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900 group-hover:text-blue-700 dark:text-white dark:group-hover:text-blue-300">{r.title}</h3>
@@ -110,6 +108,16 @@ const AssignedCard: React.FC<{ r: MonitorRow; onOpen: () => void }> = ({ r, onOp
           {r.relation === "SUPERVISOR" ? "You supervise" : "You're on the team"}
         </span>
         <StageChip card={r} />
+        {r.plan && r.plan.total > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-slate-700 dark:bg-gray-800 dark:text-gray-200" title="Plan features done">
+            Plan {r.plan.done}/{r.plan.total}
+          </span>
+        )}
+        {r.tasks && r.tasks.open > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-slate-700 dark:bg-gray-800 dark:text-gray-200" title="Open tasks">
+            {r.tasks.open} open task{r.tasks.open === 1 ? "" : "s"}
+          </span>
+        )}
         <ReviewBadge state={r.reviewState} />
       </div>
 
@@ -266,8 +274,8 @@ const AssignedProjects: React.FC = () => {
               role="radio"
               aria-checked={on}
               onClick={() => setQuick(on ? "none" : t.key)}
-              className={`flex items-center gap-3 rounded-3xl border p-4 text-left transition focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30 ${
-                on ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white hover:border-blue-300 dark:border-gray-700/30 dark:bg-gray-800/30 dark:hover:border-blue-500/40"
+              className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30 ${
+                on ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white hover:border-blue-300 dark:border-gray-800 dark:bg-gray-900/60 dark:hover:border-blue-500/40"
               }`}
             >
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${on ? "bg-white/20" : "bg-slate-100 text-slate-600 dark:bg-gray-700/60 dark:text-gray-300"}`}>
