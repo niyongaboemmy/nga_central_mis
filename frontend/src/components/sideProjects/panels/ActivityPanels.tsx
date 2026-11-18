@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Archive, ArchiveRestore, BadgeCheck, CheckCircle2, FilePlus2, Images, MessageSquareWarning, PlusCircle, Send, ShieldCheck, Target, UserCheck, UserMinus, UserPlus, Users, Wrench, X, Bell, ArrowRightLeft, Trash2, Mail, Check, GanttChartSquare,
+  Archive, ArchiveRestore, CheckCircle2, FilePlus2, Images, PlusCircle, ShieldCheck, Target, UserCheck, UserMinus, UserPlus, Users, Wrench, X, Bell, ArrowRightLeft, Trash2, Mail, Check, GanttChartSquare,
 } from "lucide-react";
 import { failure, sideProjectsApi, type ProjectDetail, type Status } from "../../../api/sideProjects";
 import { useToast } from "../../../contexts/ToastContext";
 import UserAvatar from "../../ui/UserAvatar";
-import { CharMeter, PersonPicker, TYPE_LABEL } from "../fields";
-import { DOC_META, FieldError, inputCls, inputErrCls, primaryBtn, secondaryBtn, Spinner, STATUS_META, statusColor, timeAgo, useIsDark, cardCls } from "../ui";
+import { PersonPicker, TYPE_LABEL } from "../fields";
+import { DOC_META, primaryBtn, Spinner, STATUS_META, statusColor, timeAgo, useIsDark, cardCls } from "../ui";
 
 const EVENT_ICON: Record<string, { icon: React.ElementType; color: string }> = {
   CREATED: { icon: PlusCircle, color: "#3b6cff" },
@@ -77,7 +77,7 @@ export const TimelinePanel: React.FC<{ p: ProjectDetail }> = ({ p }) => {
                 {describe(e) || e.type.replace(/_/g, " ").toLowerCase()}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-gray-400">{e.actor || "System"} · {timeAgo(e.createdAt)}</p>
-              {e.note && e.type !== "MILESTONE" && e.type !== "DOC" && <p className="mt-1 rounded-lg bg-slate-50 px-2 py-1 text-xs italic text-slate-600 dark:bg-gray-700/40 dark:text-gray-300">{e.note}</p>}
+              {e.note && e.type !== "MILESTONE" && e.type !== "DOC" && <p className="mt-1 w-fit max-w-full whitespace-pre-line break-words rounded-xl bg-slate-100 px-2.5 py-1 text-xs italic text-slate-600 dark:bg-gray-800 dark:text-gray-300">{e.note}</p>}
             </div>
           </motion.li>
         );
@@ -87,74 +87,6 @@ export const TimelinePanel: React.FC<{ p: ProjectDetail }> = ({ p }) => {
 };
 
 /** Feedback thread. Reviewers (staff mode) get the review actions; the team replies. */
-export const FeedbackPanel: React.FC<{ p: ProjectDetail; staff: boolean; onChanged: () => void }> = ({ p, staff, onChanged }) => {
-  const { showToast } = useToast();
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const canReview = staff && p.rights.review;
-  const send = async (kind: "COMMENT" | "CHANGES_REQUESTED" | "VERIFIED") => {
-    setErr(null);
-    if (kind === "CHANGES_REQUESTED" && text.trim().length < 10) return setErr("Say what should change (10+ characters)");
-    if (kind === "COMMENT" && text.trim().length < 2) return setErr("Write a comment");
-    setBusy(kind);
-    try {
-      if (canReview) await sideProjectsApi.review(p.id, kind, text.trim() || undefined);
-      else await sideProjectsApi.comment(p.id, text.trim());
-      setText("");
-      showToast(kind === "VERIFIED" ? "Verified" : kind === "CHANGES_REQUESTED" ? "Changes requested" : "Sent", "success");
-      onChanged();
-    } catch (e) {
-      setErr(failure(e).message);
-    } finally {
-      setBusy(null);
-    }
-  };
-  return (
-    <div className="space-y-3">
-      <ul className="space-y-3">
-        {p.comments.map((c) => {
-          const mine = c.authorType === "STUDENT";
-          return (
-            <motion.li key={c.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className={`flex gap-2 ${mine ? "flex-row-reverse" : ""}`}>
-              <UserAvatar name={c.author} userId={c.authorId} size={30} decorative />
-              <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${c.kind === "CHANGES_REQUESTED" ? "bg-amber-50 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-500/30" : c.kind === "VERIFIED" ? "bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-500/30" : mine ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-gray-700/50"}`}>
-                <p className={`mb-0.5 flex items-center gap-1 text-[11px] font-semibold ${mine && c.kind === "COMMENT" ? "text-white/80" : "text-slate-600 dark:text-gray-300"}`}>
-                  {c.kind === "CHANGES_REQUESTED" && <MessageSquareWarning className="h-3.5 w-3.5 text-amber-600" />}
-                  {c.kind === "VERIFIED" && <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" />}
-                  {c.author} · {timeAgo(c.createdAt)}
-                </p>
-                <p className={`whitespace-pre-line text-sm ${mine && c.kind === "COMMENT" ? "text-white" : "text-slate-800 dark:text-gray-100"}`}>{c.body}</p>
-              </div>
-            </motion.li>
-          );
-        })}
-      </ul>
-      <div className={`${cardCls} p-3`}>
-        <div className="flex items-center justify-end"><CharMeter value={text} min={canReview ? 2 : 2} max={2000} /></div>
-        <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} aria-label="Feedback" className={`${inputCls} ${err ? inputErrCls : ""}`} />
-        <FieldError message={err} />
-        <div className="mt-2 flex flex-wrap justify-end gap-2">
-          {canReview && (
-            <>
-              <button type="button" className={`${secondaryBtn} !border-amber-300 !text-amber-800 dark:!border-amber-500/50 dark:!text-amber-200`} disabled={!!busy} onClick={() => send("CHANGES_REQUESTED")}>
-                {busy === "CHANGES_REQUESTED" ? <Spinner className="h-4 w-4" /> : <MessageSquareWarning className="h-4 w-4" />} Request changes
-              </button>
-              {p.status === "COMPLETED" && p.reviewState !== "VERIFIED" && (
-                <button type="button" className={`${primaryBtn} !bg-emerald-600 hover:!bg-emerald-700`} disabled={!!busy} onClick={() => send("VERIFIED")}>
-                  {busy === "VERIFIED" ? <Spinner className="h-4 w-4" /> : <BadgeCheck className="h-4 w-4" />} Verify
-                </button>
-              )}
-            </>
-          )}
-          <button type="button" className={primaryBtn} disabled={!!busy} onClick={() => send("COMMENT")}>
-            {busy === "COMMENT" ? <Spinner className="h-4 w-4" /> : <Send className="h-4 w-4" />} Send
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export const TeamPanel: React.FC<{ p: ProjectDetail; meId: number; onChanged: () => void; onLeft: () => void }> = ({ p, meId, onChanged, onLeft }) => {
   const { showToast } = useToast();

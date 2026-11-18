@@ -231,7 +231,7 @@ const GenerateModal: React.FC<{ p: ProjectDetail; open: boolean; append: boolean
           {chosen && (
             <ol className="space-y-3">
               {chosen.phases.map((ph, i) => (
-                <li key={i} className="rounded-2xl border border-slate-200 p-3 dark:border-gray-800">
+                <li key={i} className="rounded-2xl border border-slate-900/[0.07] p-3 dark:border-white/[0.06]">
                   <p className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
                     <span className="flex h-6 w-6 items-center justify-center rounded-lg text-white" style={{ backgroundColor: statusColor(ph.stage, false) }}>
                       {React.createElement(STATUS_META[ph.stage].icon, { className: "h-3.5 w-3.5", "aria-hidden": true })}
@@ -270,7 +270,7 @@ const ItemMenu: React.FC<{ onEdit: () => void; onDelete: () => void; onAddFeatur
         <MoreHorizontal className="h-4 w-4" />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-8 z-30 w-40 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700 dark:bg-gray-900">
+        <div role="menu" className="absolute right-0 top-8 z-30 w-40 overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-white p-1.5 dark:border-white/10 dark:bg-gray-900">
           {entries.map(([Icon, label, fn, danger]) => (
             <button key={label} role="menuitem" type="button" onClick={(e) => (e.stopPropagation(), setOpen(false), fn())} className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm ${danger ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10" : "text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-800"}`}>
               <Icon className="h-4 w-4" /> {label}
@@ -404,7 +404,7 @@ const PlanView: React.FC<{ p: ProjectDetail; data: PlanData; team: Teammate[]; m
             </button>
           )}
           {it.dueDate && <span className={`hidden shrink-0 text-[11px] font-medium tabular-nums sm:inline ${late ? "font-bold text-red-700 dark:text-red-300" : "text-slate-500 dark:text-gray-400"}`}>{fmtDay(it.dueDate)}</span>}
-          {owner ? <UserAvatar name={owner.name} userId={owner.id} size={22} decorative /> : <span className="h-[22px] w-[22px] shrink-0 rounded-full border border-dashed border-slate-300 dark:border-gray-600" title="Nobody accountable" />}
+          {owner ? <UserAvatar name={owner.name} userId={owner.id} size={22} decorative /> : <span className="h-[22px] w-[22px] shrink-0 rounded-full border border-dashed border-slate-900/10 dark:border-gray-600" title="Nobody accountable" />}
           {manage && <ItemMenu onEdit={() => setItemModal({ item: it, preset: null })} onDelete={() => remove(it)} onAddTask={() => setTaskModal({ itemId: it.id })} />}
         </div>
         <AnimatePresence initial={false}>

@@ -101,7 +101,7 @@ const MilestoneRow: React.FC<{
         aria-checked={m.done}
         disabled={!canEdit}
         onClick={onToggle}
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${m.done ? "border-green-600 bg-green-600 text-white" : "border-slate-300 hover:border-green-600 dark:border-slate-500"}`}
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${m.done ? "border-green-600 bg-green-600 text-white" : "border-slate-900/10 hover:border-green-600 dark:border-slate-500"}`}
         aria-label={m.title}
       >
         <AnimatePresence>

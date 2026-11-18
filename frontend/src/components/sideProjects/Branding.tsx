@@ -122,7 +122,7 @@ export const EditableLogo: React.FC<{ projectId: number; logoAssetId: number | n
             <Camera className="h-4 w-4" aria-hidden />
           </button>
           {menu && (
-            <div role="menu" className="absolute left-0 top-[calc(100%+4px)] z-30 w-40 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700 dark:bg-gray-900">
+            <div role="menu" className="absolute left-0 top-[calc(100%+4px)] z-30 w-40 overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-white p-1.5 dark:border-white/10 dark:bg-gray-900">
               <button role="menuitem" type="button" onClick={() => (setMenu(false), up.pick())} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-800">
                 <Camera className="h-4 w-4" /> New logo
               </button>

@@ -98,7 +98,7 @@ const Slot: React.FC<{ type: DocType; slot: { current: DocVersion | null; versio
         )}
       </div>
       {showVersions && (
-        <ul className="border-t border-slate-100 px-3 py-2 dark:border-gray-700/40">
+        <ul className="border-t border-slate-900/[0.05] px-3 py-2 dark:border-white/[0.06]">
           {slot.versions.map((v) => (
             <li key={v.id} className="flex items-center gap-2 py-1 text-xs text-slate-600 dark:text-gray-300">
               <span className={`rounded-md px-1.5 font-bold ${v.isCurrent ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-100" : "bg-slate-100 dark:bg-gray-700/50"}`}>v{v.version}</span>
@@ -110,7 +110,7 @@ const Slot: React.FC<{ type: DocType; slot: { current: DocVersion | null; versio
         </ul>
       )}
       {canEdit && (
-        <div className="border-t border-slate-100 p-3 dark:border-gray-700/40">
+        <div className="border-t border-slate-900/[0.05] p-3 dark:border-white/[0.06]">
           <Dropzone compact onFiles={upload} accept={ACCEPT[type]} busy={busy} progress={progress} error={error} label={cur ? "Replace" : "Add"} icon={cur ? RefreshCw : undefined} />
         </div>
       )}

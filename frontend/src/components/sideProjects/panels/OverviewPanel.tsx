@@ -17,7 +17,7 @@ const LINK_KINDS: LinkKind[] = ["VIDEO", "DESIGN", "DOCS", "STORE", "OTHER"];
 
 
 export const ExtLink: React.FC<{ href: string; icon: React.ElementType; label: string }> = ({ href, icon: Icon, label }) => (
-  <a href={href} target="_blank" rel="noopener noreferrer" className="group inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-500 hover:text-blue-700 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100">
+  <a href={href} target="_blank" rel="noopener noreferrer" className="group inline-flex items-center gap-2 rounded-full border border-slate-900/[0.07] bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-500 hover:text-blue-700 dark:border-white/10 dark:bg-gray-800/40 dark:text-gray-100">
     <Icon className="h-4 w-4" aria-hidden />
     <span className="max-w-[12rem] truncate">{label}</span>
     <ExternalLink className="h-3 w-3 opacity-0 transition group-hover:opacity-100" aria-hidden />
@@ -105,7 +105,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">The problem</p>
               <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-slate-800 dark:text-gray-100">{p.problemStatement}</p>
-              {p.description && <p className="mt-3 whitespace-pre-line border-t border-slate-100 pt-3 text-sm leading-relaxed text-slate-600 dark:border-gray-700/40 dark:text-gray-300">{p.description}</p>}
+              {p.description && <p className="mt-3 whitespace-pre-line border-t border-slate-900/[0.05] pt-3 text-sm leading-relaxed text-slate-600 dark:border-white/[0.06] dark:text-gray-300">{p.description}</p>}
             </div>
           </div>
           {p.outcomeSummary && (
@@ -188,7 +188,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
               </div>
             ) : (
               <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-dashed border-slate-300 text-slate-400 dark:border-gray-600">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-dashed border-slate-900/10 text-slate-400 dark:border-gray-600">
                   <UserCheck className="h-4 w-4" aria-hidden />
                 </span>
                 <div>
@@ -234,7 +234,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
           </div>
         ) : (
           canEdit && (
-            <button type="button" onClick={() => setEdit(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 p-4 text-sm font-semibold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-400 dark:hover:bg-blue-500/10">
+            <button type="button" onClick={() => setEdit(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-900/[0.07] p-4 text-sm font-semibold text-slate-500 transition hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-700 dark:border-white/10 dark:text-gray-400 dark:hover:bg-blue-500/10">
               <Link2 className="h-4 w-4" aria-hidden /> Add a GitHub, live or demo link
             </button>
           )
@@ -279,9 +279,9 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
             {f.links.map((l, i) => {
               const Icon = LINK_ICON[l.kind];
               return (
-                <motion.div key={i} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3 dark:border-gray-700/40 dark:bg-gray-800/30">
+                <motion.div key={i} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-slate-900/[0.07] bg-slate-50/60 p-3 dark:border-white/[0.06] dark:bg-gray-800/30">
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex rounded-full border border-slate-200 bg-white p-1 dark:border-gray-700/60 dark:bg-gray-800/40" role="radiogroup" aria-label="Link type">
+                    <div className="flex rounded-full border border-slate-900/[0.07] bg-white p-1 dark:border-white/10 dark:bg-gray-800/40" role="radiogroup" aria-label="Link type">
                       {LINK_KINDS.map((k) => {
                         const KI = LINK_ICON[k];
                         return (
@@ -304,7 +304,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
               );
             })}
             {f.links.length < 10 && (
-              <button type="button" onClick={() => set("links", [...f.links, { kind: "OTHER", label: "", url: "" }])} className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-slate-300 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-solid hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-300 dark:hover:bg-blue-500/10">
+              <button type="button" onClick={() => set("links", [...f.links, { kind: "OTHER", label: "", url: "" }])} className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-slate-900/10 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-solid hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 dark:border-white/10 dark:text-gray-300 dark:hover:bg-blue-500/10">
                 <Plus className="h-3.5 w-3.5" /> Add a link (video, design, docs…)
               </button>
             )}
@@ -321,7 +321,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
           </Field>
         </FormSection>
       </div>
-      <div className="flex items-center justify-end gap-2 border-t border-slate-200/80 bg-slate-50/80 px-5 py-4 sm:px-6 dark:border-gray-700/40 dark:bg-gray-800/40">
+      <div className="flex items-center justify-end gap-2 border-t border-slate-900/[0.06] bg-slate-50/80 px-5 py-4 sm:px-6 dark:border-white/[0.06] dark:bg-gray-800/40">
         <button type="button" className={secondaryBtn} onClick={() => (setEdit(false), setErrors({}))}>
           <X className="h-4 w-4" /> Cancel
         </button>

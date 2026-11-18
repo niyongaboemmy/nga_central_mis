@@ -96,7 +96,7 @@ export const FormModal: React.FC<FormModalProps> = ({ open, onClose, title, subt
             aria-labelledby={titleId}
             aria-describedby={subtitle ? descId : undefined}
             tabIndex={-1}
-            className={`relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[28px] border border-slate-200/70 bg-white focus:outline-none sm:max-h-[88vh] sm:rounded-[28px] dark:border-gray-700/40 dark:bg-gray-900 ${SIZES[size]}`}
+            className={`relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[28px] border border-slate-900/[0.06] bg-white focus:outline-none sm:max-h-[88vh] sm:rounded-[28px] dark:border-white/[0.06] dark:bg-gray-900 ${SIZES[size]}`}
             initial={{ opacity: 0, y: 40, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.98 }}
@@ -133,7 +133,7 @@ export const FormModal: React.FC<FormModalProps> = ({ open, onClose, title, subt
             {band && <div className="px-6 pb-2 sm:px-8">{band}</div>}
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 sm:px-8">{children}</div>
             {footer && (
-              <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/80 bg-slate-50/80 px-6 py-4 backdrop-blur sm:px-8 dark:border-gray-700/40 dark:bg-gray-800/40">
+              <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-900/[0.06] bg-slate-50/80 px-6 py-4 backdrop-blur sm:px-8 dark:border-white/[0.06] dark:bg-gray-800/40">
                 {footer}
               </footer>
             )}
@@ -238,7 +238,7 @@ export function OptionCards<T extends string>({
             onClick={() => onChange(o.value)}
             whileTap={{ scale: 0.98 }}
             className={`relative flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-              on ? "bg-white dark:bg-gray-800/60" : "border-slate-200 bg-white hover:border-slate-300 dark:border-gray-700/60 dark:bg-gray-800/30 dark:hover:border-gray-600"
+              on ? "bg-white dark:bg-gray-800/60" : "border-slate-900/[0.07] bg-white hover:border-slate-900/20 dark:border-white/10 dark:bg-gray-800/30 dark:hover:border-white/20"
             }`}
             style={on ? { borderColor: color } : undefined}
           >
@@ -249,7 +249,7 @@ export function OptionCards<T extends string>({
               <span className="block text-sm font-bold text-slate-900 dark:text-white">{o.title}</span>
               {o.caption && <span className="mt-0.5 block text-xs text-slate-500 dark:text-gray-400">{o.caption}</span>}
             </span>
-            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${on ? "border-transparent" : "border-slate-300 dark:border-gray-600"}`} style={on ? { backgroundColor: color } : undefined} aria-hidden>
+            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${on ? "border-transparent" : "border-slate-900/10 dark:border-gray-600"}`} style={on ? { backgroundColor: color } : undefined} aria-hidden>
               {on && <span className="h-2 w-2 rounded-full bg-white" />}
             </span>
           </motion.button>

@@ -12,7 +12,7 @@ import type { Teammate } from "./WorkPanel";
 import { BlockedReason, TaskDetailModal, TaskModal, planOptions } from "./TaskModals";
 
 const selectCls =
-  "min-w-0 max-w-full rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100";
+  "min-w-0 max-w-full rounded-full border border-slate-900/[0.07] bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-white/10 dark:bg-gray-900 dark:text-gray-100";
 
 const TaskCard: React.FC<{ t: Task; itemTitle: string; onOpen: () => void; draggable: boolean }> = ({ t, itemTitle, onOpen, draggable }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: t.id, disabled: !draggable });
@@ -25,7 +25,7 @@ const TaskCard: React.FC<{ t: Task; itemTitle: string; onOpen: () => void; dragg
         aria-roledescription={draggable ? "draggable task" : undefined}
         aria-label={`${t.title}, ${t.status.toLowerCase().replace("_", " ")}`}
         onClick={onOpen}
-        className="w-full rounded-xl border border-slate-200/80 bg-white p-3 text-left transition hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-blue-500/50"
+        className="w-full rounded-xl border border-slate-900/[0.06] bg-white p-3 text-left transition hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-white/[0.06] dark:bg-gray-900 dark:hover:border-blue-500/50"
       >
         <p className="line-clamp-1 text-[11px] font-medium text-slate-500 dark:text-gray-400">{itemTitle}</p>
         <p className={`mt-0.5 line-clamp-2 text-sm font-semibold leading-snug ${t.status === "DONE" ? "text-slate-500 line-through dark:text-gray-400" : "text-slate-800 dark:text-gray-100"}`}>{t.title}</p>
@@ -44,7 +44,7 @@ const TaskCard: React.FC<{ t: Task; itemTitle: string; onOpen: () => void; dragg
             </span>
           )}
           <span className="ml-auto">
-            {t.assigneeName ? <UserAvatar name={t.assigneeName} userId={t.assigneeId ?? undefined} size={22} decorative /> : <span className="block h-[22px] w-[22px] rounded-full border border-dashed border-slate-300 dark:border-gray-600" title="Unassigned" />}
+            {t.assigneeName ? <UserAvatar name={t.assigneeName} userId={t.assigneeId ?? undefined} size={22} decorative /> : <span className="block h-[22px] w-[22px] rounded-full border border-dashed border-slate-900/10 dark:border-gray-600" title="Unassigned" />}
           </span>
         </div>
       </button>
@@ -146,7 +146,7 @@ const TasksView: React.FC<{ p: ProjectDetail; data: PlanData; team: Teammate[]; 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[10rem] flex-1 sm:max-w-[14rem]">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tasks" aria-label="Search tasks" className="h-9 w-full rounded-full border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tasks" aria-label="Search tasks" className="h-9 w-full rounded-full border border-slate-900/[0.07] bg-white pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-white/10 dark:bg-gray-900 dark:text-white" />
         </div>
         <button type="button" aria-pressed={who === "me"} onClick={() => setWho(who === "me" ? "all" : "me")} className={chipCls(who === "me")}>
           Mine <span className="tabular-nums opacity-80">{data.tasks.filter((t) => t.assigneeId === meId && t.status !== "DONE" && t.status !== "CANCELLED").length}</span>
@@ -180,7 +180,7 @@ const TasksView: React.FC<{ p: ProjectDetail; data: PlanData; team: Teammate[]; 
           </button>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-900" role="radiogroup" aria-label="Layout">
+          <div className="flex items-center gap-1 rounded-full border border-slate-900/[0.07] bg-white p-1 dark:border-white/10 dark:bg-gray-900" role="radiogroup" aria-label="Layout">
             <button type="button" role="radio" aria-checked={view === "board"} aria-label="Board" title="Board" onClick={() => setView("board")} className={`rounded-full p-1.5 ${view === "board" ? "bg-blue-600 text-white" : "text-slate-500 dark:text-gray-400"}`}>
               <KanbanSquare className="h-4 w-4" />
             </button>
@@ -206,14 +206,14 @@ const TasksView: React.FC<{ p: ProjectDetail; data: PlanData; team: Teammate[]; 
                   {list.map((t) => (
                     <TaskCard key={t.id} t={t} itemTitle={itemTitle.get(t.planItemId) ?? ""} onOpen={() => setDetail(t.id)} draggable={canMoveTask(t)} />
                   ))}
-                  {list.length === 0 && <div className="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-slate-200 py-6 text-[11px] text-slate-400 dark:border-gray-800 dark:text-gray-500">Drop here</div>}
+                  {list.length === 0 && <div className="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-slate-900/[0.07] py-6 text-[11px] text-slate-400 dark:border-white/[0.06] dark:text-gray-500">Drop here</div>}
                 </Column>
               );
             })}
           </div>
         </DndContext>
       ) : (
-        <div className={`${cardCls} divide-y divide-slate-100 overflow-hidden dark:divide-gray-800`}>
+        <div className={`${cardCls} divide-y divide-slate-900/[0.05] overflow-hidden dark:divide-white/[0.05]`}>
           {tasks.length === 0 && <p className="p-6 text-center text-sm text-slate-500 dark:text-gray-400">No task matches.</p>}
           {tasks.map((t) => (
             <button key={t.id} type="button" onClick={() => setDetail(t.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 dark:hover:bg-gray-800/50">
@@ -224,7 +224,7 @@ const TasksView: React.FC<{ p: ProjectDetail; data: PlanData; team: Teammate[]; 
               </span>
               <PriorityMark priority={t.priority} />
               {t.dueDate && <span className={`hidden w-14 text-right text-[11px] tabular-nums sm:block ${t.overdue ? "font-bold text-red-700 dark:text-red-300" : "text-slate-500 dark:text-gray-400"}`}>{fmtDay(t.dueDate)}</span>}
-              {t.assigneeName ? <UserAvatar name={t.assigneeName} userId={t.assigneeId ?? undefined} size={22} decorative /> : <span className="h-[22px] w-[22px] rounded-full border border-dashed border-slate-300 dark:border-gray-600" title="Unassigned" />}
+              {t.assigneeName ? <UserAvatar name={t.assigneeName} userId={t.assigneeId ?? undefined} size={22} decorative /> : <span className="h-[22px] w-[22px] rounded-full border border-dashed border-slate-900/10 dark:border-gray-600" title="Unassigned" />}
             </button>
           ))}
         </div>

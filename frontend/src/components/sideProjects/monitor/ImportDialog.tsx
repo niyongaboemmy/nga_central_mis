@@ -112,7 +112,7 @@ const ImportDialog: React.FC<{ open: boolean; onClose: () => void; onDone: () =>
           <div className="h-2 overflow-hidden rounded-full bg-red-100 dark:bg-red-500/20" role="img" aria-label={`${pct}% of rows ready`}>
             <motion.div className="h-full rounded-full bg-emerald-500" initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6 }} />
           </div>
-          <div className="max-h-72 overflow-auto rounded-2xl border border-slate-200 dark:border-gray-700/40">
+          <div className="max-h-72 overflow-auto rounded-2xl border border-slate-900/[0.07] dark:border-white/[0.06]">
             <table className="w-full text-left text-xs">
               <thead className="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 dark:bg-gray-800 dark:text-gray-400">
                 <tr>
@@ -123,7 +123,7 @@ const ImportDialog: React.FC<{ open: boolean; onClose: () => void; onDone: () =>
                   <th className="px-3 py-2" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-gray-700/40">
+              <tbody className="divide-y divide-slate-900/[0.05] dark:divide-white/[0.05]">
                 {res.rows.map((r) => (
                   <tr key={r.line} className={r.ok ? "" : "bg-red-50/50 dark:bg-red-500/5"}>
                     <td className="px-3 py-2 tabular-nums text-slate-400">{r.line}</td>

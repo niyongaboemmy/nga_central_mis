@@ -61,7 +61,7 @@ export function StatusMenu<T extends string>({
         <ChevronDown className="h-3 w-3 text-slate-400 dark:text-gray-500" aria-hidden />
       </button>
       {open && (
-        <div role="menu" aria-label={label} className="absolute left-0 top-7 z-40 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700 dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
+        <div role="menu" aria-label={label} className="absolute left-0 top-7 z-40 w-56 overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-white p-1.5 dark:border-white/10 dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
           {options.map((o) => {
             const M = meta[o];
             return (

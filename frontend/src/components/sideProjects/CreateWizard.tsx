@@ -110,7 +110,7 @@ const Preview: React.FC<{
   return (
     <aside className="space-y-4" aria-label="Preview">
       <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">Preview</p>
-      <motion.div layout className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-gray-700/40 dark:bg-gray-800/40">
+      <motion.div layout className="overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-white dark:border-white/[0.06] dark:bg-gray-800/40">
         <div className="relative h-28 overflow-hidden" style={{ background: `linear-gradient(135deg, ${accent}33, ${accent}0d)` }}>
           {cover && <motion.img key={cover} src={cover} alt="" initial={{ opacity: 0, scale: 1.08 }} animate={{ opacity: 1, scale: 1 }} className="absolute inset-0 h-full w-full object-cover" />}
           <motion.div key={category?.id ?? "none"} initial={{ scale: 0.6, opacity: 0, rotate: -10 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} className="flex h-full items-center justify-center">
@@ -125,7 +125,7 @@ const Preview: React.FC<{
           <p className={`line-clamp-2 text-sm font-bold ${title ? "text-slate-900 dark:text-white" : "italic text-slate-500 dark:text-gray-400"}`}>{title || "Your project title"}</p>
           <div className="flex min-h-[22px] flex-wrap gap-1">
             {(tags.length ? tags : ["Tech", "Stack"]).slice(0, 4).map((t) => (
-              <span key={t} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tags.length ? "bg-slate-100 text-slate-600 dark:bg-gray-700/60 dark:text-gray-300" : "border border-dashed border-slate-300 text-slate-500 dark:border-gray-600 dark:text-gray-400"}`}>
+              <span key={t} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${tags.length ? "bg-slate-100 text-slate-600 dark:bg-gray-700/60 dark:text-gray-300" : "border border-dashed border-slate-900/10 text-slate-500 dark:border-gray-600 dark:text-gray-400"}`}>
                 {t}
               </span>
             ))}
@@ -162,7 +162,7 @@ const Preview: React.FC<{
         </div>
       </motion.div>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-gray-700/40 dark:bg-gray-800/30">
+      <div className="rounded-2xl border border-slate-900/[0.07] bg-slate-50/70 p-4 dark:border-white/[0.06] dark:bg-gray-800/30">
         <div className="flex items-center gap-3">
           <ProgressRing value={Math.round((done / checks.length) * 100)} size={48} stroke={5} color={done === checks.length ? "#10b981" : "#2563eb"}>
             {done}/{checks.length}
@@ -177,7 +177,7 @@ const Preview: React.FC<{
             <li key={c.label} className="flex items-center gap-2 text-xs">
               <motion.span
                 animate={{ scale: c.ok ? [1, 1.25, 1] : 1 }}
-                className={`flex h-5 w-5 items-center justify-center rounded-full ${c.ok ? "bg-emerald-500 text-white" : "border-2 border-slate-300 dark:border-gray-600"}`}
+                className={`flex h-5 w-5 items-center justify-center rounded-full ${c.ok ? "bg-emerald-500 text-white" : "border-2 border-slate-900/10 dark:border-gray-600"}`}
               >
                 {c.ok && <Check className="h-3 w-3" />}
               </motion.span>
@@ -209,7 +209,7 @@ const ImageSlot: React.FC<{ label: string; hint: string; file: File | null; onFi
         {label} <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-gray-800 dark:text-gray-300">Optional</span>
       </p>
       {url ? (
-        <div className={`group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-gray-700 dark:bg-gray-800 ${shape === "square" ? "aspect-square" : "aspect-[3/1]"}`}>
+        <div className={`group relative overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-slate-50 dark:border-white/10 dark:bg-gray-800 ${shape === "square" ? "aspect-square" : "aspect-[3/1]"}`}>
           <img src={url} alt={`${label} preview`} className="h-full w-full object-cover" />
           <button type="button" aria-label={`Remove ${label.toLowerCase()}`} onClick={() => onFile(null)} className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-700 transition hover:text-red-600 dark:bg-gray-900/80 dark:text-gray-200 dark:hover:text-red-400">
             <Trash2 className="h-4 w-4" />
@@ -611,7 +611,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
                             </motion.div>
                           )}
                         </AnimatePresence>
-                        <a href="/templates/projects/concept-note.md" download className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-blue-300 hover:text-blue-700 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-300">
+                        <a href="/templates/projects/concept-note.md" download className="inline-flex items-center gap-2 rounded-full border border-slate-900/[0.07] bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-blue-300 hover:text-blue-700 dark:border-white/10 dark:bg-gray-800/40 dark:text-gray-300">
                           <Download className="h-3.5 w-3.5" /> Download the template
                         </a>
                       </div>
@@ -659,7 +659,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
                         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                           <AnimatePresence initial={false}>
                             {media.map((m, i) => (
-                              <motion.div key={`${m.name}-${m.size}`} layout initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} className="group relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-gray-700/40 dark:bg-gray-800/40">
+                              <motion.div key={`${m.name}-${m.size}`} layout initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} className="group relative aspect-square overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-slate-50 dark:border-white/[0.06] dark:bg-gray-800/40">
                                 {previews[i] ? (
                                   <img src={previews[i] as string} alt={m.name} className="h-full w-full object-cover" />
                                 ) : (
@@ -712,7 +712,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
                               key={label}
                               type="button"
                               onClick={() => (setTarget(d), redate(start, d), setErrors((x) => ({ ...x, targetDate: undefined })))}
-                              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${target === d ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-300"}`}
+                              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${target === d ? "border-blue-600 bg-blue-600 text-white" : "border-slate-900/[0.07] text-slate-600 hover:border-blue-300 hover:text-blue-700 dark:border-white/10 dark:text-gray-300"}`}
                             >
                               {label}
                             </button>

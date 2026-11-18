@@ -68,6 +68,7 @@ export async function people(userId: number, q: string, opts: { students?: boole
     SELECT u.user_id AS id, ${fullName("p")} AS name, p.registration_number AS regNumber, p.user_type AS type
     FROM User u JOIN UserProfile p ON p.user_id = u.user_id
     WHERE u.status = 'ACTIVE' AND u.user_id <> ${userId}
+      AND TRIM(CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,''))) <> ''
       ${opts.students ? sql`AND p.user_type = 'STUDENT'` : sql``}
       AND (CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) LIKE ${needle}
            OR p.registration_number LIKE ${needle} OR u.email LIKE ${needle})
