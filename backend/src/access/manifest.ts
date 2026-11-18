@@ -31,7 +31,7 @@ const SCHOOL_ONLY = { scopeable: false };
 export const MIS_MANIFEST = defineManifest({
   app: "mis",
   name: "Central MIS",
-  version: "2026.11.19",
+  version: "2026.11.20",
   capabilities: {
     // People & accounts
     MANAGE_USERS: W("Create, update and deactivate users", "PEOPLE"),
@@ -172,6 +172,9 @@ export const MIS_MANIFEST = defineManifest({
     // (anyone may own projects: students, staff, parents).
     SIDE_PROJECTS_MANAGE_OWN: W("Run your own projects (board, documents, media, progress)", "ACADEMICS", SCHOOL_ONLY),
     SIDE_PROJECTS_ASSIGNED: R("See and follow the projects assigned to you", "ACADEMICS", ["detail"], SCHOOL_ONLY),
+    // Classification (migration 132): Student / NGA Delivery Studio / Individual. Every role except
+    // students' and parents'; the service also refuses student accounts.
+    SIDE_PROJECTS_CLASSIFY: W("Choose a project's classification (student, Delivery Studio, individual)", "ACADEMICS", SCHOOL_ONLY),
     SIDE_PROJECTS_VIEW: R("See students' side projects in your area", "ACADEMICS", ["summary", "detail"]),
     SIDE_PROJECTS_REVIEW: W("Review side projects (feedback, changes, verify completion)", "ACADEMICS"),
     SIDE_PROJECTS_MANAGE_ANY: W("Manage every side project (import, correct, archive, categories)", "ACADEMICS", { ...SCHOOL_ONLY, restricted: true }),

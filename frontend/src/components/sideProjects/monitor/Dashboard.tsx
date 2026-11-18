@@ -4,12 +4,12 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Too
 import {
   Activity, AlertTriangle, BadgeCheck, Briefcase, Clock3, FileWarning, FolderKanban, Github, Hourglass, PauseCircle, Table2, TrendingDown, TrendingUp, Users, AlertOctagon, Minus,
 } from "lucide-react";
-import { fileUrl, type Health, type MonitorRow, type Status, type Summary } from "../../../api/sideProjects";
+import { fileUrl, type Kind, type Health, type MonitorRow, type Status, type Summary } from "../../../api/sideProjects";
 import UserAvatar from "../../ui/UserAvatar";
 import { ReportingInsights, StageInsights } from "./Insights";
-import { STATUS_SOLID, HEALTH_META, ReviewBadge, STATUS_META, STATUS_ORDER, statusColor, timeAgo, useIsDark, cardCls, CATEGORY_ICON } from "../ui";
+import { KIND_META, KINDS, STATUS_SOLID, HEALTH_META, ReviewBadge, STATUS_META, STATUS_ORDER, statusColor, timeAgo, useIsDark, cardCls, CATEGORY_ICON } from "../ui";
 
-export type DrillFilter = Partial<{ ownerType: "STUDENT" | "STAFF"; status: Status; review: string; health: Health; missing: string; hasGithub: string; hasAccess: string; classId: number }>;
+export type DrillFilter = Partial<{ kind: Kind; ownerType: "STUDENT" | "STAFF"; status: Status; review: string; health: Health; missing: string; hasGithub: string; hasAccess: string; classId: number }>;
 
 const SEQ = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95"];
 const SEQ_DARK = ["#1e293b", "#184f95", "#1c5cab", "#256abf", "#3987e5", "#6da7ec"];
@@ -181,7 +181,25 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
         <Tile icon={Activity} value={`${s.totals.avgProgress}%`} label="Average progress" tone="text-blue-700 bg-blue-50 dark:bg-blue-500/15 dark:text-blue-200" delay={0.33} />
       </div>
 
-      <Panel title="Pipeline" icon={FolderKanban}>
+      <Panel
+        title="Pipeline"
+        icon={FolderKanban}
+        action={
+          s.totals.byKind ? (
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Projects by type">
+              {KINDS.map((k) => {
+                const K = KIND_META[k];
+                return (
+                  <button key={k} type="button" disabled={!detail} onClick={() => drill({ kind: k })} title={K.label} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 transition enabled:hover:bg-slate-200 dark:bg-gray-700/60 dark:text-gray-200 dark:enabled:hover:bg-gray-700">
+                    <K.icon className="h-3.5 w-3.5" aria-hidden /> {K.short}
+                    <span className="tabular-nums text-slate-900 dark:text-white">{s.totals.byKind?.[k] ?? 0}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : undefined
+        }
+      >
         <Pipeline s={s} onDrill={drill} />
       </Panel>
 

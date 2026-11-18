@@ -37,6 +37,8 @@ export interface MonitorFilters {
   assignedTo?: number | null;
   /** STUDENT = students' projects, STAFF = everyone else's (teachers, staff, parents). */
   ownerType?: "STUDENT" | "STAFF" | null;
+  /** classification (migration 132) */
+  kind?: "STUDENT" | "DELIVERY_STUDIO" | "INDIVIDUAL" | null;
 }
 
 const num = (v: unknown) => (v === undefined || v === null || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
@@ -61,6 +63,7 @@ export function parseFilters(q: Record<string, unknown>): MonitorFilters {
     q: s(q.q),
     archived: bool(q.archived) === true,
     ownerType: q.ownerType === "STUDENT" || q.ownerType === "STAFF" ? q.ownerType : null,
+    kind: q.kind === "STUDENT" || q.kind === "DELIVERY_STUDIO" || q.kind === "INDIVIDUAL" ? q.kind : null,
   };
 }
 
@@ -93,6 +96,7 @@ async function loadRows(scope: ScopeEntry | null, f: MonitorFilters) {
     conds.push(sql`NOT EXISTS (SELECT 1 FROM SideProjectDocument d WHERE d.project_id = sp.project_id AND d.doc_type = ${f.missing})`);
   }
   if (f.supervisorId) conds.push(sql`sp.supervisor_user_id = ${f.supervisorId}`);
+  if (f.kind) conds.push(sql`sp.kind = ${f.kind}`);
   if (f.ownerType === "STUDENT") conds.push(sql`up.user_type = 'STUDENT'`);
   if (f.ownerType === "STAFF") conds.push(sql`(up.user_type IS NULL OR up.user_type <> 'STUDENT')`);
   if (f.q) {
@@ -205,6 +209,7 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
   const classes = new Map<string, { classId: number | null; name: string; grade: string | null; students: Set<number> } & Record<Status, number>>();
   const studentOwners = new Set<number>();
   let staffProjects = 0;
+  const byKind: Record<string, number> = { STUDENT: 0, DELIVERY_STUDIO: 0, INDIVIDUAL: 0 };
   let completedNow = 0,
     completedPrev = 0,
     withGithub = 0,
@@ -218,6 +223,7 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
     owners.add(p.student.id);
     if (p.student.type === "STUDENT") studentOwners.add(p.student.id);
     else staffProjects += 1;
+    byKind[p.kind ?? "INDIVIDUAL"] = (byKind[p.kind ?? "INDIVIDUAL"] ?? 0) + 1;
     if (inWin(p.completedAt, windows.current)) completedNow += 1;
     if (inWin(p.completedAt, windows.previous)) completedPrev += 1;
     if (p.githubUrl) withGithub += 1;
@@ -333,6 +339,7 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
       participation: population ? Math.round((studentOwners.size / population) * 100) : null,
       studentProjects: rows.length - staffProjects,
       staffProjects,
+      byKind,
       byStatus,
       completedThisTerm: completedNow,
       completedPreviousTerm: completedPrev,
@@ -371,6 +378,7 @@ export async function exportRows(scope: ScopeEntry | null, f: MonitorFilters, fo
     Programme: p.class?.program ?? "",
     "Academic year": p.year?.name ?? "",
     Title: p.title,
+    Type: p.kind === "DELIVERY_STUDIO" ? "NGA Delivery Studio" : p.kind === "STUDENT" ? "Student project" : "Individual project",
     Category: p.category?.name ?? "",
     Technologies: (p.techTags as string[]).join(", "),
     Status: p.status,

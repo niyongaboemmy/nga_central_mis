@@ -3,11 +3,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Calendar, CalendarRange, Check, Flag, GanttChartSquare, Clock, Download, FileCheck2, FileText, FileUp, Github, Globe, Image as ImageIcon, Lightbulb, Link2, Paperclip, PenLine, Rocket, Sparkles, Target, Trash2, UserCheck, Users, Wand2, X,
 } from "lucide-react";
-import { failure, sideProjectsApi, type Category, type Status } from "../../api/sideProjects";
+import { failure, sideProjectsApi, type Category, type Kind, type Status } from "../../api/sideProjects";
+import { useSpMe } from "./useMe";
 import { CategoryPicker, PersonPicker, TagInput, checkGithub, checkHttps } from "./fields";
 import { Field, FormModal, FormSection, IconInput, OptionCards, TextArea } from "./form";
 import PlanEditor, { MIN_PROJECT_DAYS, addDays, clampEnds, defaultEnds, endsToDates, spanDays } from "./PlanEditor";
-import { CATEGORY_ICON, Dropzone, ProgressRing, STATUS_META, Spinner, fmtBytes, inputCls, primaryBtn, secondaryBtn, statusColor, useIsDark } from "./ui";
+import { KIND_META, KINDS, CATEGORY_ICON, Dropzone, ProgressRing, STATUS_META, Spinner, fmtBytes, inputCls, primaryBtn, secondaryBtn, statusColor, useIsDark } from "./ui";
 
 const DOC_ACCEPT = ".pdf,.doc,.docx,.odt,.md,.txt,.ppt,.pptx";
 const STEPS = [
@@ -242,6 +243,8 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   const [ends, setEnds] = useState<number[]>([]);
   const [supervisor, setSupervisor] = useState<{ id: number; name: string } | null>(null);
   const [status, setStatus] = useState<Status>(initialStatus);
+  const me = useSpMe();
+  const [kind, setKind] = useState<Kind>("INDIVIDUAL");
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -270,6 +273,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       setEnds([]);
       setSupervisor(null);
       setStatus(startable(initialStatus));
+      setKind("INDIVIDUAL");
       setErrors({});
       setDone(false);
     }
@@ -346,6 +350,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
         stagePlan: ends.length === 3 ? endsToDates(start, ends) : undefined,
         supervisorId: supervisor?.id,
         status,
+        ...(me?.classify ? { kind } : {}),
       };
       if (mode === "write") fields.conceptWritten = { problem: problem.trim(), ...written };
       setPhase(mode === "upload" ? "Uploading the concept" : "Creating");
@@ -495,6 +500,23 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
                     <Field label="Problem it solves" htmlFor="sp-problem" counter={{ value: problem, min: 30, max: 3000 }} error={err("problemStatement")} hint="Who has the problem, and why it matters.">
                       <TextArea id="sp-problem" rows={4} value={problem} onChange={(e) => setProblem(e.target.value)} invalid={!!err("problemStatement")} placeholder="Describe the problem in a few sentences…" />
                     </Field>
+                    {me?.classify ? (
+                      <Field label="Project type">
+                        <OptionCards
+                          label="Project type"
+                          value={kind}
+                          onChange={setKind}
+                          options={KINDS.map((k) => ({ value: k, title: KIND_META[k].short, caption: KIND_META[k].hint, icon: KIND_META[k].icon }))}
+                        />
+                      </Field>
+                    ) : (
+                      me && (
+                        <p className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-xs text-slate-600 dark:bg-gray-800/40 dark:text-gray-300">
+                          {React.createElement(KIND_META.STUDENT.icon, { className: "h-4 w-4 text-slate-500", "aria-hidden": true })}
+                          This will be a <span className="font-semibold text-slate-800 dark:text-gray-100">Student project</span>.
+                        </p>
+                      )
+                    )}
                     <Field label="Category" optional>
                       <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} />
                     </Field>

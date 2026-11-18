@@ -10,6 +10,8 @@ export type Stage = "IDEA" | "PLANNING" | "IN_PROGRESS" | "TESTING";
 export type ReviewState = "NONE" | "CHANGES_REQUESTED" | "AWAITING_VERIFICATION" | "VERIFIED";
 export type Health = "ON_TRACK" | "STALE" | "OVERDUE" | "BLOCKED" | "DONE" | "IDLE" | "PAUSED";
 export type DocType = "CONCEPT" | "SRS" | "IMPLEMENTATION_PLAN";
+/** Classification (migration 132). Students' projects are always STUDENT. */
+export type Kind = "STUDENT" | "DELIVERY_STUDIO" | "INDIVIDUAL";
 export type LinkKind = "VIDEO" | "DESIGN" | "DOCS" | "STORE" | "OTHER";
 
 export interface Category {
@@ -85,6 +87,7 @@ export interface ProjectCard {
   id: number;
   title: string;
   status: Status;
+  kind: Kind;
   boardPosition: number;
   reviewState: ReviewState;
   progress: number;
@@ -200,6 +203,7 @@ export interface Summary {
     studentOwners: number;
     studentProjects: number;
     staffProjects: number;
+    byKind?: Record<Kind, number>;
     byStatus: Record<Status, number>;
     completedThisTerm: number;
     completedPreviousTerm: number;
@@ -247,6 +251,8 @@ export interface Me {
   supervising: number;
   /** may open the Assigned projects page (SIDE_PROJECTS_ASSIGNED) */
   assigned: boolean;
+  /** may choose a project's classification (SIDE_PROJECTS_CLASSIFY, never a student) */
+  classify?: boolean;
 }
 
 export interface FilterOptions {
@@ -357,6 +363,7 @@ export const sideProjectsApi = {
     api.post<Data<{ id: number }>>(`${B}/${id}/updates`, toForm(body as unknown as Record<string, unknown>, { files }), onUp(progress)).then((r) => r.data.data),
   editReport: (id: number, uid: number, body: ReportBody & { removeFiles?: number[] }, files: File[], progress?: Progress) =>
     api.patch(`${B}/${id}/updates/${uid}`, toForm(body as unknown as Record<string, unknown>, { files }), onUp(progress)),
+  setKind: (id: number, kind: Kind) => api.patch<Data<{ kind: Kind }>>(`${B}/${id}/kind`, { kind }).then((r) => r.data.data),
   activity: (id: number, days = 182) => api.get<Data<Activity>>(`${B}/${id}/activity`, { params: { days } }).then((r) => r.data.data),
   updatePlan: (id: number, body: { startDate: string; targetDate: string; stagePlan?: string[] }) =>
     api.put<Data<{ plan: Array<{ stage: Stage; start: string; end: string }> }>>(`${B}/${id}/plan`, body).then((r) => r.data.data),

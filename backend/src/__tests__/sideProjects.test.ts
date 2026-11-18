@@ -31,6 +31,7 @@ const rows = (r: unknown): any[] => (Array.isArray(r) && Array.isArray(r[0]) ? r
 const viewers = new Map<number, Partial<Viewer>>();
 const owners = new Set<number>();
 const assignedOk = new Set<number>();
+const classifiers = new Set<number>();
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
 const DATES = { startDate: day(0), targetDate: day(60) };
 
@@ -42,7 +43,7 @@ app.use(
     (req: any, res, next) => {
       const id = Number(req.get("X-Test-User"));
       if (!id) return res.status(401).end();
-      req.user = { userId: id, permissions: owners.has(id) ? ["SIDE_PROJECTS_MANAGE_OWN"] : [] };
+      req.user = { userId: id, permissions: [...(owners.has(id) ? ["SIDE_PROJECTS_MANAGE_OWN"] : []), ...(classifiers.has(id) ? ["SIDE_PROJECTS_CLASSIFY"] : [])] };
       next();
     },
     (req: any, res, next) => (owners.has(Number(req.user.userId)) ? next() : res.status(403).json({ message: "Forbidden" })),
@@ -161,7 +162,7 @@ describe("permissions and seeding", () => {
 
   it("migration 128 seeded the permissions, the student and super-admin grants and the categories", async () => {
     const perms = rows(await db.execute(sql`SELECT name, depths, scopeable, restricted FROM Permission WHERE name LIKE 'SIDE_PROJECTS_%' ORDER BY name`));
-    expect(perms.map((p) => p.name)).toEqual(["SIDE_PROJECTS_ASSIGNED", "SIDE_PROJECTS_MANAGE_ANY", "SIDE_PROJECTS_MANAGE_OWN", "SIDE_PROJECTS_REVIEW", "SIDE_PROJECTS_VIEW"]);
+    expect(perms.map((p) => p.name)).toEqual(["SIDE_PROJECTS_ASSIGNED", "SIDE_PROJECTS_CLASSIFY", "SIDE_PROJECTS_MANAGE_ANY", "SIDE_PROJECTS_MANAGE_OWN", "SIDE_PROJECTS_REVIEW", "SIDE_PROJECTS_VIEW"]);
     const grants = rows(await db.execute(sql`
       SELECT r.name AS role, p.name AS perm FROM RolePermission rp JOIN Role r ON r.role_id = rp.role_id JOIN Permission p ON p.perm_id = rp.perm_id
       WHERE p.name LIKE 'SIDE_PROJECTS_%' AND r.name IN ('STUDENT', 'SUPER_ADMIN')`));
@@ -662,6 +663,73 @@ describe("assigned projects", () => {
     expect(res.body.data.rows.some((r: any) => r.relation === "MEMBER")).toBe(true); // the staff project's team
     expect(res.body.data.rows.every((r: any) => r.student.id !== supervisor)).toBe(true);
     expect((await api().get("/side-projects/assigned").set(as(outsider))).status).toBe(403);
+  });
+});
+
+describe("classification (migration 132)", () => {
+  beforeAll(() => {
+    owners.add(teacherA);
+    classifiers.add(teacherA);
+    classifiers.add(alice); // even if a student somehow held the permission, the service refuses
+  });
+
+  it("migration 132 grants SIDE_PROJECTS_CLASSIFY to every role except students' and parents'", async () => {
+    const text = fs.readFileSync(path.join(__dirname, "../../migrations/132_side_projects_kind.sql"), "utf8");
+    const at = text.indexOf("INSERT INTO `RolePermission`");
+    await db.execute(sql.raw(text.slice(at, text.indexOf(";", at))));
+    const [r] = rows(await db.execute(sql`
+      SELECT (SELECT COUNT(*) FROM Role WHERE name NOT IN ('STUDENT','PARENT') AND (preset_key IS NULL OR preset_key NOT IN ('student','parent'))) AS eligible,
+             (SELECT COUNT(DISTINCT rp.role_id) FROM RolePermission rp JOIN Permission p ON p.perm_id = rp.perm_id JOIN Role ro ON ro.role_id = rp.role_id
+               WHERE p.name = 'SIDE_PROJECTS_CLASSIFY' AND ro.name NOT IN ('STUDENT','PARENT') AND (ro.preset_key IS NULL OR ro.preset_key NOT IN ('student','parent'))) AS holders,
+             (SELECT COUNT(*) FROM RolePermission rp JOIN Permission p ON p.perm_id = rp.perm_id JOIN Role ro ON ro.role_id = rp.role_id
+               WHERE p.name = 'SIDE_PROJECTS_CLASSIFY' AND ro.name IN ('STUDENT','PARENT')) AS students`));
+    expect(Number(r.holders)).toBe(Number(r.eligible));
+    expect(Number(r.students)).toBe(0);
+  });
+
+  it("a student's project is always a Student project and the student can't change it", async () => {
+    const id = await createProject(alice, "Kind student", { kind: "DELIVERY_STUDIO" });
+    const d = (await api().get(`/side-projects/${id}`).set(as(alice))).body.data;
+    expect(d.kind).toBe("STUDENT");
+    const me = (await api().get("/side-projects/me").set(as(alice))).body.data;
+    expect(me.classify).toBe(false);
+    const r = await api().patch(`/side-projects/${id}/kind`).set(as(alice)).send({ kind: "INDIVIDUAL" });
+    expect(r.status).toBe(403);
+  });
+
+  it("staff choose the type when creating (default Individual) and can change it later", async () => {
+    const a = await createProject(teacherA, "Kind default");
+    expect((await api().get(`/side-projects/${a}`).set(as(teacherA))).body.data.kind).toBe("INDIVIDUAL");
+    const b = await createProject(teacherA, "Kind studio", { kind: "DELIVERY_STUDIO" });
+    expect((await api().get(`/side-projects/${b}`).set(as(teacherA))).body.data.kind).toBe("DELIVERY_STUDIO");
+    expect((await api().get("/side-projects/me").set(as(teacherA))).body.data.classify).toBe(true);
+    const bad = await api().patch(`/side-projects/${a}/kind`).set(as(teacherA)).send({ kind: "NOPE" });
+    expect(bad.status).toBe(400);
+    const ok = await api().patch(`/side-projects/${a}/kind`).set(as(teacherA)).send({ kind: "DELIVERY_STUDIO" });
+    expect(ok.status).toBe(200);
+    expect(ok.body.data.kind).toBe("DELIVERY_STUDIO");
+    const ev = rows(await db.execute(sql`SELECT from_value, to_value FROM SideProjectEvent WHERE project_id = ${a} AND type = 'KIND'`));
+    expect(ev[0]).toMatchObject({ from_value: "INDIVIDUAL", to_value: "DELIVERY_STUDIO" });
+  });
+
+  it("without the permission a staff member can't choose a type", async () => {
+    classifiers.delete(teacherA);
+    const r = await api().post("/side-projects").set(as(teacherA)).field("title", "Kind refused").field("problemStatement", PROBLEM).field(DATES).field("kind", "DELIVERY_STUDIO").attach("concept", pdf(), "c.pdf");
+    expect(r.status).toBe(403);
+    expect(r.body.field).toBe("kind");
+    classifiers.add(teacherA);
+  });
+
+  it("the projects lead reclassifies a student's project, and the monitor filters by type", async () => {
+    const id = await createProject(alice, "Kind lead change");
+    classifiers.add(lead);
+    const r = await api().patch(`/side-projects/${id}/kind`).set(as(lead)).send({ kind: "DELIVERY_STUDIO" });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const list = (await api().get("/side-projects/monitor/projects").query({ kind: "DELIVERY_STUDIO", pageSize: 200 }).set(as(lead))).body.data;
+    expect(list.rows.some((x: any) => x.id === id)).toBe(true);
+    expect(list.rows.every((x: any) => x.kind === "DELIVERY_STUDIO")).toBe(true);
+    const sum = (await api().get("/side-projects/monitor/summary").set(as(lead))).body.data;
+    expect(sum.totals.byKind.DELIVERY_STUDIO).toBeGreaterThan(0);
   });
 });
 

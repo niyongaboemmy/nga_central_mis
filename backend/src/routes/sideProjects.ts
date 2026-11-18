@@ -6,7 +6,7 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { authorizeIn } from "../services/access/policy";
 import { recordActivity } from "../utils/activityLogger";
 import { MAX_UPLOAD_BYTES } from "../services/files/fileKinds";
-import { CAP, DOC_TYPES, DocType, fail, SideProjectError, Status } from "../services/sideProjects/core";
+import { CAP, DOC_TYPES, DocType, fail, isStudentAccount, SideProjectError, Status } from "../services/sideProjects/core";
 import { accessProject, assertEdit, assertOwnerOrAny, isEmptyScope, snapshotViewer, Viewer, ViewerResolver } from "../services/sideProjects/access";
 import * as projects from "../services/sideProjects/projects";
 import * as files from "../services/sideProjects/files";
@@ -94,6 +94,9 @@ export function sideProjectsRouter(
     res.send(TEMPLATE_CSV);
   });
 
+  /** SIDE_PROJECTS_CLASSIFY, and never a student account (migration 132). */
+  const mayClassify = async (req: any) => ((req.user?.permissions ?? []) as string[]).includes(CAP.CLASSIFY) && !(await isStudentAccount(uid(req)));
+
   // ------------------------------------------------------------------ what this user may open
   router.get(
     "/me",
@@ -104,6 +107,7 @@ export function sideProjectsRouter(
       return {
         own: perms.includes(CAP.OWN),
         assigned: perms.includes(CAP.ASSIGNED),
+        classify: perms.includes(CAP.CLASSIFY) && !(await isStudentAccount(uid(req))),
         view: v.detail && !isEmptyScope(v.detail) ? "detail" : v.summary && !isEmptyScope(v.summary) ? "summary" : null,
         review: !!v.review && !isEmptyScope(v.review),
         manageAny: v.manageAny,
@@ -239,7 +243,7 @@ export function sideProjectsRouter(
       await requireAny(req);
       const studentId = Number(req.body?.studentId);
       if (!studentId) fail(400, "VALIDATION", "Choose the owner", "studentId");
-      const id = await projects.createProject(studentId, uid(req), { ...req.body, concept: req.file ?? null }, { conceptPending: !req.file && !req.body?.conceptWritten });
+      const id = await projects.createProject(studentId, uid(req), { ...req.body, concept: req.file ?? null }, { conceptPending: !req.file && !req.body?.conceptWritten, canClassify: await mayClassify(req) });
       await notify.notifyMany([studentId], "side_project_created_for", "A project was added for you", "Open My projects to see it.", id, false);
       return { id };
     }),
@@ -291,7 +295,7 @@ export function sideProjectsRouter(
     uploadRateLimit,
     upload.single("concept"),
     handle(async (req) => {
-      const id = await projects.createProject(uid(req), uid(req), { ...req.body, concept: req.file ?? null });
+      const id = await projects.createProject(uid(req), uid(req), { ...req.body, concept: req.file ?? null }, { canClassify: await mayClassify(req) });
       await notify.onCreated(id, uid(req));
       return { id };
     }),
@@ -521,6 +525,14 @@ export function sideProjectsRouter(
       }
       await progress.updateUpdate(a, uid(req), idParam(req, "uid"), req.body ?? {}, list);
       return { ok: true };
+    }),
+  );
+  // Classification: Student / NGA Delivery Studio / Individual (the team or the lead; never students).
+  router.patch(
+    "/:id/kind",
+    handle(async (req) => {
+      const a = await anyAccess(req);
+      return { kind: await projects.setKind(a, uid(req), req.user?.permissions ?? [], req.body?.kind) };
     }),
   );
   // Daily work activity for the contribution graph (anyone who may open the project).

@@ -640,3 +640,26 @@ The list has a sortable "Time in stage" column. The export adds days in stage, s
 **Navigation.** One sidebar group, "Projects": My projects (default), Assigned projects (staff with the permission, with a badge for how many they supervise) and All projects (`SIDE_PROJECTS_VIEW`). My projects also shows an "Assigned to me" shortcut.
 
 **Deploy.** Run `131_side_projects_stages_reports.sql` with the migrate workflow before (or with) the backend deploy. It changes the status ENUM, adds the columns and tables, and seeds the permission.
+
+## 14. Classification, shared header, compact drawer, reports feed (2026-11-18, migration 132)
+
+**Classification.** `SideProject.kind`: `STUDENT` (Student project), `DELIVERY_STUDIO` (NGA Delivery Studio project) or `INDIVIDUAL` (Individual project).
+- A student's project is always `STUDENT`. Students never choose, and the service refuses a student account even if it holds the permission.
+- Other people choose when creating (default Individual) if they hold `SIDE_PROJECTS_CLASSIFY`. Migration 132 grants it to every role except students' and parents'.
+- `PATCH /:id/kind` changes the type, for a holder who may edit the project or the projects lead. It records a `KIND` event.
+- Existing rows are backfilled from the owner's account type.
+- The monitor has a type filter, a type column in the export, a `byKind` summary (pills on the Pipeline panel) and type chips in the list.
+
+**Shared header.** `PageHeader.tsx`: a theme surface (no gradient) with an icon tile, title, one line of context, actions, key numbers and optional tabs. It is used by My projects, Assigned projects and All projects.
+
+**Drawer.** The header went from about 560px to about 165px:
+- a cover thumbnail with the title, status, type (a menu when allowed), category, review and health;
+- one owner and context line;
+- a compact stage track with the pause action beside it.
+
+**Reports.** `ReportsFeed.tsx`:
+- a summary with totals, the last 14 days as bars, and a nudge to report today (amber after 3 quiet days);
+- search, filters (mine, blockers, PDFs, one teammate) and a timeline or compact view (remembered);
+- collapsible week groups with count and hours, four weeks at a time;
+- the date block shows once per day;
+- a guided empty state.

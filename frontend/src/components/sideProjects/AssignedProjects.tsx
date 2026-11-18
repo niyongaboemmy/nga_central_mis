@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { AlertTriangle, ClipboardCheck, Hourglass, Kanban, LayoutGrid, NotebookPen, PauseCircle, RefreshCw, Search, UserCheck, Users, X } from "lucide-react";
+import { AlertTriangle, BadgeCheck, FolderKanban, ClipboardCheck, Hourglass, Kanban, LayoutGrid, NotebookPen, PauseCircle, RefreshCw, Search, UserCheck, Users, X } from "lucide-react";
 import { failure, sideProjectsApi, type AssignedResult, type Category, type MonitorRow, type Status } from "../../api/sideProjects";
 import { useUser } from "../../contexts/UserContext";
 import { useToast } from "../../contexts/ToastContext";
@@ -10,8 +10,9 @@ import SelectField from "../ui/SelectField";
 import Board from "./Board";
 import ProjectDrawer from "./ProjectDrawer";
 import { StageChip } from "./ProjectCard";
+import PageHeader from "./PageHeader";
 import {
-  CATEGORY_ICON, EmptyArt, HealthDot, PATH, ReviewBadge, STATUS_META, STATUS_ORDER, Skeleton, cardCls, chipCls, pathStage, primaryBtn, statusColor, timeAgo, useIsDark,
+  CATEGORY_ICON, EmptyArt, HealthDot, PATH, ReviewBadge, STATUS_META, STATUS_ORDER, Skeleton, cardCls, chipCls, iconBtn, pathStage, primaryBtn, statusColor, timeAgo, useIsDark,
 } from "./ui";
 
 type Relation = "all" | "SUPERVISOR" | "MEMBER";
@@ -237,36 +238,22 @@ const AssignedProjects: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 px-4 py-6">
-      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700 via-blue-600 to-blue-500 p-5 text-white sm:p-6">
-        <div className="pointer-events-none absolute inset-0" aria-hidden>
-          <motion.span className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10" animate={{ scale: [1, 1.06, 1] }} transition={{ repeat: Infinity, duration: 6 }} />
-          <span className="absolute -bottom-20 right-40 h-48 w-48 rounded-full bg-blue-300/20" />
-        </div>
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
-              <ClipboardCheck className="h-7 w-7" aria-hidden /> Assigned projects
-            </h1>
-            <p className="mt-1 text-sm text-white/80">Projects you supervise or help build.</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {[
-                { label: "In all", value: c?.total },
-                { label: "Supervising", value: c?.supervising },
-                { label: "On the team", value: c?.member },
-                { label: "Completed", value: c?.completed },
-              ].map((t) => (
-                <span key={t.label} className="inline-flex items-baseline gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 ring-1 ring-white/20 backdrop-blur">
-                  {t.value === undefined ? <span className="inline-block h-4 w-5 animate-pulse rounded bg-white/30" /> : <span className="text-base font-extrabold tabular-nums">{t.value}</span>}
-                  <span className="text-xs font-medium text-white/85">{t.label}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-          <button type="button" onClick={() => load(true)} disabled={refreshing} aria-label="Refresh" title="Refresh" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/15 ring-1 ring-inset ring-white/25 backdrop-blur transition hover:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-60">
+      <PageHeader
+        icon={ClipboardCheck}
+        title="Assigned projects"
+        subtitle="Projects you supervise or help build."
+        actions={
+          <button type="button" onClick={() => load(true)} disabled={refreshing} aria-label="Refresh" title="Refresh" className={iconBtn}>
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
-        </div>
-      </motion.section>
+        }
+        stats={[
+          { label: "In all", value: c?.total, icon: FolderKanban },
+          { label: "Supervising", value: c?.supervising, icon: UserCheck },
+          { label: "On the team", value: c?.member, icon: Users },
+          { label: "Completed", value: c?.completed, icon: BadgeCheck },
+        ]}
+      />
 
       {/* What needs a look: each tile filters the list */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" role="radiogroup" aria-label="Needs attention">
