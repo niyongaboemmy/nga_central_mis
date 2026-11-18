@@ -62,9 +62,9 @@ const PageHeader: React.FC<{
   </motion.header>
 );
 
-/** Tabs for a PageHeader: pills, the active one solid blue. */
+/** Tabs for a PageHeader: quiet text tabs with a sliding 2px blue underline (no solid pills). */
 export const HeaderTabs: React.FC<{ items: Array<{ key: string; label: string; icon?: React.ElementType; count?: number }>; value: string; onChange: (k: string) => void; label: string }> = ({ items, value, onChange, label }) => (
-  <nav className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1" role="tablist" aria-label={label}>
+  <nav className="no-scrollbar -mx-4 -mb-4 flex gap-1 overflow-x-auto border-t border-slate-100 px-3 sm:-mx-5 sm:-mb-5 sm:px-4 dark:border-gray-800" role="tablist" aria-label={label}>
     {items.map((t) => {
       const on = t.key === value;
       return (
@@ -74,13 +74,15 @@ export const HeaderTabs: React.FC<{ items: Array<{ key: string; label: string; i
           role="tab"
           aria-selected={on}
           onClick={() => onChange(t.key)}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-            on ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-white"
-          }`}
+          className={`group relative flex shrink-0 items-center py-3 text-[13px] transition-colors focus:outline-none ${on ? "font-semibold text-slate-900 dark:text-white" : "font-medium text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white"}`}
         >
-          {t.icon && <t.icon className="h-4 w-4" aria-hidden />}
-          {t.label}
-          {t.count !== undefined && <span className={`rounded-full px-1.5 text-[11px] tabular-nums ${on ? "bg-blue-800" : "bg-slate-100 dark:bg-gray-700/60"}`}>{t.count}</span>}
+          <span className="pointer-events-none absolute inset-x-0 inset-y-1.5 rounded-lg transition-colors group-hover:bg-slate-100 group-focus-visible:ring-2 group-focus-visible:ring-blue-500 dark:group-hover:bg-gray-800" aria-hidden />
+          <span className="relative flex items-center gap-1.5 px-2.5">
+            {t.icon && <t.icon className={`h-4 w-4 ${on ? "text-blue-600 dark:text-blue-400" : ""}`} aria-hidden />}
+            {t.label}
+            {t.count !== undefined && <span className="text-[11px] font-medium tabular-nums text-slate-500 dark:text-gray-400">{t.count}</span>}
+          </span>
+          {on && <motion.span layoutId={`hdr-tab-${label}`} className="absolute inset-x-1 bottom-0 h-0.5 rounded-full bg-blue-600 dark:bg-blue-400" transition={{ type: "spring", stiffness: 420, damping: 36 }} aria-hidden />}
         </button>
       );
     })}

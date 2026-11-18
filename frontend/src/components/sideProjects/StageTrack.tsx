@@ -5,7 +5,6 @@ import type { ProjectDetail, Status } from "../../api/sideProjects";
 import {
   PATH,
   STATUS_META,
-  STATUS_SOLID,
   dayWord,
   pathStage,
   statusColor,
@@ -61,74 +60,60 @@ const StageTrack: React.FC<{
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1.5">
-        <ol
-          className="grid flex-1 grid-cols-5 gap-1 rounded-[1.25rem] bg-slate-100 p-1 dark:bg-gray-800"
-          aria-label="Stages"
-        >
+      <div className="flex items-start gap-2">
+        <ol className="grid flex-1 grid-cols-5 gap-2" aria-label="Stages">
           {PATH.map((s, i) => {
             const M = STATUS_META[s];
             const current = i === idx;
             const done = i < idx;
             const v = view.get(s);
             const over = current && !paused && (v?.overrunDays ?? 0) > 0;
-            const clickable =
-              canMove &&
-              !(current && !paused) &&
-              !(paused && s === "COMPLETED");
+            const clickable = canMove && !(current && !paused) && !(paused && s === "COMPLETED");
             const cap = caption(s, i);
+            const color = statusColor(s, dark);
+            // How far through its window the current stage is (the bar fills as days pass).
+            const fill = current ? (s === "COMPLETED" ? 100 : v?.plannedDays && v.daysIn !== null ? Math.max(8, Math.min(100, ((v.daysIn + 1) / v.plannedDays) * 100)) : 35) : done ? 100 : 0;
             return (
-              <li key={s} className="relative min-w-0">
-                {current && (
-                  <motion.span
-                    layoutId="sp-status"
-                    className={`absolute inset-0 rounded-2xl ${paused ? "opacity-60" : ""}`}
-                    style={{ backgroundColor: STATUS_SOLID[s] }}
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
+              <li key={s} className="min-w-0">
                 <button
                   type="button"
                   disabled={!clickable}
                   onClick={() => onStep(s)}
                   aria-current={current ? "step" : undefined}
-                  title={
-                    clickable
-                      ? paused
-                        ? `Resume in ${M.label}`
-                        : `Move to ${M.label}`
-                      : M.label
-                  }
-                  className={`relative flex w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 ${compact ? "py-1" : "py-1.5"} text-xs font-bold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default ${
-                    current
-                      ? "text-white"
-                      : done
-                        ? `${M.text} enabled:hover:bg-white dark:enabled:hover:bg-gray-700`
-                        : "text-slate-600 enabled:hover:bg-white enabled:hover:text-slate-900 dark:text-gray-300 dark:enabled:hover:bg-gray-700 dark:enabled:hover:text-white"
-                  }`}
+                  title={clickable ? (paused ? `Resume in ${M.label}` : `Move to ${M.label}`) : M.label}
+                  className="group flex w-full min-w-0 flex-col gap-1.5 rounded-lg pb-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default"
                 >
-                  <span className="flex min-w-0 items-center gap-1">
+                  <span className="relative h-1 w-full overflow-hidden rounded-full bg-slate-200 transition group-enabled:group-hover:bg-slate-300 dark:bg-gray-700 dark:group-enabled:group-hover:bg-gray-600" aria-hidden>
+                    {fill > 0 && (
+                      <motion.span
+                        className={`absolute inset-y-0 left-0 rounded-full ${current && paused ? "opacity-50" : ""}`}
+                        style={{ backgroundColor: over ? "#d03b3b" : color }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${fill}%` }}
+                        transition={{ duration: 0.6, ease: "easeOut" }}
+                      />
+                    )}
+                  </span>
+                  <span className="flex min-w-0 items-center gap-1.5">
                     {done ? (
-                      <span
-                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white"
-                        style={{ backgroundColor: statusColor(s, dark) }}
-                      >
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: color }}>
                         <Check className="h-2.5 w-2.5" aria-hidden />
                       </span>
                     ) : current && paused ? (
-                      <PauseCircle
-                        className="h-3.5 w-3.5 shrink-0"
-                        aria-hidden
-                      />
+                      <PauseCircle className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
                     ) : (
-                      <M.icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <M.icon className="h-4 w-4 shrink-0" style={current ? { color } : undefined} aria-hidden />
                     )}
-                    <span className="hidden truncate sm:inline">{M.label}</span>
+                    <span
+                      className={`hidden truncate text-xs sm:inline ${
+                        current ? "font-semibold text-slate-900 dark:text-white" : done ? "font-medium text-slate-700 dark:text-gray-200" : "font-medium text-slate-500 group-enabled:group-hover:text-slate-800 dark:text-gray-400 dark:group-enabled:group-hover:text-white"
+                      }`}
+                    >
+                      {M.label}
+                    </span>
                     <span className="sr-only sm:hidden">{M.label}</span>
                   </span>
-                  <span
-                    className={`h-3.5 truncate text-[10px] font-semibold tabular-nums ${current ? "text-white/90" : "text-slate-600 dark:text-gray-300"} ${over ? "!text-white" : ""}`}
-                  >
+                  <span className={`h-4 truncate text-[11px] tabular-nums ${over ? "font-semibold text-red-700 dark:text-red-300" : current ? "font-medium text-slate-600 dark:text-gray-300" : "text-slate-500 dark:text-gray-400"}`}>
                     {over ? `${dayWord(v!.overrunDays)} over` : cap}
                   </span>
                 </button>
@@ -142,7 +127,7 @@ const StageTrack: React.FC<{
             onClick={() => onStep("ON_HOLD")}
             aria-label="Put on hold"
             title="Put on hold"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+            className="-mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-white"
           >
             <PauseCircle className="h-[18px] w-[18px]" aria-hidden />
           </button>

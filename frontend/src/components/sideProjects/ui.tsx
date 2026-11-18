@@ -339,7 +339,7 @@ export const ghostBtn =
   "inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-white";
 export const iconBtn =
   "inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700/50 dark:hover:text-white";
-export const cardCls = "rounded-3xl border border-slate-200 bg-white dark:border-gray-700/30 dark:bg-gray-800/30";
+export const cardCls = "rounded-2xl border border-slate-200/80 bg-white dark:border-gray-800 dark:bg-gray-900/60";
 /** A chip toggle (filters, view switches): rounded-full, blue when on. */
 export const chipCls = (on: boolean) =>
   `inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
