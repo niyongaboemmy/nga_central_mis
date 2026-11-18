@@ -20,7 +20,7 @@ import { KIND_META, KINDS, KindChip, iconBtn, primaryBtn, pathStage, chipCls, ST
 type Tab = "dashboard" | "list" | "board" | "supervising";
 const FILTER_KEYS = ["yearId", "yearMode", "ownerType", "kind", "customerId", "classId", "status", "review", "categoryId", "health", "hasGithub", "hasAccess", "missing", "q"] as const;
 
-const selectCls = "min-w-0 max-w-full rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100";
+const selectCls = "min-w-0 max-w-full rounded-full border border-slate-900/[0.07] bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-white/10 dark:bg-gray-800/40 dark:text-gray-100";
 
 /**
  * /projects-monitor — every student's side projects in the viewer's scope: an interactive
@@ -190,7 +190,7 @@ const ProjectsMonitor: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[14rem] flex-1 sm:max-w-sm">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-            <input defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && patch({ q: (e.target as HTMLInputElement).value.trim() || null })} onBlur={(e) => e.target.value.trim() !== (params.get("q") ?? "") && patch({ q: e.target.value.trim() || null })} placeholder="Search owner, reg. number, title, tech" aria-label="Search" className="h-10 w-full rounded-full border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-white dark:focus:bg-gray-900" />
+            <input defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && patch({ q: (e.target as HTMLInputElement).value.trim() || null })} onBlur={(e) => e.target.value.trim() !== (params.get("q") ?? "") && patch({ q: e.target.value.trim() || null })} placeholder="Search owner, reg. number, title, tech" aria-label="Search" className="h-10 w-full rounded-full border border-slate-900/[0.07] bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/15 dark:border-white/10 dark:bg-gray-800/40 dark:text-white dark:focus:bg-gray-900" />
           </div>
           <div className="flex gap-1.5" role="radiogroup" aria-label="Owner">
             {([
@@ -236,7 +236,7 @@ const ProjectsMonitor: React.FC = () => {
             </motion.button>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-gray-700/40">
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-900/[0.05] pt-3 dark:border-white/[0.06]">
           <span className="inline-flex items-center gap-1.5 pr-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
             <Filter className="h-3.5 w-3.5" aria-hidden /> Refine
           </span>
@@ -308,7 +308,7 @@ const ProjectsMonitor: React.FC = () => {
                       <SortHead k="activity">Activity</SortHead>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-gray-700/40">
+                  <tbody className="divide-y divide-slate-900/[0.05] dark:divide-white/[0.05]">
                     {rows.rows.map((r, i) => (
                       <motion.tr key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.012 }} onClick={() => openProject(r.id)} onKeyDown={(e) => e.key === "Enter" && openProject(r.id)} tabIndex={0} className="cursor-pointer transition hover:bg-blue-50/50 focus:bg-blue-50/60 focus:outline-none dark:hover:bg-gray-700/40 dark:focus:bg-gray-700/50">
                         <td className="px-3 py-2.5">
@@ -357,7 +357,7 @@ const ProjectsMonitor: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2 text-xs text-slate-600 dark:border-gray-700/40 dark:text-gray-300">
+              <div className="flex items-center justify-between border-t border-slate-900/[0.05] px-4 py-2 text-xs text-slate-600 dark:border-white/[0.06] dark:text-gray-300">
                 <span className="tabular-nums">{(page - 1) * 25 + 1}–{Math.min(page * 25, rows.total)} / {rows.total}</span>
                 <div className="flex gap-1">
                   <button type="button" className={`${secondaryBtn} !px-2 !py-1`} disabled={page <= 1} onClick={() => patch({ page: page - 1 }, { resetPage: false })} aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></button>

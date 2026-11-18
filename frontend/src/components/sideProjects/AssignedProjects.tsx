@@ -24,7 +24,7 @@ const DAY = 86_400_000;
 const daysSince = (d: string | null | undefined) => (d ? Math.max(0, Math.floor((Date.now() - Date.parse(`${d}T00:00:00Z`)) / DAY)) : null);
 const QUIET_DAYS = 14;
 const selectCls =
-  "min-w-0 max-w-full rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100";
+  "min-w-0 max-w-full rounded-full border border-slate-900/[0.07] bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-white/10 dark:bg-gray-800/40 dark:text-gray-100";
 
 /** The higher, the sooner it needs a look. */
 const attention = (r: MonitorRow) => {
@@ -275,7 +275,7 @@ const AssignedProjects: React.FC = () => {
               aria-checked={on}
               onClick={() => setQuick(on ? "none" : t.key)}
               className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30 ${
-                on ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white hover:border-blue-300 dark:border-gray-800 dark:bg-gray-900/60 dark:hover:border-blue-500/40"
+                on ? "border-blue-600 bg-blue-600 text-white" : "border-slate-900/[0.07] bg-white hover:border-blue-300 dark:border-white/[0.06] dark:bg-gray-900/60 dark:hover:border-blue-500/40"
               }`}
             >
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${on ? "bg-white/20" : "bg-slate-100 text-slate-600 dark:bg-gray-700/60 dark:text-gray-300"}`}>
@@ -294,7 +294,7 @@ const AssignedProjects: React.FC = () => {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search projects, people" aria-label="Search" className="w-full rounded-full border border-slate-200 bg-white py-2 pl-10 pr-8 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-white" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search projects, people" aria-label="Search" className="w-full rounded-full border border-slate-900/[0.07] bg-white py-2 pl-10 pr-8 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-white/10 dark:bg-gray-800/40 dark:text-white" />
           {q && (
             <button type="button" aria-label="Clear search" onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
               <X className="h-4 w-4" />
@@ -329,7 +329,7 @@ const AssignedProjects: React.FC = () => {
           <option value="progress">Least progress</option>
           <option value="title">Title</option>
         </SelectField>
-        <div className="ml-auto flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 dark:border-gray-700/60 dark:bg-gray-800/40">
+        <div className="ml-auto flex items-center gap-1 rounded-full border border-slate-900/[0.07] bg-white p-1 dark:border-white/10 dark:bg-gray-800/40">
           <button type="button" aria-pressed={view === "cards"} title="Cards" aria-label="Cards" onClick={() => setView("cards")} className={`rounded-full p-1.5 ${view === "cards" ? "bg-blue-600 text-white" : "text-slate-500"}`}>
             <LayoutGrid className="h-4 w-4" />
           </button>

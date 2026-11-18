@@ -282,7 +282,7 @@ const TeamPanel: React.FC<{ p: ProjectDetail; meId: number; onChanged: () => voi
         )}
       </section>
 
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <Card id={p.owner.id} name={p.owner.name} avatar={p.owner.avatar} sub={p.owner.regNumber ?? TYPE_LABEL[p.owner.type] ?? ""} roleKey="LEAD" roleTitle={null} responsibilities={null} manager owner />
         {p.members.map((m) => (
           <Card key={m.id} id={m.id} name={m.name} sub={m.regNumber ?? TYPE_LABEL[m.type] ?? ""} roleKey={m.roleKey} roleTitle={m.roleTitle} responsibilities={m.responsibilities} manager={m.isManager} invited={m.status === "INVITED"} member={m} />

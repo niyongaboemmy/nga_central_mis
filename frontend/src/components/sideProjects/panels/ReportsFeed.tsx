@@ -182,7 +182,7 @@ const Actions: React.FC<{
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-9 z-10 w-36 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700/60 dark:bg-gray-800"
+          className="absolute right-0 top-9 z-10 w-36 overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-white p-1.5 dark:border-white/10 dark:bg-gray-900"
           onMouseLeave={() => setOpen(false)}
         >
           <button
@@ -674,7 +674,7 @@ const ReportsFeed: React.FC<{
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search reports"
                 aria-label="Search reports"
-                className="h-9 w-full rounded-full border border-slate-200 bg-white pl-9 pr-8 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-white"
+                className="h-9 w-full rounded-full border border-slate-900/[0.07] bg-white pl-9 pr-8 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-white/10 dark:bg-gray-800/40 dark:text-white"
               />
               {q && (
                 <button
@@ -735,7 +735,7 @@ const ReportsFeed: React.FC<{
                 ))}
             </div>
             <div
-              className="ml-auto flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 dark:border-gray-700/60 dark:bg-gray-800/40"
+              className="ml-auto flex items-center gap-1 rounded-full border border-slate-900/[0.07] bg-white p-1 dark:border-white/10 dark:bg-gray-800/40"
               role="radiogroup"
               aria-label="Layout"
             >

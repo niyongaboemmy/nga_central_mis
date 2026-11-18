@@ -59,7 +59,7 @@ const KindControl: React.FC<{ p: ProjectDetail; canChange: boolean; onChanged: (
         <ChevronDown className="h-3 w-3 opacity-70" aria-hidden />
       </button>
       {open && (
-        <div role="menu" aria-label="Project type" className="absolute left-0 top-7 z-30 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700/60 dark:bg-gray-800">
+        <div role="menu" aria-label="Project type" className="absolute left-0 top-7 z-30 w-64 overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-white p-1.5 dark:border-white/10 dark:bg-gray-900">
           {KINDS.map((k) => {
             const K = KIND_META[k];
             const on = k === p.kind;

@@ -328,24 +328,22 @@ export const FieldError: React.FC<{ message?: string | null; id?: string }> = ({
  * blue buttons, rounded-2xl inputs with a soft blue focus ring, rounded-2xl cards, translucent
  * gray surfaces in dark mode. */
 export const inputCls =
-  "w-full min-h-[44px] rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100 dark:placeholder:text-gray-500 dark:hover:border-gray-600";
+  "w-full min-h-[44px] rounded-2xl border border-slate-900/10 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-900/20 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-white/10 dark:bg-gray-800/40 dark:text-gray-100 dark:placeholder:text-gray-500 dark:hover:border-white/20";
 export const inputErrCls = "!border-red-400 focus:!border-red-500 focus:!ring-red-500/15 dark:!border-red-500/70";
 export const labelCls = "mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-700 dark:text-gray-200";
 export const primaryBtn =
   "inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-gray-900";
 export const secondaryBtn =
-  "inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100 dark:hover:bg-gray-700/50";
+  "inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full border border-slate-900/10 bg-white px-5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900/20 hover:bg-slate-50 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-gray-800/40 dark:text-gray-100 dark:hover:bg-gray-700/50";
 export const ghostBtn =
   "inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:hover:bg-gray-700/50 dark:hover:text-white";
 export const iconBtn =
   "inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700/50 dark:hover:text-white";
-export const cardCls = "rounded-2xl border border-slate-200/80 bg-white dark:border-gray-800 dark:bg-gray-900/60";
+export const cardCls = "rounded-2xl border border-slate-900/[0.06] bg-white dark:border-white/[0.06] dark:bg-gray-900/60";
 /** A chip toggle (filters, view switches): rounded-full, blue when on. */
 export const chipCls = (on: boolean) =>
-  `inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-    on
-      ? "border-blue-600 bg-blue-600 text-white "
-      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-300 dark:hover:bg-gray-700/50"
+  `inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+    on ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
   }`;
 
 /** Drop files here or click: native drag events, keyboard reachable, touch falls back to the picker. */
@@ -403,7 +401,7 @@ export const Dropzone: React.FC<{
           ? "border-red-300 bg-red-50/60 dark:border-red-500/50 dark:bg-red-500/5"
           : over
             ? "scale-[1.01] border-blue-500 bg-blue-50 dark:bg-blue-500/10"
-            : "border-slate-200 bg-slate-50/60 hover:border-blue-500/60 hover:bg-blue-50/40 dark:border-gray-700/60 dark:bg-gray-800/40 dark:hover:bg-gray-700/40"
+            : "border-slate-900/[0.07] bg-slate-50/60 hover:border-blue-500/60 hover:bg-blue-50/40 dark:border-white/10 dark:bg-gray-800/40 dark:hover:bg-gray-700/40"
       } ${disabled ? "pointer-events-none opacity-50" : ""}`}
     >
       <input ref={input} type="file" className="hidden" accept={accept} multiple={multiple} onChange={(e) => (take(e.target.files), (e.target.value = ""))} />

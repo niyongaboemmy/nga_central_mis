@@ -28,7 +28,7 @@ const PageHeader: React.FC<{
     initial={{ opacity: 0, y: 6 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.2 }}
-    className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 dark:border-gray-800 dark:bg-gray-900/60"
+    className="rounded-2xl border border-slate-900/[0.06] bg-white p-4 sm:p-5 dark:border-white/[0.06] dark:bg-gray-900/60"
   >
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -64,7 +64,7 @@ const PageHeader: React.FC<{
 
 /** Tabs for a PageHeader: quiet text tabs with a sliding 2px blue underline (no solid pills). */
 export const HeaderTabs: React.FC<{ items: Array<{ key: string; label: string; icon?: React.ElementType; count?: number }>; value: string; onChange: (k: string) => void; label: string }> = ({ items, value, onChange, label }) => (
-  <nav className="no-scrollbar -mx-4 -mb-4 flex gap-1 overflow-x-auto border-t border-slate-100 px-3 sm:-mx-5 sm:-mb-5 sm:px-4 dark:border-gray-800" role="tablist" aria-label={label}>
+  <nav className="no-scrollbar -mx-4 -mb-4 flex gap-1 overflow-x-auto border-t border-slate-900/[0.05] px-3 sm:-mx-5 sm:-mb-5 sm:px-4 dark:border-white/[0.06]" role="tablist" aria-label={label}>
     {items.map((t) => {
       const on = t.key === value;
       return (

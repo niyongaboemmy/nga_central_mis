@@ -171,3 +171,72 @@ const StageTrack: React.FC<{
 };
 
 export default StageTrack;
+
+/**
+ * The same path as a vertical list (workspace sidebar): each stage with its days, the current
+ * one highlighted, finished ones ticked; Pause / Resume underneath.
+ */
+export const StageList: React.FC<{ p: ProjectDetail; canMove: boolean; onStep: (to: Status) => void }> = ({ p, canMove, onStep }) => {
+  const dark = useIsDark();
+  const paused = p.status === "ON_HOLD";
+  const at = pathStage(p.status, p.pausedFrom);
+  const idx = PATH.indexOf(at);
+  const view = new Map(p.period?.stages.map((s) => [s.stage as Status, s]) ?? []);
+  const caption = (s: Status, i: number) => {
+    const v = view.get(s);
+    if (s === "COMPLETED") return p.completedAt ? new Date(p.completedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : p.targetDate ? `by ${new Date(`${p.targetDate}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : "";
+    if (!v) return "";
+    if (i < idx) return v.state === "skipped" ? "skipped" : dayWord(Math.max(1, Math.round(v.actualDays)));
+    if (i === idx) {
+      if ((v.overrunDays ?? 0) > 0 && !paused) return `${dayWord(v.overrunDays)} over`;
+      return v.daysIn === null ? (v.plannedDays ? `${dayWord(v.plannedDays)} planned` : "") : v.plannedDays ? `day ${v.daysIn + 1} of ${v.plannedDays}` : `day ${v.daysIn + 1}`;
+    }
+    return v.plannedDays ? `${dayWord(v.plannedDays)} planned` : "";
+  };
+  return (
+    <div>
+      <ol className="space-y-0.5" aria-label="Stages">
+        {PATH.map((s, i) => {
+          const M = STATUS_META[s];
+          const current = i === idx;
+          const done = i < idx;
+          const color = statusColor(s, dark);
+          const over = current && !paused && (view.get(s)?.overrunDays ?? 0) > 0;
+          const clickable = canMove && !(current && !paused) && !(paused && s === "COMPLETED");
+          return (
+            <li key={s}>
+              <button
+                type="button"
+                disabled={!clickable}
+                onClick={() => onStep(s)}
+                aria-current={current ? "step" : undefined}
+                title={clickable ? (paused ? `Resume in ${M.label}` : `Move to ${M.label}`) : M.label}
+                className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default ${current ? "bg-slate-100 dark:bg-gray-800" : "enabled:hover:bg-slate-50 dark:enabled:hover:bg-gray-800/60"}`}
+              >
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "text-white" : current ? "text-white" : "border-2 border-slate-900/[0.07] text-slate-400 dark:border-white/10 dark:text-gray-500"} ${current && paused ? "opacity-60" : ""}`}
+                  style={done || current ? { backgroundColor: color } : undefined}
+                >
+                  {done ? <Check className="h-3.5 w-3.5" aria-hidden /> : current && paused ? <PauseCircle className="h-3.5 w-3.5" aria-hidden /> : <M.icon className="h-3 w-3" aria-hidden />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-[13px] ${current ? "font-semibold text-slate-900 dark:text-white" : done ? "font-medium text-slate-700 dark:text-gray-200" : "font-medium text-slate-500 dark:text-gray-400"}`}>{M.label}</span>
+                </span>
+                <span className={`shrink-0 text-[11px] tabular-nums ${over ? "font-semibold text-red-700 dark:text-red-300" : "text-slate-500 dark:text-gray-400"}`}>{caption(s, i)}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      {canMove && p.status !== "COMPLETED" && (
+        <button
+          type="button"
+          onClick={() => onStep(paused ? at : "ON_HOLD")}
+          className={`mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${paused ? "bg-blue-600 text-white hover:bg-blue-700" : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"}`}
+        >
+          {paused ? <PlayCircle className="h-3.5 w-3.5" aria-hidden /> : <PauseCircle className="h-3.5 w-3.5" aria-hidden />} {paused ? "Resume" : "Put on hold"}
+        </button>
+      )}
+    </div>
+  );
+};

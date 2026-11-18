@@ -94,7 +94,7 @@ export const PlanEditor: React.FC<{
 
   if (!valid) {
     return (
-      <div className="rounded-2xl border-2 border-dashed border-slate-200 px-4 py-6 text-center text-xs font-medium text-slate-500 dark:border-gray-700/60 dark:text-gray-400">
+      <div className="rounded-2xl border-2 border-dashed border-slate-900/[0.07] px-4 py-6 text-center text-xs font-medium text-slate-500 dark:border-white/10 dark:text-gray-400">
         Choose a start and a closing date at least {MIN_PROJECT_DAYS} days apart to plan the stages.
       </div>
     );

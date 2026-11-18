@@ -166,7 +166,7 @@ const InsightsView: React.FC<{ p: ProjectDetail; refreshKey?: unknown }> = ({ p,
                   <th className="pb-2 text-right font-medium">On time</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+              <tbody className="divide-y divide-slate-900/[0.05] dark:divide-white/[0.05]">
                 {d.members.map((m) => {
                   const R = ROLE_META[m.roleKey] ?? ROLE_META.OTHER;
                   const open = m.todo + m.inProgress + m.inReview + m.blocked;

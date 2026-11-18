@@ -108,7 +108,7 @@ export const CustomerModal: React.FC<{ open: boolean; customer?: Customer | null
           <div className="w-28 shrink-0">
             {preview || currentLogo ? (
               <div className="relative">
-                <img src={preview ?? currentLogo ?? ""} alt="Logo preview" className="h-28 w-28 rounded-2xl border border-slate-200 bg-white object-contain p-2 dark:border-gray-700 dark:bg-gray-100" />
+                <img src={preview ?? currentLogo ?? ""} alt="Logo preview" className="h-28 w-28 rounded-2xl border border-slate-900/[0.07] bg-white object-contain p-2 dark:border-white/10 dark:bg-gray-100" />
                 <button type="button" aria-label="Remove logo" onClick={() => (logo ? setLogo(null) : setRemoveLogo(true))} className="absolute -right-2 -top-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-white hover:bg-slate-700 dark:bg-gray-700 dark:hover:bg-gray-600">
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -209,22 +209,29 @@ export const CustomerPicker: React.FC<{ value: Customer | { id: number; name: st
       </button>
       {error && <p role="alert" className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">{error}</p>}
       {open && (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          <div className="relative border-b border-slate-100 p-2 dark:border-gray-800">
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-white dark:border-white/10 dark:bg-gray-900">
+          <div className="relative border-b border-slate-900/[0.05] p-2 dark:border-white/[0.06]">
             <Search className="pointer-events-none absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search customers" aria-label="Search customers" className="h-9 w-full rounded-full bg-slate-50 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30 dark:bg-gray-800 dark:text-white" />
           </div>
-          <ul role="listbox" className="max-h-64 overflow-y-auto p-1.5">
+          <ul role="listbox" aria-label="Customers" className="max-h-64 overflow-y-auto p-1.5">
             {!list ? (
-              <li className="flex items-center justify-center py-4">
+              <li role="presentation" className="flex items-center justify-center py-4">
                 <Spinner className="h-4 w-4 text-slate-400" />
               </li>
             ) : list.length === 0 ? (
-              <li className="px-3 py-3 text-center text-xs text-slate-500 dark:text-gray-400">{q ? `No customer called “${q}” yet` : "No customers registered yet"}</li>
+              <li role="presentation" className="px-3 py-3 text-center text-xs text-slate-500 dark:text-gray-400">{q ? `No customer called “${q}” yet` : "No customers registered yet"}</li>
             ) : (
               list.map((c) => (
-                <li key={c.id}>
-                  <button type="button" role="option" aria-selected={value?.id === c.id} onClick={() => (onChange(c), setOpen(false))} className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition ${value?.id === c.id ? "bg-blue-50 dark:bg-blue-500/15" : "hover:bg-slate-50 dark:hover:bg-gray-800"}`}>
+                <li
+                  key={c.id}
+                  role="option"
+                  tabIndex={0}
+                  aria-selected={value?.id === c.id}
+                  onClick={() => (onChange(c), setOpen(false))}
+                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onChange(c), setOpen(false))}
+                  className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${value?.id === c.id ? "bg-blue-50 dark:bg-blue-500/15" : "hover:bg-slate-50 dark:hover:bg-gray-800"}`}
+                >
                     <CustomerLogo c={c} size={30} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-800 dark:text-gray-100">{c.name}</span>
@@ -234,12 +241,11 @@ export const CustomerPicker: React.FC<{ value: Customer | { id: number; name: st
                       </span>
                     </span>
                     {value?.id === c.id && <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden />}
-                  </button>
                 </li>
               ))
             )}
           </ul>
-          <div className="border-t border-slate-100 p-1.5 dark:border-gray-800">
+          <div className="border-t border-slate-900/[0.05] p-1.5 dark:border-white/[0.06]">
             <button type="button" onClick={() => (setRegister(true), setOpen(false))} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10">
               <Plus className="h-4 w-4" /> Register {q ? `“${q}”` : "a new customer"}
             </button>
@@ -274,7 +280,7 @@ export const CustomerField: React.FC<{
             role="radio"
             aria-checked={on}
             onClick={() => onChange(k, k === "OWN" ? null : undefined)}
-            className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition ${on ? "border-blue-600 bg-blue-50 dark:border-blue-500 dark:bg-blue-500/10" : "border-slate-200 hover:border-slate-300 dark:border-gray-700 dark:hover:border-gray-600"}`}
+            className={`flex items-start gap-3 rounded-2xl border p-3 text-left transition ${on ? "border-blue-600 bg-blue-50 dark:border-blue-500 dark:bg-blue-500/10" : "border-slate-900/[0.07] hover:border-slate-900/20 dark:border-white/10 dark:hover:border-white/20"}`}
           >
             <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${on ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400"}`}>
               <Icon className="h-4 w-4" aria-hidden />

@@ -58,7 +58,7 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
   return (
     <div
       className={`group relative overflow-hidden rounded-2xl border bg-white text-left transition dark:bg-gray-800/40 ${
-        dragging ? "rotate-[1.5deg] scale-[1.02] border-brand-400 " : "border-slate-200/80 hover:-translate-y-0.5 dark:border-gray-700/40"
+        dragging ? "rotate-[1.5deg] scale-[1.02] border-brand-400 " : "border-slate-900/[0.06] hover:-translate-y-0.5 dark:border-white/[0.06]"
       } ${invited ? "ring-2 ring-dashed ring-blue-300" : ""}`}
     >
       <button type="button" onClick={() => onOpen(card.id)} className="block w-full text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30" aria-label={`Open ${card.title}`}>
@@ -181,7 +181,7 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
             <MoreHorizontal className="h-4 w-4" />
           </button>
           {menu && (
-            <div role="menu" className="absolute bottom-8 right-0 z-20 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700/60 dark:bg-gray-800" onPointerDown={(e) => e.stopPropagation()}>
+            <div role="menu" className="absolute bottom-8 right-0 z-20 w-52 overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-white p-1.5 dark:border-white/10 dark:bg-gray-900" onPointerDown={(e) => e.stopPropagation()}>
               {moveTargets(card.status).map((s) => {
                 const M = STATUS_META[s];
                 return (

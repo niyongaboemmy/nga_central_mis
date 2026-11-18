@@ -27,7 +27,7 @@ const useChartTokens = () => {
 
 const Tip: React.FC<{ active?: boolean; payload?: any[]; label?: string; fmt?: (l: string) => string }> = ({ active, payload, label, fmt }) =>
   active && payload?.length ? (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs dark:border-gray-700/60 dark:bg-gray-800/40">
+    <div className="rounded-xl border border-slate-900/[0.07] bg-white px-3 py-2 text-xs dark:border-white/10 dark:bg-gray-800/40">
       <p className="mb-1 font-bold text-slate-800 dark:text-white">{fmt ? fmt(String(label)) : label}</p>
       {payload.map((p) => (
         <p key={p.dataKey} className="flex items-center gap-2 text-slate-600 dark:text-gray-300">
@@ -220,7 +220,7 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
             <div className="max-h-64 overflow-auto">
               <table className="w-full text-xs">
                 <thead><tr className="text-left text-slate-500"><th className="py-1">Month</th><th>Started</th><th>Completed</th></tr></thead>
-                <tbody>{s.months.map((m) => <tr key={m.month} className="border-t border-slate-100 dark:border-gray-700/40"><td className="py-1">{monthLabel(m.month)}</td><td className="tabular-nums">{m.created}</td><td className="tabular-nums">{m.completed}</td></tr>)}</tbody>
+                <tbody>{s.months.map((m) => <tr key={m.month} className="border-t border-slate-900/[0.05] dark:border-white/[0.06]"><td className="py-1">{monthLabel(m.month)}</td><td className="tabular-nums">{m.created}</td><td className="tabular-nums">{m.completed}</td></tr>)}</tbody>
               </table>
             </div>
           ) : (

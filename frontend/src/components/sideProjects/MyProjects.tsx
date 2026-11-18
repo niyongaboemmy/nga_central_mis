@@ -198,7 +198,7 @@ const MyProjects: React.FC = () => {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search projects" className="w-full rounded-full border border-slate-200 bg-white py-2 pl-10 pr-8 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-white" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search projects" className="w-full rounded-full border border-slate-900/[0.07] bg-white py-2 pl-10 pr-8 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-white/10 dark:bg-gray-800/40 dark:text-white" />
           {q && <button type="button" aria-label="Clear search" onClick={() => setQ("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"><X className="h-4 w-4" /></button>}
         </div>
         <div className="flex gap-1 overflow-x-auto" role="radiogroup" aria-label="Category">
@@ -206,13 +206,13 @@ const MyProjects: React.FC = () => {
             const Icon = CATEGORY_ICON[c.icon] ?? CATEGORY_ICON.sparkles;
             const on = cat === c.id;
             return (
-              <button key={c.id} type="button" role="radio" aria-checked={on} title={c.name} aria-label={c.name} onClick={() => setCat(on ? null : c.id)} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${on ? "border-transparent text-white " : "border-slate-200 bg-white hover:border-slate-300 dark:border-gray-700/60 dark:bg-gray-800/40 dark:hover:border-gray-600"}`} style={on ? { backgroundColor: c.color } : undefined}>
+              <button key={c.id} type="button" role="radio" aria-checked={on} title={c.name} aria-label={c.name} onClick={() => setCat(on ? null : c.id)} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${on ? "border-transparent text-white " : "border-slate-900/[0.07] bg-white hover:border-slate-900/20 dark:border-white/10 dark:bg-gray-800/40 dark:hover:border-white/20"}`} style={on ? { backgroundColor: c.color } : undefined}>
                 <Icon className="h-4 w-4" style={on ? undefined : { color: c.color }} />
               </button>
             );
           })}
         </div>
-        <div className="ml-auto flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 dark:border-gray-700/60 dark:bg-gray-800/40">
+        <div className="ml-auto flex items-center gap-1 rounded-full border border-slate-900/[0.07] bg-white p-1 dark:border-white/10 dark:bg-gray-800/40">
           <button type="button" aria-pressed={archived} title="Archived" aria-label="Archived" onClick={() => setArchived((a) => !a)} className={`rounded-full p-1.5 ${archived ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900" : "text-slate-500"}`}><Archive className="h-4 w-4" /></button>
           <span className="mx-0.5 h-5 w-px bg-slate-200 dark:bg-slate-600" />
           <button type="button" aria-pressed={view === "board"} title="Board" aria-label="Board" onClick={() => setView("board")} className={`rounded-full p-1.5 ${view === "board" ? "bg-blue-600 text-white" : "text-slate-500"}`}><Kanban className="h-4 w-4" /></button>
@@ -249,7 +249,7 @@ const MyProjects: React.FC = () => {
       ) : view === "board" && !archived ? (
         <Board cards={shown} onOpen={(id) => open(id)} onMove={move} onReorder={(s, ids) => sideProjectsApi.order(s, ids).catch(() => showToast("The new order wasn't saved", "warning"))} onAdd={(s) => setWizard(s)} />
       ) : (
-        <div className={`${cardCls} divide-y divide-slate-100 overflow-hidden dark:divide-gray-700/40`}>
+        <div className={`${cardCls} divide-y divide-slate-900/[0.05] overflow-hidden dark:divide-white/[0.05]`}>
           {shown.length === 0 && <EmptyArt icon={Archive} className="my-8" />}
           {shown.map((c) => (
             <button key={c.id} type="button" onClick={() => open(c.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-gray-700/40">

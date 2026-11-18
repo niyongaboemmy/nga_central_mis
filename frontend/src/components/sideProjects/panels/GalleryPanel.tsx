@@ -18,7 +18,7 @@ const Tile: React.FC<{ m: Media; cover: boolean; canEdit: boolean; onOpen: () =>
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: m.id, disabled: !canEdit });
   const Icon = KIND_ICON[m.kind] ?? FileText;
   return (
-    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`group relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-gray-700/40 dark:bg-gray-800/40 ${isDragging ? "z-10 opacity-60 " : ""}`} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`group relative aspect-square overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-slate-50 dark:border-white/[0.06] dark:bg-gray-800/40 ${isDragging ? "z-10 opacity-60 " : ""}`} {...attributes} {...listeners}>
       <button type="button" onClick={onOpen} className="absolute inset-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40" aria-label={`Open ${m.caption || m.name}`}>
         {m.kind === "image" ? (
           <img src={fileUrl(m.assetId, m.hasThumb ? "thumb" : "original")} alt={m.caption ?? ""} loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />

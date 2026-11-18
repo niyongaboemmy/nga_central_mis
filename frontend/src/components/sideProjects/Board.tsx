@@ -80,7 +80,7 @@ const Column: React.FC<{ status: Status; ids: number[]; byId: Map<number, AnyCar
   // On hold folds into a slim rail while it is empty; it opens as soon as a card is lifted.
   if (status === "ON_HOLD" && ids.length === 0 && !dragging) {
     return (
-      <section ref={setNodeRef} aria-label={`${M.label} column, empty`} className="flex min-h-[18rem] w-14 shrink-0 snap-start flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/60 py-4 dark:border-gray-700/60 dark:bg-gray-800/20">
+      <section ref={setNodeRef} aria-label={`${M.label} column, empty`} className="flex min-h-[18rem] w-14 shrink-0 snap-start flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/60 py-4 dark:border-white/10 dark:bg-gray-800/20">
         <span className="flex h-8 w-8 items-center justify-center rounded-xl text-white" style={{ backgroundColor: color }} title="Drag a card here to pause it">
           <M.icon className="h-4 w-4" aria-hidden />
         </span>
@@ -92,7 +92,7 @@ const Column: React.FC<{ status: Status; ids: number[]; byId: Map<number, AnyCar
     <section
       ref={setNodeRef}
       aria-label={`${M.label} column`}
-      className={`flex min-h-[18rem] w-[17rem] shrink-0 snap-start flex-col rounded-2xl border p-3 transition xl:w-auto xl:min-w-[15.5rem] xl:flex-1 ${status === "ON_HOLD" ? "border-dashed" : ""} ${hot ? "border-transparent ring-2" : "border-slate-200/70 dark:border-gray-700/40"} ${M.soft}`}
+      className={`flex min-h-[18rem] w-[17rem] shrink-0 snap-start flex-col rounded-2xl border p-3 transition xl:w-auto xl:min-w-[15.5rem] xl:flex-1 ${status === "ON_HOLD" ? "border-dashed" : ""} ${hot ? "border-transparent ring-2" : "border-slate-900/[0.06] dark:border-white/[0.06]"} ${M.soft}`}
       style={hot ? ({ ["--tw-ring-color" as any]: color } as React.CSSProperties) : undefined}
     >
       <header className="mb-3 flex items-center justify-between px-1">
@@ -114,7 +114,7 @@ const Column: React.FC<{ status: Status; ids: number[]; byId: Map<number, AnyCar
       <div className="flex flex-1 flex-col gap-3">
         {children}
         {ids.length === 0 && (
-          <div className={`flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed py-8 ${hot ? "border-current" : "border-slate-300/70 dark:border-gray-700/60"}`} style={hot ? { color } : undefined}>
+          <div className={`flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed py-8 ${hot ? "border-current" : "border-slate-300/70 dark:border-white/10"}`} style={hot ? { color } : undefined}>
             <EmptyArt icon={M.icon} className="scale-75 opacity-80" />
           </div>
         )}
