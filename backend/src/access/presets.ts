@@ -331,7 +331,9 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Homeroom teacher of a class group; granted automatically from class-teacher assignments.",
     category: "Teaching",
     scopes: ["CLASS_GROUP", "GRADE"],
-    caps: [...SIDE_PROJECTS_REVIEWER, "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_OWN", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "detail"], ["VIEW_RESULTS", "detail"]],
+    // No SIDE_PROJECTS_VIEW/REVIEW (migration 135): "All projects" is for leadership and explicit
+    // grants; a class teacher follows the projects they supervise under Assigned projects.
+    caps: ["SIDE_PROJECTS_CLASSIFY", "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_OWN", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "detail"], ["VIEW_RESULTS", "detail"]],
   },
   {
     key: "subject_teacher",
@@ -360,7 +362,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Mentors a list of students; granted automatically from mentor assignments.",
     category: "Welfare",
     scopes: ["MENTEES"],
-    caps: [["SIDE_PROJECTS_VIEW", "detail"], "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "OFFICE_HOURS_MANAGE_OWN", ["VIEW_RESULTS", "detail"], ["VIEW_ATTENDANCE", "detail"]],
+    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "OFFICE_HOURS_MANAGE_OWN", ["VIEW_RESULTS", "detail"], ["VIEW_ATTENDANCE", "detail"]],
   },
   {
     key: "school_administrator",

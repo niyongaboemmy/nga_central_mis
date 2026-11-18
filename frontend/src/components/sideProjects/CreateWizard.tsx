@@ -10,7 +10,7 @@ import type { Customer } from "../../api/sideProjects";
 import { CategoryPicker, PersonPicker, TagInput, checkGithub, checkHttps } from "./fields";
 import { Field, FormModal, FormSection, IconInput, OptionCards, TextArea } from "./form";
 import PlanEditor, { MIN_PROJECT_DAYS, addDays, clampEnds, defaultEnds, endsToDates, spanDays } from "./PlanEditor";
-import { KIND_META, KINDS, CATEGORY_ICON, Dropzone, ProgressRing, STATUS_META, Spinner, fmtBytes, inputCls, primaryBtn, secondaryBtn, statusColor, useIsDark } from "./ui";
+import { ABSTRACT_MAX, ABSTRACT_MIN, KIND_META, KINDS, CATEGORY_ICON, Dropzone, ProgressRing, STATUS_META, Spinner, fmtBytes, inputCls, primaryBtn, secondaryBtn, statusColor, useIsDark } from "./ui";
 
 const DOC_ACCEPT = ".pdf,.doc,.docx,.odt,.md,.txt,.ppt,.pptx";
 const STEPS = [
@@ -260,6 +260,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
   const [title, setTitle] = useState("");
+  const [abstract, setAbstract] = useState("");
   const [problem, setProblem] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [tags, setTags] = useState<string[]>([]);
@@ -326,6 +327,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   const conceptReady = mode === "upload" ? !!file : written.users.trim().length >= 10 && written.solution.trim().length >= 30 && written.impact.trim().length >= 10;
   const checks = [
     { label: "A title", ok: title.trim().length >= 3 },
+    { label: "A short abstract", ok: abstract.trim().length >= ABSTRACT_MIN && abstract.trim().length <= ABSTRACT_MAX },
     { label: "The problem it solves", ok: problem.trim().length >= 30 },
     { label: "A concept note", ok: conceptReady },
     { label: "Start and closing dates", ok: !!start && spanDays(start, target) >= MIN_PROJECT_DAYS },
@@ -336,6 +338,9 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
     if (s === 0) {
       if (title.trim().length < 3) e.title = "At least 3 characters";
       if (title.trim().length > 150) e.title = "At most 150 characters";
+      const ab = abstract.trim().length;
+      if (ab < ABSTRACT_MIN) e.abstract = `${ABSTRACT_MIN - ab} more characters`;
+      else if (ab > ABSTRACT_MAX) e.abstract = `At most ${ABSTRACT_MAX} characters`;
       if (problem.trim().length < 30) e.problemStatement = `${30 - problem.trim().length} more characters`;
     }
     if (s === 1) {
@@ -375,7 +380,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
     const all = { ...check(0), ...check(1), ...check(3), ...check(4) };
     setErrors(all);
     if (Object.keys(all).length) {
-      if (all.title || all.problemStatement) setStep(0);
+      if (all.title || all.abstract || all.problemStatement) setStep(0);
       else if (Object.keys(all).some((k) => k.startsWith("concept"))) setStep(1);
       else if (all.startDate || all.targetDate) setStep(3);
       else setStep(4);
@@ -386,6 +391,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
     try {
       const fields: Record<string, unknown> = {
         title: title.trim(),
+        abstract: abstract.trim(),
         problemStatement: problem.trim(),
         categoryId,
         techTags: tags,
@@ -427,7 +433,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
     } catch (e) {
       const f = failure(e);
       setErrors({ [f.field ?? "form"]: f.message });
-      if (f.field === "title" || f.field === "problemStatement") setStep(0);
+      if (f.field === "title" || f.field === "abstract" || f.field === "problemStatement") setStep(0);
       else if (f.field?.startsWith("concept") || f.field === "file") setStep(1);
       else if (f.field === "startDate" || f.field === "targetDate" || f.field?.startsWith("plan")) setStep(3);
     } finally {
@@ -548,6 +554,9 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
                   <>
                     <Field label="Project title" htmlFor="sp-title" counter={{ value: title, min: 3, max: 150 }} error={err("title")}>
                       <input id="sp-title" data-autofocus value={title} onChange={(e) => setTitle(e.target.value)} className={`${inputCls} text-base font-semibold ${err("title") ? "!border-red-400" : ""}`} placeholder="e.g. Smart irrigation for school gardens" />
+                    </Field>
+                    <Field label="Abstract" htmlFor="sp-abstract" counter={{ value: abstract, min: ABSTRACT_MIN, max: ABSTRACT_MAX }} error={err("abstract")} hint="Introduce the project in two or three sentences: what it is, who it is for, what it changes.">
+                      <TextArea id="sp-abstract" rows={3} value={abstract} onChange={(e) => setAbstract(e.target.value)} invalid={!!err("abstract")} placeholder="A web app that… It helps… so that…" />
                     </Field>
                     <Field label="Problem it solves" htmlFor="sp-problem" counter={{ value: problem, min: 30, max: 3000 }} error={err("problemStatement")} hint="Who has the problem, and why it matters.">
                       <TextArea id="sp-problem" rows={4} value={problem} onChange={(e) => setProblem(e.target.value)} invalid={!!err("problemStatement")} placeholder="Describe the problem in a few sentences…" />

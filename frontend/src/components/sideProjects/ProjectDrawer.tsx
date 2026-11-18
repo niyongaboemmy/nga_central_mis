@@ -256,7 +256,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
     (p ? statusColor(pathStage(p.status, p.pausedFrom), dark) : "#2a78d6");
 
   const SECTION_HINT: Record<Tab, string> = {
-    overview: "The problem, who it's for, the plan in time and daily work",
+    overview: "What it is, the problem it solves, who it's for, its timeline and daily work",
     plan: "Phases, features and the tasks inside them",
     documents: "Concept note, SRS and implementation plan",
     gallery: "Screenshots, designs and files",
@@ -360,7 +360,9 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
 
           <div className="flex min-h-0 flex-1">
             {/* Sidebar (large screens): identity, stages, facts, sections */}
-            <aside className="hidden w-[19rem] shrink-0 flex-col overflow-y-auto border-r border-slate-900/[0.07] bg-white lg:flex dark:border-white/[0.06] dark:bg-gray-900" aria-label="Project">
+            {/* A block, not a flex column: in a scrolling flex column the cover band would shrink to
+                nothing on long sidebars and the overlapping logo would slide under the top bar. */}
+            <aside className="hidden w-[19rem] shrink-0 overflow-y-auto border-r border-slate-900/[0.07] bg-white lg:block dark:border-white/[0.06] dark:bg-gray-900" aria-label="Project">
               {!p ? (
                 <div className="space-y-3 p-5" aria-busy="true">
                   <Skeleton className="h-14 w-14 !rounded-2xl" />

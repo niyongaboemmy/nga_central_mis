@@ -87,6 +87,10 @@ export const STATUS_SOLID: Record<Status, string> = {
 export const pathStage = (s: Status, pausedFrom?: Status | null): Status => (s === "ON_HOLD" ? (pausedFrom && pausedFrom !== "ON_HOLD" ? pausedFrom : "IDEA") : s);
 
 /** "3d", "1 day", "today" for chips. */
+/** The abstract that opens a project: two or three sentences (server: projects.ts). */
+export const ABSTRACT_MIN = 40;
+export const ABSTRACT_MAX = 400;
+
 export const dayWord = (n: number) => (n === 1 ? "1 day" : `${n} days`);
 
 /** Status palette (good / warning / serious / critical), always with an icon + label. */

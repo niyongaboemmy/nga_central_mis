@@ -62,7 +62,7 @@ export const CoverBand: React.FC<{ projectId: number; coverAssetId: number | nul
   const up = useImageUpload(projectId, "cover", onChanged);
   if (!coverAssetId) return up.field;
   return (
-    <div className="group relative h-28 w-full overflow-hidden bg-slate-100 sm:h-32 dark:bg-gray-800">
+    <div className="group relative h-28 w-full shrink-0 overflow-hidden bg-slate-100 sm:h-32 dark:bg-gray-800">
       <img src={fileUrl(coverAssetId, "thumb")} alt="" className="h-full w-full object-cover" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/90 dark:to-gray-900/90" aria-hidden />
       {up.pct !== null && (

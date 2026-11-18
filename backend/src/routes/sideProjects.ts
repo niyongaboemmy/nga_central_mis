@@ -91,7 +91,12 @@ export function sideProjectsRouter(
   // ------------------------------------------------------------------ shared lookups
   router.get("/categories", handle(async () => projects.categories()));
   router.get("/tags", handle(async (req) => projects.tagSuggestions(String(req.query.q ?? ""))));
-  router.get("/supervisors", handle(async (req) => projects.supervisorCandidates(String(req.query.q ?? ""))));
+  router.get(
+    "/supervisors",
+    handle(async (req) =>
+      projects.supervisorCandidates(String(req.query.q ?? ""), { askerId: uid(req), projectId: Number(req.query.projectId) > 0 ? Number(req.query.projectId) : null }),
+    ),
+  );
   router.get("/import/template.csv", (req, res) => {
     res.set("Content-Type", "text/csv; charset=utf-8");
     res.set("Content-Disposition", 'attachment; filename="side-projects-import-template.csv"');
@@ -145,7 +150,10 @@ export function sideProjectsRouter(
     "/monitor/options",
     handle(async (req) => {
       const v = await viewer(req);
-      return monitor.filterOptions(v.summary ?? v.detail ?? { students: [] });
+      // Without SIDE_PROJECTS_VIEW only the supervising view is open: no classes, and only the
+      // customers of projects this person supervises.
+      const sees = !isEmptyScope(v.summary) || !isEmptyScope(v.detail);
+      return monitor.filterOptions(sees ? (v.summary ?? v.detail) : { students: [] }, sees ? {} : { supervisorId: uid(req) });
     }),
   );
   router.get(

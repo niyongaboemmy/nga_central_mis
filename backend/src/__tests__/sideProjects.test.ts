@@ -34,7 +34,9 @@ const owners = new Set<number>();
 const assignedOk = new Set<number>();
 const classifiers = new Set<number>();
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
-const DATES = { startDate: day(0), targetDate: day(60) };
+const ABSTRACT = "A low-cost sensor kit and web dashboard that shows soil moisture so gardens are watered only when needed.";
+// Every create sends an abstract (required since migration 136); spread with the dates.
+const DATES = { startDate: day(0), targetDate: day(60), abstract: ABSTRACT };
 
 const app = express();
 app.use(express.json());
@@ -83,6 +85,7 @@ async function createProject(owner: number, title: string, extra: Record<string,
     .field("problemStatement", PROBLEM)
     .field("startDate", DATES.startDate)
     .field("targetDate", DATES.targetDate)
+    .field("abstract", ABSTRACT)
     .field("techTags", JSON.stringify(["Arduino", "C++"]))
     .field("categoryId", String((rows(await db.execute(sql`SELECT category_id FROM SideProjectCategory WHERE slug = 'iot'`)))[0].category_id))
     .field(extra)
@@ -1089,5 +1092,85 @@ describe("delete rules, import and sweep", () => {
     expect(sup.length).toBe(1);
     const lm = await api().get(`/side-projects/monitor/projects?health=STALE&pageSize=200`).set(as(lead));
     expect(lm.body.data.rows.map((r: any) => r.id)).toContain(pc);
+  });
+});
+
+describe("supervising is its own role (migration 134)", () => {
+  beforeAll(() => owners.add(teacherA));
+  const ids = (r: any) => (r.body.data as any[]).map((x) => x.id);
+
+  it("the owner can't supervise their own project, and isn't offered as a candidate", async () => {
+    const create = await api().post("/side-projects").set(as(teacherA)).field("title", "Self supervised").field("problemStatement", PROBLEM).field(DATES).field("supervisorId", String(teacherA)).attach("concept", pdf(), "c.pdf");
+    expect(create.status).toBe(400);
+    expect(create.body.code).toBe("SUPERVISOR_IS_OWNER");
+    const p = await createProject(teacherA, "Staff tool");
+    const patch = await api().patch(`/side-projects/${p}`).set(as(teacherA)).send({ supervisorId: teacherA });
+    expect(patch.body.code).toBe("SUPERVISOR_IS_OWNER");
+    expect(ids(await api().get("/side-projects/supervisors").set(as(teacherA)))).not.toContain(teacherA);
+    expect(ids(await api().get("/side-projects/supervisors").query({ projectId: p }).set(as(lead)))).not.toContain(teacherA);
+  });
+
+  it("a teammate can't supervise, and the supervisor can't join the team", async () => {
+    const p = await createProject(teacherA, "Team with a supervisor");
+    expect((await api().post(`/side-projects/${p}/members`).set(as(teacherA)).send({ userId: outsider })).status).toBe(200);
+    expect(ids(await api().get("/side-projects/supervisors").query({ projectId: p }).set(as(teacherA)))).not.toContain(outsider);
+    const asSup = await api().patch(`/side-projects/${p}`).set(as(teacherA)).send({ supervisorId: outsider });
+    expect(asSup.body.code).toBe("SUPERVISOR_IS_MEMBER");
+    expect((await api().patch(`/side-projects/${p}`).set(as(teacherA)).send({ supervisorId: supervisor })).status).toBe(200);
+    const inv = await api().post(`/side-projects/${p}/members`).set(as(teacherA)).send({ userId: supervisor });
+    expect(inv.status).toBe(409);
+    expect(inv.body.code).toBe("IS_SUPERVISOR");
+  });
+
+  it("the supervising badge matches the Assigned page (own projects never count)", async () => {
+    const p = await createProject(teacherA, "Legacy self supervision");
+    assignedOk.add(teacherA);
+    await db.execute(sql`UPDATE SideProject SET supervisor_user_id = ${teacherA} WHERE project_id = ${p}`); // as old data had it
+    const me = (await api().get("/side-projects/me").set(as(teacherA))).body.data;
+    const assigned = (await api().get("/side-projects/assigned").set(as(teacherA))).body.data;
+    expect(me.supervising).toBe(assigned.counts.supervising);
+    expect(assigned.rows.map((r: any) => r.id)).not.toContain(p);
+  });
+});
+
+describe("All projects is for leadership and explicit grants (migration 135)", () => {
+  it("class teachers and mentors no longer hold SIDE_PROJECTS_VIEW or REVIEW", async () => {
+    const r = rows(await db.execute(sql`
+      SELECT COUNT(*) AS n FROM RolePermission rp JOIN Role r ON r.role_id = rp.role_id JOIN Permission p ON p.perm_id = rp.perm_id
+      WHERE p.name IN ('SIDE_PROJECTS_VIEW', 'SIDE_PROJECTS_REVIEW') AND (r.preset_key IN ('class_teacher', 'mentor') OR r.name IN ('CLASS_TEACHER', 'Mentor'))`));
+    expect(Number(r[0].n)).toBe(0);
+    const lead = rows(await db.execute(sql`
+      SELECT COUNT(*) AS n FROM RolePermission rp JOIN Role r ON r.role_id = rp.role_id JOIN Permission p ON p.perm_id = rp.perm_id
+      WHERE p.name = 'SIDE_PROJECTS_VIEW' AND r.preset_key IN ('platform_owner', 'side_projects_lead')`));
+    expect(Number(lead[0].n)).toBeGreaterThanOrEqual(1);
+  });
+
+  it("without the view permission the school-wide endpoints refuse, and options expose no customers", async () => {
+    for (const path of ["/side-projects/monitor/projects", "/side-projects/monitor/board", "/side-projects/monitor/export", "/side-projects/monitor/summary"]) {
+      expect((await api().get(path).set(as(alice))).status, path).toBe(403);
+    }
+    const opts = (await api().get("/side-projects/monitor/options").set(as(alice))).body.data;
+    expect(opts.customers).toEqual([]);
+    expect(opts.classes).toEqual([]);
+    expect((await api().get("/side-projects/monitor/options").set(as(lead))).body.data.customers.length).toBeGreaterThan(0);
+  });
+});
+
+describe("project abstract (migration 136)", () => {
+  it("is required and brief on create, returned first-class, and editable", async () => {
+    const base = () => api().post("/side-projects").set(as(alice)).field("title", `Abstract check ${Date.now()}`).field("problemStatement", PROBLEM).field({ startDate: day(0), targetDate: day(60) });
+    const missing = await base().attach("concept", pdf(), "c.pdf");
+    expect(missing.status).toBe(400);
+    expect(missing.body.field).toBe("abstract");
+    const short = await base().field("abstract", "Too short.").attach("concept", pdf(), "c.pdf");
+    expect(short.body.field).toBe("abstract");
+    const long = await base().field("abstract", "x".repeat(401)).attach("concept", pdf(), "c.pdf");
+    expect(long.body.field).toBe("abstract");
+    const p = await createProject(alice, "Abstract shown");
+    expect((await api().get(`/side-projects/${p}`).set(as(alice))).body.data.abstract).toBe(ABSTRACT);
+    const next = "A shared map of lost items on campus so that students find their things within a day.";
+    expect((await api().patch(`/side-projects/${p}`).set(as(alice)).send({ abstract: next })).status).toBe(200);
+    expect((await api().get(`/side-projects/${p}`).set(as(alice))).body.data.abstract).toBe(next);
+    expect((await api().patch(`/side-projects/${p}`).set(as(alice)).send({ abstract: "" })).body.field).toBe("abstract");
   });
 });

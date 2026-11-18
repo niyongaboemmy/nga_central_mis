@@ -288,6 +288,8 @@ export interface Media {
 }
 
 export interface ProjectDetail extends ProjectCard {
+  /** Brief summary (40-400 characters) that opens the project; null on older or imported rows. */
+  abstract: string | null;
   problemStatement: string;
   description: string | null;
   outcomeSummary: string | null;
@@ -478,7 +480,9 @@ export const sideProjectsApi = {
   me: () => api.get<Data<Me>>(`${B}/me`).then((r) => r.data.data),
   categories: () => api.get<Data<Category[]>>(`${B}/categories`).then((r) => r.data.data),
   tags: (q: string) => api.get<Data<string[]>>(`${B}/tags`, { params: { q } }).then((r) => r.data.data),
-  supervisors: (q: string) => api.get<Data<Array<{ id: number; name: string; type: string }>>>(`${B}/supervisors`, { params: { q } }).then((r) => r.data.data),
+  /** Staff who may supervise; with a project, its owner and teammates are left out. */
+  supervisors: (q: string, projectId?: number) =>
+    api.get<Data<Array<{ id: number; name: string; type: string }>>>(`${B}/supervisors`, { params: { q, projectId } }).then((r) => r.data.data),
   /** Everyone active (team invites): students, staff, parents. */
   people: (q: string) => api.get<Data<Array<{ id: number; name: string; regNumber: string | null; type: string }>>>(`${B}/people`, { params: { q } }).then((r) => r.data.data),
 
