@@ -1,7 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "../../db";
 import {
-  clip, fail, fullName, insertId, iso, many, one, PLAN_STATUSES, PRIORITIES, recordEvent, STAGES, TASK_STATUSES, touch, ymd,
+  clip, fail, fullName, insertId, iso, latestToday, many, one, PLAN_STATUSES, PRIORITIES, recordEvent, STAGES, TASK_STATUSES, touch, ymd,
   type PlanStatus, type Priority, type TaskStatus,
 } from "./core";
 import { ProjectAccess } from "./access";
@@ -107,6 +107,18 @@ export async function rollup(itemId: number | null | undefined) {
 
 // ------------------------------------------------------------------------------------- plan
 
+/** Per plan item: how many reports cover it and when it was last reported on. */
+export async function reportingByItem(projectId: number) {
+  const rows = await many(sql`
+    SELECT w.plan_item_id AS itemId, COUNT(DISTINCT w.update_id) AS n,
+           DATE_FORMAT(MAX(COALESCE(u.work_date, u.created_at)), '%Y-%m-%d') AS last,
+           COALESCE(SUM(w.hours), 0) AS hours
+    FROM SideProjectUpdateWork w JOIN SideProjectUpdate u ON u.update_id = w.update_id
+    WHERE w.project_id = ${projectId}
+    GROUP BY w.plan_item_id`);
+  return new Map(rows.map((r) => [Number(r.itemId), { reports: Number(r.n), lastReport: r.last as string | null, reportedHours: Number(r.hours) }]));
+}
+
 export async function planOf(projectId: number) {
   const items = await many(sql`
     SELECT i.item_id AS id, i.parent_id AS parentId, i.kind, i.title, i.description, i.status, i.status_mode AS statusMode,
@@ -117,8 +129,18 @@ export async function planOf(projectId: number) {
     WHERE i.project_id = ${projectId}
     ORDER BY i.sort, i.item_id`);
   const tasks = await tasksOf(sql`t.project_id = ${projectId}`);
+  const rep = await reportingByItem(projectId);
   return {
-    items: items.map((i) => ({ ...i, id: Number(i.id), parentId: i.parentId ? Number(i.parentId) : null, ownerId: i.ownerId ? Number(i.ownerId) : null, estimateHours: i.estimateHours == null ? null : Number(i.estimateHours), sort: Number(i.sort) })),
+    items: items.map((i) => ({
+      ...i,
+      id: Number(i.id),
+      parentId: i.parentId ? Number(i.parentId) : null,
+      ownerId: i.ownerId ? Number(i.ownerId) : null,
+      estimateHours: i.estimateHours == null ? null : Number(i.estimateHours),
+      sort: Number(i.sort),
+      // Reports written against this item (migration 138).
+      ...(rep.get(Number(i.id)) ?? { reports: 0, lastReport: null, reportedHours: 0 }),
+    })),
     tasks,
   };
 }
@@ -441,6 +463,11 @@ export async function moveTask(a: ProjectAccess, by: number, taskId: number, bod
   await touch(projectId, await getCurrentAcademicYearId());
   if (to === "IN_REVIEW") await notifyWork(await managerIds(projectId), "side_project_task_review", `Review: ${t.title}`, `A task in ${a.project.title} is ready for review.`, projectId, by);
   if (to === "BLOCKED") await notifyWork(await managerIds(projectId), "side_project_task_blocked", `Blocked: ${t.title}`, note ?? "A task is blocked.", projectId, by);
+  if (to === "DONE") {
+    // Done: whoever created it and the people who plan hear about it.
+    const to2 = [...new Set([...(await managerIds(projectId)), ...(t.created_by ? [Number(t.created_by)] : [])])];
+    await notifyWork(to2, "side_project_task_done", `Done: ${t.title}`, `A task in ${a.project.title} was completed.`, projectId, by);
+  }
   return { status: to };
 }
 
@@ -478,7 +505,7 @@ export async function addLog(a: ProjectAccess, by: number, taskId: number, body:
   const hours = hoursOf(body.hours, "hours", 24);
   if (hours === null) fail(400, "VALIDATION", "Enter the hours", "hours");
   const d = v.date(body.workDate, "workDate") ?? todayYmd();
-  if (d > todayYmd()) fail(400, "VALIDATION", "That day hasn't come yet", "workDate");
+  if (d > latestToday()) fail(400, "VALIDATION", "That day hasn't come yet", "workDate");
   if (dayOf(todayYmd()) - dayOf(d) > 60) fail(400, "VALIDATION", "Logs go back 60 days at most", "workDate");
   const r = await db.execute(sql`
     INSERT INTO SideProjectTaskLog (task_id, user_id, work_date, hours, note, created_at)
@@ -514,6 +541,22 @@ export async function myTasks(userId: number) {
 }
 
 /** Overdue-task nudges for the sweep: once per task per day, to the assignee. */
+/** Tasks due tomorrow: the assignee is reminded once. */
+export async function nudgeDueSoonTasks() {
+  const today = todayYmd();
+  const rows = await many(sql`
+    SELECT t.task_id AS id, t.title, t.project_id AS projectId, t.assignee_user_id AS assignee
+    FROM SideProjectTask t JOIN SideProject sp ON sp.project_id = t.project_id AND sp.deleted_at IS NULL AND sp.archived_at IS NULL
+    WHERE t.status NOT IN ('DONE', 'CANCELLED') AND t.due_date = DATE_ADD(${today}, INTERVAL 1 DAY) AND t.assignee_user_id IS NOT NULL
+      AND (t.due_soon_nudged_on IS NULL OR t.due_soon_nudged_on <> ${today})
+    LIMIT 500`);
+  for (const r of rows) {
+    await notifyWork([Number(r.assignee)], "side_project_task_due", `Due tomorrow: ${r.title}`, "Finish it or report where it stands.", Number(r.projectId), null);
+    await db.execute(sql`UPDATE SideProjectTask SET due_soon_nudged_on = ${today} WHERE task_id = ${r.id}`);
+  }
+  return rows.length;
+}
+
 export async function nudgeOverdueTasks() {
   const today = todayYmd();
   const rows = await many(sql`

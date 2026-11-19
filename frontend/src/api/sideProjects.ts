@@ -47,6 +47,10 @@ export interface PlanItem {
   sort: number;
   doneAt: string | null;
   statusChangedAt: string | null;
+  /** Reports written against this item (migration 138). */
+  reports?: number;
+  lastReport?: string | null;
+  reportedHours?: number;
 }
 
 export interface Task {
@@ -211,6 +215,27 @@ export interface Report {
   authorId: number;
   author: string;
   files: ReportFile[];
+  /** The plan items / tasks this report covers (migration 138). */
+  work?: ReportWork[];
+}
+
+export interface ReportWork {
+  itemId: number;
+  itemTitle: string;
+  itemKind: "PHASE" | "FEATURE";
+  phaseTitle: string | null;
+  taskId: number | null;
+  taskTitle: string | null;
+  hours: number | null;
+  status: string | null;
+}
+
+/** One line of a report: a feature or a task, the hours spent and an optional new state. */
+export interface ReportWorkInput {
+  itemId?: number;
+  taskId?: number;
+  hours?: number | null;
+  status?: string | null;
 }
 
 export interface Activity {
@@ -467,6 +492,7 @@ export interface ReportBody {
   mood?: number | null;
   workDate: string;
   hours?: number | null;
+  work?: ReportWorkInput[];
 }
 /** Multipart config: the shared client defaults to JSON (axios would turn FormData into JSON and
  *  drop the files) and to a 10 s timeout, too short for uploads on school Wi-Fi. */

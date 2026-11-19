@@ -266,7 +266,10 @@ export function sideProjectsRouter(
     handle(async (req) => {
       await requireAny(req);
       const a = await staffAccess(req);
-      return projects.moveProject(a, uid(req), req.body ?? {}, { correction: true });
+      const from = String(a.project.status);
+      const r = await projects.moveProject(a, uid(req), req.body ?? {}, { correction: true });
+      if (r?.to && r.to !== from) await notify.onStatus(Number(a.project.project_id), uid(req), r.to, from);
+      return r;
     }),
   );
   router.post(
@@ -374,7 +377,9 @@ export function sideProjectsRouter(
     "/invitations/:id",
     own,
     handle(async (req) => {
-      await members.respond(idParam(req), uid(req), req.body?.accept === true || req.body?.accept === "true");
+      const accept = req.body?.accept === true || req.body?.accept === "true";
+      await members.respond(idParam(req), uid(req), accept);
+      await notify.onInviteAnswer(idParam(req), uid(req), accept);
       return { ok: true };
     }),
   );
@@ -401,8 +406,9 @@ export function sideProjectsRouter(
     handle(async (req) => {
       const a = await studentAccess(req);
       assertEdit(a);
+      const from = String(a.project.status);
       const r = await projects.moveProject(a, uid(req), req.body ?? {});
-      await notify.onStatus(Number(a.project.project_id), uid(req), r.to);
+      if (r.to !== from) await notify.onStatus(Number(a.project.project_id), uid(req), r.to, from);
       return r;
     }),
   );
@@ -452,7 +458,9 @@ export function sideProjectsRouter(
         if (req.file) await import("fs").then((fs) => fs.promises.rm(req.file.path, { force: true })).catch(() => undefined);
         throw e;
       }
-      return projects.uploadDocument(a, uid(req), type, req.file);
+      const doc = await projects.uploadDocument(a, uid(req), type, req.file);
+      await notify.onDocument(Number(a.project.project_id), uid(req), type);
+      return doc;
     }),
   );
 
@@ -564,7 +572,9 @@ export function sideProjectsRouter(
         await dropTemp(list);
         throw e;
       }
-      return { id: await progress.addUpdate(a, uid(req), req.body ?? {}, list) };
+      const id = await progress.addUpdate(a, uid(req), req.body ?? {}, list);
+      await notify.onReport(Number(a.project.project_id), uid(req), id);
+      return { id };
     }),
   );
   router.patch(
@@ -629,7 +639,10 @@ export function sideProjectsRouter(
     "/:id/members/:userId",
     handle(async (req) => {
       const a = await anyAccess(req);
-      await members.updateMember(a, uid(req), idParam(req, "userId"), req.body ?? {});
+      const target = idParam(req, "userId");
+      await members.updateMember(a, uid(req), target, req.body ?? {});
+      if (typeof req.body?.roleTitle === "string" && target !== Number(a.project.owner_user_id))
+        await notify.onPosition(Number(a.project.project_id), uid(req), target, req.body.roleTitle.trim() || null);
       return { ok: true };
     }),
   );
@@ -775,7 +788,9 @@ export function sideProjectsRouter(
     "/:id/members/:userId",
     own,
     handle(async (req) => {
-      await members.removeMember(await studentAccess(req), uid(req), idParam(req, "userId"));
+      const a = await studentAccess(req);
+      await members.removeMember(a, uid(req), idParam(req, "userId"));
+      await notify.onMemberGone(Number(a.project.project_id), uid(req), idParam(req, "userId"));
       return { ok: true };
     }),
   );

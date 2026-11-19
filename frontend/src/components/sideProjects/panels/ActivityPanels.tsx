@@ -31,7 +31,11 @@ const EVENT_ICON: Record<string, { icon: React.ElementType; color: string }> = {
   NUDGE_STALE: { icon: Bell, color: "#fab219" },
   NUDGE_CONCEPT: { icon: Bell, color: "#d03b3b" },
   NUDGE_STAGE: { icon: Bell, color: "#d03b3b" },
+  NUDGE_CLOSING: { icon: Bell, color: "#fab219" },
+  NUDGE_LATE: { icon: Bell, color: "#d03b3b" },
 };
+/** Per-person reminders (report reminders) are notices, not project history. */
+const HIDDEN_EVENTS = new Set(["NUDGE_REPORT"]);
 
 const shortDate = (d: string) => new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" });
 
@@ -54,6 +58,10 @@ const describe = (e: ProjectDetail["events"][number]) => {
     }
     case "NUDGE_STAGE":
       return e.toValue ? `${STATUS_META[e.toValue as Status]?.label ?? e.toValue} past its plan` : "Stage past its plan";
+    case "NUDGE_CLOSING":
+      return e.toValue ? `Closing date reminder (${shortDate(e.toValue)})` : "Closing date reminder";
+    case "NUDGE_LATE":
+      return e.toValue ? `Past its closing date (${shortDate(e.toValue)})` : "Past its closing date";
     default:
       return "";
   }
@@ -61,14 +69,15 @@ const describe = (e: ProjectDetail["events"][number]) => {
 
 export const TimelinePanel: React.FC<{ p: ProjectDetail }> = ({ p }) => {
   const dark = useIsDark();
+  const events = p.events.filter((e) => !HIDDEN_EVENTS.has(e.type));
   return (
     <ol className="relative space-y-1 pl-2">
-      {p.events.map((e, i) => {
+      {events.map((e, i) => {
         const m = EVENT_ICON[e.type] ?? { icon: CheckCircle2, color: "#94a3b8" };
         const color = e.type === "STATUS" && e.toValue ? statusColor(e.toValue as Status, dark) : m.color;
         return (
           <motion.li key={e.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 15) * 0.02 }} className="relative flex gap-3 pb-3">
-            {i < p.events.length - 1 && <span className="absolute left-[15px] top-8 h-[calc(100%-1.5rem)] w-0.5 bg-slate-200 dark:bg-gray-700/50" aria-hidden />}
+            {i < events.length - 1 && <span className="absolute left-[15px] top-8 h-[calc(100%-1.5rem)] w-0.5 bg-slate-200 dark:bg-gray-700/50" aria-hidden />}
             <span className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white " style={{ backgroundColor: color }}>
               <m.icon className="h-4 w-4" aria-hidden />
             </span>

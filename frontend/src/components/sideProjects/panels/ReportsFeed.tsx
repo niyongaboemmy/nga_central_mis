@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertOctagon,
   ArrowRight,
   CalendarCheck2,
   Check,
+  CircleDot,
+  ListChecks,
   ChevronDown,
   Clock3,
   FileText,
@@ -23,10 +25,13 @@ import {
 import {
   failure,
   sideProjectsApi,
+  type PlanData,
   type ProjectDetail,
   type Report,
   type ReportFile,
+  type ReportWork,
 } from "../../../api/sideProjects";
+import { PLAN_META, TASK_META } from "../work/meta";
 import { useToast } from "../../../contexts/ToastContext";
 import { useConfirm } from "../../../contexts/ConfirmContext";
 import UserAvatar from "../../ui/UserAvatar";
@@ -207,6 +212,30 @@ const Actions: React.FC<{
   );
 };
 
+/** What a report covered in the plan: features / tasks, hours each, and states moved to. */
+const WorkChips: React.FC<{ work: ReportWork[]; onPickItem?: (itemId: number) => void }> = ({ work, onPickItem }) => (
+  <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Plan items covered">
+    {work.map((w, i) => {
+      const meta = w.status ? (w.taskId ? TASK_META[w.status as keyof typeof TASK_META] : PLAN_META[w.status as keyof typeof PLAN_META]) : null;
+      return (
+        <li key={`${w.itemId}-${w.taskId ?? 0}-${i}`}>
+          <button
+            type="button"
+            onClick={() => onPickItem?.(w.itemId)}
+            title={w.taskId ? `Task in ${w.itemTitle}` : w.phaseTitle ? `Feature in ${w.phaseTitle}` : "Feature"}
+            className="inline-flex max-w-[18rem] items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-800 transition hover:bg-blue-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/20"
+          >
+            {w.taskId ? <ListChecks className="h-3 w-3 shrink-0" aria-hidden /> : <CircleDot className="h-3 w-3 shrink-0" aria-hidden />}
+            <span className="truncate">{w.taskTitle ?? w.itemTitle}</span>
+            {w.hours !== null && <span className="shrink-0 tabular-nums text-blue-700/80 dark:text-blue-300/80">· {w.hours}h</span>}
+            {meta && <span className="shrink-0 text-blue-700/80 dark:text-blue-300/80">→ {meta.label}</span>}
+          </button>
+        </li>
+      );
+    })}
+  </ul>
+);
+
 /** One report in the timeline: date block, what was done (clamped), next, blockers, chips. */
 const ReportItem: React.FC<{
   r: Report;
@@ -217,6 +246,7 @@ const ReportItem: React.FC<{
   onDelete: () => void;
   onOpenFile: (f: ReportFile) => void;
   firstOfDay?: boolean;
+  onPickItem?: (itemId: number) => void;
 }> = ({
   r,
   showAuthor,
@@ -226,6 +256,7 @@ const ReportItem: React.FC<{
   onDelete,
   onOpenFile,
   firstOfDay = true,
+  onPickItem,
 }) => {
   const dark = useIsDark();
   const [more, setMore] = useState(false);
@@ -291,6 +322,7 @@ const ReportItem: React.FC<{
             <Actions onEdit={onEdit} onDelete={onDelete} busy={deleting} />
           )}
         </div>
+        {r.work && r.work.length > 0 && <WorkChips work={r.work} onPickItem={onPickItem} />}
         {r.nextSteps && (
           <p className="mt-1.5 flex gap-1.5 text-sm text-slate-600 dark:text-gray-300">
             <ArrowRight
@@ -403,6 +435,13 @@ const CompactRow: React.FC<{
         <span className="min-w-0 flex-1 truncate text-sm text-slate-800 dark:text-gray-100">
           {r.did}
         </span>
+        {r.work && r.work.length > 0 && (
+          <span className="hidden max-w-[12rem] shrink-0 items-center gap-1 truncate rounded-md bg-blue-50 px-1.5 py-0.5 text-[11px] font-semibold text-blue-800 sm:inline-flex dark:bg-blue-500/10 dark:text-blue-200" title={r.work.map((w) => w.taskTitle ?? w.itemTitle).join(", ")}>
+            <ListChecks className="h-3 w-3 shrink-0" aria-hidden />
+            <span className="truncate">{r.work[0].taskTitle ?? r.work[0].itemTitle}</span>
+            {r.work.length > 1 && <span className="shrink-0">+{r.work.length - 1}</span>}
+          </span>
+        )}
         {r.blockers && (
           <AlertOctagon
             className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300"
@@ -432,12 +471,29 @@ const ReportsFeed: React.FC<{
   p: ProjectDetail;
   meId: number;
   onChanged: () => void;
-}> = ({ p, meId, onChanged }) => {
+  /** The implementation plan (null while loading, undefined where not loaded at all). */
+  plan?: PlanData | null;
+  /** Show only the reports on this plan item (from the Plan tab or the progress card). */
+  focusItem?: number | null;
+  onFocusItem?: (itemId: number | null) => void;
+  /** Open a new report preset to this plan item (nonce makes repeats open again). */
+  reportOn?: { itemId: number; nonce: number } | null;
+}> = ({ p, meId, onChanged, plan, focusItem = null, onFocusItem, reportOn }) => {
   const { showToast } = useToast();
   const confirm = useConfirm();
   const canEdit = p.rights.edit;
   const reports = p.updates;
-  const [modal, setModal] = useState<{ report: Report | null } | null>(null);
+  const [modal, setModal] = useState<{ report: Report | null; presetItem?: number | null } | null>(null);
+  const [item, setItemState] = useState<number | null>(focusItem);
+  useEffect(() => setItemState(focusItem), [focusItem]);
+  useEffect(() => {
+    if (reportOn) setModal({ report: null, presetItem: reportOn.itemId });
+  }, [reportOn]);
+  const setItem = (id: number | null) => {
+    setItemState(id);
+    onFocusItem?.(id);
+  };
+  const itemTitle = item ? (plan?.items.find((i) => i.id === item)?.title ?? reports.flatMap((r) => r.work ?? []).find((w) => w.itemId === item)?.itemTitle ?? "Plan item") : null;
   const [file, setFile] = useState<ReportFile | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -480,6 +536,7 @@ const ReportsFeed: React.FC<{
       if (filter === "blockers" && !r.blockers) return false;
       if (filter === "files" && !r.files.length) return false;
       if (author && r.authorId !== author) return false;
+      if (item && !(r.work ?? []).some((w) => w.itemId === item)) return false;
       if (
         needle &&
         ![
@@ -493,7 +550,7 @@ const ReportsFeed: React.FC<{
         return false;
       return true;
     });
-  }, [reports, filter, author, q, meId]);
+  }, [reports, filter, author, q, meId, item]);
 
   const groups = useMemo(() => {
     const out: Array<{ week: string; items: Report[]; hours: number }> = [];
@@ -542,7 +599,7 @@ const ReportsFeed: React.FC<{
     { icon: CalendarCheck2, label: "This week", value: thisWeek },
     { icon: Clock3, label: "Hours", value: totalHours },
   ];
-  const filtered = filter !== "all" || author !== null || q.trim() !== "";
+  const filtered = filter !== "all" || author !== null || q.trim() !== "" || item !== null;
   const visible = groups.slice(0, weeks);
 
   return (
@@ -763,6 +820,18 @@ const ReportsFeed: React.FC<{
               </button>
             </div>
           </div>
+          {item !== null && (
+            <div className="flex flex-wrap items-center gap-2 px-2 pb-2">
+              <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-blue-600 py-1 pl-2.5 pr-1 text-xs font-semibold text-white">
+                <CircleDot className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="truncate">Reports on {itemTitle}</span>
+                <button type="button" onClick={() => setItem(null)} aria-label="Show all reports" className="inline-flex h-5 w-5 items-center justify-center rounded-full hover:bg-blue-700">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+              <span className="text-xs text-slate-500 dark:text-gray-400">{shown.length} report{shown.length === 1 ? "" : "s"}</span>
+            </div>
+          )}
           {team && (
             <div
               className="flex flex-wrap gap-1.5 px-2 pb-2"
@@ -801,13 +870,18 @@ const ReportsFeed: React.FC<{
           {shown.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
               <p className="text-sm text-slate-600 dark:text-gray-300">
-                No report matches.
+                {item !== null ? `No report on ${itemTitle} yet.` : "No report matches."}
               </p>
+              {item !== null && canEdit && (
+                <button type="button" className={primaryBtn} onClick={() => setModal({ report: null, presetItem: item })}>
+                  <NotebookPen className="h-4 w-4" /> Write the first report on it
+                </button>
+              )}
               {filtered && (
                 <button
                   type="button"
                   className={chipCls(false)}
-                  onClick={() => (setFilter("all"), setAuthor(null), setQ(""))}
+                  onClick={() => (setFilter("all"), setAuthor(null), setQ(""), setItem(null))}
                 >
                   <X className="h-3.5 w-3.5" /> Clear filters
                 </button>
@@ -870,6 +944,7 @@ const ReportsFeed: React.FC<{
                                 }
                                 deleting={deleting === r.id}
                                 onEdit={() => setModal({ report: r })}
+                                onPickItem={(id: number) => setItem(id)}
                                 onDelete={() => remove(r)}
                                 onOpenFile={setFile}
                               />
@@ -907,6 +982,9 @@ const ReportsFeed: React.FC<{
         report={modal?.report ?? null}
         onClose={() => setModal(null)}
         onSaved={onChanged}
+        plan={plan}
+        meId={meId}
+        presetItem={modal?.presetItem ?? (item && !modal?.report ? item : null)}
       />
       <Modal
         isOpen={!!file}

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, Check, ChevronDown, Layers, ListChecks, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, Undo2, Wand2, Zap } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, Layers, ListChecks, MoreHorizontal, Pencil, Plus, Sparkles, Trash2, Undo2, Wand2, Zap, NotebookPen } from "lucide-react";
 import { failure, sideProjectsApi, type PlanData, type PlanItem, type PlanStatus, type PlanTemplate, type Priority, type ProjectDetail, type Stage } from "../../../api/sideProjects";
 import { useToast } from "../../../contexts/ToastContext";
 import { useConfirm } from "../../../contexts/ConfirmContext";
@@ -403,6 +403,7 @@ const PlanView: React.FC<{ p: ProjectDetail; data: PlanData; team: Teammate[]; m
               {tDone}/{ts.length}
             </button>
           )}
+          <ReportsChip it={it} />
           {it.dueDate && <span className={`hidden shrink-0 text-[11px] font-medium tabular-nums sm:inline ${late ? "font-bold text-red-700 dark:text-red-300" : "text-slate-500 dark:text-gray-400"}`}>{fmtDay(it.dueDate)}</span>}
           {owner ? <UserAvatar name={owner.name} userId={owner.id} size={22} decorative /> : <span className="h-[22px] w-[22px] shrink-0 rounded-full border border-dashed border-slate-900/10 dark:border-gray-600" title="Nobody accountable" />}
           {manage && <ItemMenu onEdit={() => setItemModal({ item: it, preset: null })} onDelete={() => remove(it)} onAddTask={() => setTaskModal({ itemId: it.id })} />}
@@ -546,3 +547,24 @@ const PlanView: React.FC<{ p: ProjectDetail; data: PlanData; team: Teammate[]; m
 };
 
 export default PlanView;
+
+/** A feature's progress reports: count and last date; opens the Progress tab filtered to it. */
+const ReportsChip: React.FC<{ it: PlanItem }> = ({ it }) => {
+  const n = it.reports ?? 0;
+  const active = it.status === "IN_PROGRESS" || it.status === "IN_REVIEW" || it.status === "BLOCKED";
+  const days = it.lastReport ? Math.floor((Date.now() - Date.parse(`${it.lastReport}T00:00:00Z`)) / 86_400_000) : null;
+  const quiet = active && (days === null || days >= 7);
+  if (!n && !active) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => window.dispatchEvent(new CustomEvent("sp:open", { detail: { tab: "progress", item: it.id } }))}
+      title={n ? `${n} report${n === 1 ? "" : "s"}${it.lastReport ? ` · last ${it.lastReport}` : ""}` : "No report on this feature yet"}
+      className={`hidden shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums transition sm:inline-flex ${
+        quiet ? "bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:bg-amber-500/20" : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+      }`}
+    >
+      <NotebookPen className="h-3 w-3" aria-hidden /> {n}
+    </button>
+  );
+};
