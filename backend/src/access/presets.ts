@@ -67,7 +67,7 @@ const PLATFORM_VIEW: PresetCap[] = [["PLATFORM_TENANTS_VIEW", "detail"]];
 
 // Student side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §4.3). Migration 128 seeds the
 // same links for roles that already have holders.
-const SIDE_PROJECTS_REVIEWER: PresetCap[] = [["SIDE_PROJECTS_VIEW", "detail"], "SIDE_PROJECTS_REVIEW", "SIDE_PROJECTS_CLASSIFY"];
+const SIDE_PROJECTS_REVIEWER: PresetCap[] = [["SIDE_PROJECTS_VIEW", "detail"], "SIDE_PROJECTS_REVIEW", "SIDE_PROJECTS_CLASSIFY", "SIDE_PROJECTS_AI_SETUP"];
 const SIDE_PROJECTS_FULL: PresetCap[] = [...SIDE_PROJECTS_REVIEWER, "SIDE_PROJECTS_MANAGE_ANY"];
 
 const MIS_PRESETS: PresetDef[] = [
@@ -333,7 +333,7 @@ const MIS_PRESETS: PresetDef[] = [
     scopes: ["CLASS_GROUP", "GRADE"],
     // No SIDE_PROJECTS_VIEW/REVIEW (migration 135): "All projects" is for leadership and explicit
     // grants; a class teacher follows the projects they supervise under Assigned projects.
-    caps: ["SIDE_PROJECTS_CLASSIFY", "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_OWN", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "detail"], ["VIEW_RESULTS", "detail"]],
+    caps: ["SIDE_PROJECTS_CLASSIFY", "SIDE_PROJECTS_AI_SETUP", "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_OWN", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "detail"], ["VIEW_RESULTS", "detail"]],
   },
   {
     key: "subject_teacher",
@@ -484,7 +484,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Baseline for every teacher (own calendar, own records). Teaching power comes from Subject/Class Teacher grants.",
     category: "Teaching",
     scopes: ["SELF"],
-    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "OFFICE_HOURS_MANAGE_OWN", "VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", ["SIDE_PROJECTS_ASSIGNED", "detail"], "SIDE_PROJECTS_CLASSIFY"],
+    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "OFFICE_HOURS_MANAGE_OWN", "VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", ["SIDE_PROJECTS_ASSIGNED", "detail"], "SIDE_PROJECTS_CLASSIFY", "SIDE_PROJECTS_AI_SETUP"],
   },
   {
     key: "support_staff",
@@ -493,7 +493,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Baseline for non-teaching staff.",
     category: "Operations",
     scopes: ["SELF"],
-    caps: ["VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", ["SIDE_PROJECTS_ASSIGNED", "detail"], "SIDE_PROJECTS_CLASSIFY"],
+    caps: ["VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", ["SIDE_PROJECTS_ASSIGNED", "detail"], "SIDE_PROJECTS_CLASSIFY", "SIDE_PROJECTS_AI_SETUP"],
   },
   {
     key: "student",
@@ -511,7 +511,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Parent/guardian: their children's records.",
     category: "Family",
     scopes: ["CHILDREN", "SELF"],
-    caps: [["OFFICE_HOURS_VIEW_SELF", "detail"], "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN"],
+    caps: [["OFFICE_HOURS_VIEW_SELF", "detail"], "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", "SIDE_PROJECTS_AI_SETUP"],
   },
 ];
 
