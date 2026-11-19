@@ -1,10 +1,11 @@
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { getCurrentAcademicYearId } from "../../utils/academicYear";
-import { fail, fullName, inList, insertId, iso, limits, many, one, recordEvent, touch } from "./core";
+import { fail, fullName, inList, insertId, iso, latestToday, limits, many, one, recordEvent, touch } from "./core";
 import { storeProjectFiles, type Upload } from "./files";
 import { ProjectAccess } from "./access";
 import * as v from "./validate";
+import * as rw from "./reportWork";
 
 /** Milestones and progress updates (plan §3.7). */
 
@@ -60,12 +61,21 @@ export interface ReportInput {
   workDate?: unknown;
   hours?: unknown;
   removeFiles?: unknown;
+  /** The plan items / tasks covered: [{ itemId?, taskId?, hours?, status? }] or its JSON. */
+  work?: unknown;
+}
+
+/** The plan lines of a report; required once the project has a plan (migration 138). */
+async function workFor(a: ProjectAccess, by: number, body: ReportInput) {
+  const lines = await rw.parseWork(a, by, body.work);
+  if (!lines.length && (await rw.planSize(pid(a))) > 0) fail(400, "VALIDATION", "Pick what you worked on from the plan", "work");
+  return lines;
 }
 
 function workDateOf(raw: unknown): string {
   const today = new Date().toISOString().slice(0, 10);
   const d = v.date(raw, "workDate") ?? today;
-  if (d > today) fail(400, "VALIDATION", "The work date can't be in the future", "workDate");
+  if (d > latestToday()) fail(400, "VALIDATION", "The work date can't be in the future", "workDate");
   const oldest = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
   if (d < oldest) fail(400, "VALIDATION", "Report work from the last 60 days", "workDate");
   return d;
@@ -94,7 +104,9 @@ export async function addUpdate(a: ProjectAccess, by: number, body: ReportInput,
   const blockers = v.text(body.blockers, "blockers", { max: 1000, label: "Blockers" });
   const mood = v.intIn(body.mood, "mood", 1, 5);
   const workDate = workDateOf(body.workDate);
-  const hours = hoursOf(body.hours);
+  const lines = await workFor(a, by, body);
+  const hours = rw.linesTotal(lines) ?? hoursOf(body.hours);
+  await rw.checkMoves(a, by, lines, blockers);
   if (files.length > MAX_REPORT_FILES) fail(400, "VALIDATION", `A report holds at most ${MAX_REPORT_FILES} PDF files`, "files");
   const r = await db.execute(sql`
     INSERT INTO SideProjectUpdate (project_id, author_id, did, next_steps, blockers, mood, work_date, hours, stage, created_at)
@@ -102,7 +114,9 @@ export async function addUpdate(a: ProjectAccess, by: number, body: ReportInput,
   const id = insertId(r);
   try {
     await attachPdfs(a, by, id, files);
+    await rw.saveWork(a, by, id, workDate, lines, blockers);
   } catch (e) {
+    await rw.dropWork(id);
     await db.execute(sql`DELETE FROM SideProjectUpdate WHERE update_id = ${id}`);
     throw e;
   }
@@ -119,7 +133,9 @@ export async function updateUpdate(a: ProjectAccess, by: number, updateId: numbe
   const blockers = v.text(body.blockers, "blockers", { max: 1000, label: "Blockers" });
   const mood = v.intIn(body.mood, "mood", 1, 5);
   const workDate = workDateOf(body.workDate);
-  const hours = hoursOf(body.hours);
+  const lines = await workFor(a, by, body);
+  const hours = rw.linesTotal(lines) ?? hoursOf(body.hours);
+  await rw.checkMoves(a, by, lines, blockers);
   const remove = (Array.isArray(body.removeFiles) ? body.removeFiles : typeof body.removeFiles === "string" && body.removeFiles ? v.safeJson(body.removeFiles) : [])
     .map(Number)
     .filter((n: number) => Number.isInteger(n) && n > 0);
@@ -134,6 +150,7 @@ export async function updateUpdate(a: ProjectAccess, by: number, updateId: numbe
     UPDATE SideProjectUpdate SET did = ${did}, next_steps = ${next}, blockers = ${blockers}, mood = ${mood},
       work_date = ${workDate}, hours = ${hours}, edited_at = UTC_TIMESTAMP()
     WHERE update_id = ${updateId}`);
+  await rw.saveWork(a, by, updateId, workDate, lines, blockers);
   await touch(pid(a), await getCurrentAcademicYearId());
 }
 
@@ -145,6 +162,7 @@ export async function deleteUpdate(a: ProjectAccess, by: number, updateId: numbe
     UPDATE FileAsset SET deleted_at = UTC_TIMESTAMP()
     WHERE asset_id IN (SELECT asset_id FROM SideProjectUpdateFile WHERE update_id = ${updateId})`);
   await db.execute(sql`DELETE FROM SideProjectUpdateFile WHERE update_id = ${updateId}`);
+  await rw.dropWork(updateId);
   await db.execute(sql`DELETE FROM SideProjectUpdate WHERE update_id = ${updateId}`);
 }
 
@@ -166,10 +184,12 @@ export async function reportsOf(projectId: number) {
         FROM SideProjectUpdateFile f JOIN FileAsset a ON a.asset_id = f.asset_id AND a.deleted_at IS NULL
         WHERE f.update_id IN (${inList(ids)}) ORDER BY f.created_at`)
     : [];
+  const lines = await rw.workOf(ids);
   return rows.map((r) => ({
     ...r,
     hours: r.hours == null ? null : Number(r.hours),
     files: files.filter((f) => Number(f.updateId) === Number(r.id)).map((f) => ({ assetId: Number(f.assetId), name: f.name, size: Number(f.size) })),
+    work: lines.filter((w) => w.updateId === Number(r.id)).map(({ updateId: _u, ...w }) => w),
   }));
 }
 

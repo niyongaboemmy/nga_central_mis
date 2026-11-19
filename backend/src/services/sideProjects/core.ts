@@ -118,3 +118,10 @@ export async function touch(projectId: number, yearId: number | null) {
            last_active_year_id = COALESCE(${yearId}, last_active_year_id)
     WHERE project_id = ${projectId}`);
 }
+
+/**
+ * The latest calendar date anywhere right now (UTC+14). Use it only to refuse future work dates:
+ * the server runs on UTC, so "today" for someone in Kigali (UTC+2) is still "tomorrow" in UTC
+ * between 00:00 and 02:00 local time.
+ */
+export const latestToday = () => new Date(Date.now() + 14 * 3_600_000).toISOString().slice(0, 10);

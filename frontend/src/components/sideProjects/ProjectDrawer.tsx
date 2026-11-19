@@ -104,6 +104,19 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
   const [p, setP] = useState<ProjectDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>((initialTab as Tab) ?? "overview");
+  // Plan-linked reporting: other sections ask to switch (e.g. Plan -> a feature's reports).
+  const [focusItem, setFocusItem] = useState<number | null>(null);
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const d = (e as CustomEvent<{ tab: Tab; item?: number | null }>).detail;
+      if (!d?.tab) return;
+      setFocusItem(d.item ?? null);
+      setTab(d.tab);
+      document.getElementById("sp-workspace-main")?.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("sp:open", onOpen);
+    return () => window.removeEventListener("sp:open", onOpen);
+  }, []);
   const [menu, setMenu] = useState(false);
   const [correct, setCorrect] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
@@ -393,7 +406,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
                             <button
                               type="button"
                               aria-current={on ? "page" : undefined}
-                              onClick={() => setTab(t.key)}
+                              onClick={() => (setFocusItem(null), setTab(t.key))}
                               className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-[13px] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                                 on ? "bg-blue-50 font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" : "font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
                               }`}
@@ -487,7 +500,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
                     {visibleTabs.map((t) => {
                       const on = tab === t.key;
                       return (
-                        <button key={t.key} role="tab" type="button" aria-selected={on} onClick={() => setTab(t.key)} className={`relative flex shrink-0 items-center gap-1.5 px-2.5 py-3 text-[13px] ${on ? "font-semibold text-slate-900 dark:text-white" : "font-medium text-slate-600 dark:text-gray-300"}`}>
+                        <button key={t.key} role="tab" type="button" aria-selected={on} onClick={() => (setFocusItem(null), setTab(t.key))} className={`relative flex shrink-0 items-center gap-1.5 px-2.5 py-3 text-[13px] ${on ? "font-semibold text-slate-900 dark:text-white" : "font-medium text-slate-600 dark:text-gray-300"}`}>
                           <t.icon className={`h-4 w-4 ${on ? "text-blue-600 dark:text-blue-400" : ""}`} aria-hidden />
                           {t.label}
                           {t.count !== undefined && t.count > 0 && <span className="text-[11px] tabular-nums text-slate-500 dark:text-gray-400">{t.count}</span>}
@@ -526,7 +539,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
                       {tab === "plan" && <WorkPanel p={p} meId={meId} onChanged={changed} wide />}
                       {tab === "documents" && <DocumentsPanel p={p} onChanged={changed} />}
                       {tab === "gallery" && <GalleryPanel p={p} onChanged={changed} />}
-                      {tab === "progress" && <ProgressPanel p={p} meId={meId} onChanged={changed} wide />}
+                      {tab === "progress" && <ProgressPanel p={p} meId={meId} onChanged={changed} wide focusItem={focusItem} />}
                       {tab === "feedback" && <FeedbackPanel p={p} meId={meId} staff={mode === "staff"} onChanged={changed} />}
                       {tab === "team" && <TeamPanel p={p} meId={meId} onChanged={changed} onLeft={() => (onChanged(), onClose())} />}
                       {tab === "timeline" && <TimelinePanel p={p} />}

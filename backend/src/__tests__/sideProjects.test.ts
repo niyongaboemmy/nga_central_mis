@@ -1215,3 +1215,72 @@ describe("team positions (migration 137)", () => {
     expect((await api().patch(`/side-projects/${p}/members/${bob}`).set(as(bob)).send({ isManager: false })).status).toBe(403);
   });
 });
+
+describe("progress reports are written against the plan (migration 138)", () => {
+  let p: number;
+  let feature: number;
+  let task: number;
+  beforeAll(async () => {
+    owners.add(lead);
+    p = await createProject(lead, "Plan-linked reporting");
+    feature = (await api().post(`/side-projects/${p}/plan/items`).set(as(lead)).send({ title: "Sign-in", kind: "FEATURE" })).body.data.id;
+    const t = await api().post(`/side-projects/${p}/tasks`).set(as(lead)).send({ planItemId: feature, title: "Build the sign-in form", assigneeId: lead });
+    expect(t.status, JSON.stringify(t.body)).toBe(200);
+    task = (await api().get(`/side-projects/${p}/plan`).set(as(lead))).body.data.tasks.find((x: any) => x.title === "Build the sign-in form").id;
+  });
+
+  it("needs at least one plan item once the project has a plan", async () => {
+    const none = await api().post(`/side-projects/${p}/updates`).set(as(lead)).send({ did: "Did some work today" });
+    expect(none.status).toBe(400);
+    expect(none.body.field).toBe("work");
+    const foreign = await api().post(`/side-projects/${p}/updates`).set(as(lead)).send({ did: "Did some work today", work: [{ itemId: 999999999 }] });
+    expect(foreign.body.field).toBe("work");
+  });
+
+  it("links tasks and features, turns task hours into task logs, and moves the task", async () => {
+    const r = await api().post(`/side-projects/${p}/updates`).set(as(lead)).field("did", "Built most of the sign-in form").field("work", JSON.stringify([{ taskId: task, hours: 2.5, status: "IN_PROGRESS" }, { itemId: feature, hours: 1 }]));
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const id = r.body.data.id;
+    const rep = (await api().get(`/side-projects/${p}`).set(as(lead))).body.data.updates.find((x: any) => x.id === id);
+    expect(rep.hours).toBe(3.5);
+    expect(rep.work).toEqual(expect.arrayContaining([expect.objectContaining({ taskId: task, itemId: feature, hours: 2.5, status: "IN_PROGRESS", taskTitle: "Build the sign-in form" })]));
+    const plan = (await api().get(`/side-projects/${p}/plan`).set(as(lead))).body.data;
+    expect(plan.tasks.find((t: any) => t.id === task).status).toBe("IN_PROGRESS");
+    expect(plan.items.find((i: any) => i.id === feature)).toMatchObject({ reports: 1, reportedHours: 3.5 });
+    const logs = rows(await db.execute(sql`SELECT hours FROM SideProjectTaskLog WHERE update_id = ${id}`));
+    expect(logs.map((l: any) => Number(l.hours))).toEqual([2.5]);
+    // editing rewrites the logs; deleting removes them
+    expect((await api().patch(`/side-projects/${p}/updates/${id}`).set(as(lead)).field("did", "Built the whole sign-in form").field("work", JSON.stringify([{ taskId: task, hours: 4 }]))).status).toBe(200);
+    expect(rows(await db.execute(sql`SELECT hours FROM SideProjectTaskLog WHERE update_id = ${id}`)).map((l: any) => Number(l.hours))).toEqual([4]);
+    expect((await api().delete(`/side-projects/${p}/updates/${id}`).set(as(lead))).status).toBe(200);
+    expect(rows(await db.execute(sql`SELECT COUNT(*) AS n FROM SideProjectTaskLog WHERE update_id = ${id}`))[0].n).toBe(0);
+  });
+
+  it("a teammate reports on their own tasks; an unassigned task they report on becomes theirs", async () => {
+    expect((await api().post(`/side-projects/${p}/members`).set(as(lead)).send({ userId: bob })).status).toBe(200);
+    await api().post(`/side-projects/invitations/${p}`).set(as(bob)).send({ accept: true });
+    const mine = (await api().post(`/side-projects/${p}/tasks`).set(as(lead)).send({ planItemId: feature, title: "Style the sign-in form", assigneeId: bob })).status;
+    expect(mine).toBe(200);
+    const open = (await api().post(`/side-projects/${p}/tasks`).set(as(lead)).send({ planItemId: feature, title: "Write sign-in tests" })).status;
+    expect(open).toBe(200);
+    const plan = (await api().get(`/side-projects/${p}/plan`).set(as(bob))).body.data;
+    const bobTask = plan.tasks.find((t: any) => t.title === "Style the sign-in form").id;
+    const openTask = plan.tasks.find((t: any) => t.title === "Write sign-in tests").id;
+    // someone else's task, or the feature itself (it has tasks): refused
+    const others = await api().post(`/side-projects/${p}/updates`).set(as(bob)).send({ did: "Helped with the form", work: [{ taskId: task }] });
+    expect(others.status).toBe(403);
+    expect(others.body.code).toBe("NOT_YOUR_TASK");
+    expect((await api().post(`/side-projects/${p}/updates`).set(as(bob)).send({ did: "Worked on sign-in", work: [{ itemId: feature }] })).body.code).toBe("NOT_YOUR_TASK");
+    // own task + an unassigned one: accepted, and the unassigned task is now bob's
+    const ok = await api().post(`/side-projects/${p}/updates`).set(as(bob)).send({ did: "Styled the form and started the tests", work: [{ taskId: bobTask, hours: 2 }, { taskId: openTask, hours: 1 }] });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    const after = (await api().get(`/side-projects/${p}/plan`).set(as(bob))).body.data;
+    expect(after.tasks.find((t: any) => t.id === openTask).assigneeId).toBe(bob);
+  });
+
+  it("refuses a blocked move without a reason", async () => {
+    const r = await api().post(`/side-projects/${p}/updates`).set(as(lead)).send({ did: "Stuck on the sign-in form", work: [{ taskId: task, status: "BLOCKED" }] });
+    expect(r.status).toBe(400);
+    expect(r.body.field).toBe("blockers");
+  });
+});

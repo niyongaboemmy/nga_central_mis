@@ -35,8 +35,11 @@ import {
 import { useToast } from "../../../contexts/ToastContext";
 import { useConfirm } from "../../../contexts/ConfirmContext";
 import ReportsFeed from "./ReportsFeed";
+import PlanProgress, { openSection } from "./PlanProgress";
+import type { PlanData } from "../../../api/sideProjects";
 import {
   ProgressRing,
+  Skeleton,
   Spinner,
   cardCls,
   inputCls,
@@ -152,7 +155,25 @@ const ProgressPanel: React.FC<{
   meId: number;
   onChanged: () => void;
   wide?: boolean;
-}> = ({ p, meId, onChanged, wide }) => {
+  /** Show only the reports on this plan item (from the Plan tab). */
+  focusItem?: number | null;
+}> = ({ p, meId, onChanged, wide, focusItem = null }) => {
+  // The implementation plan: reports are written against it and progress follows it.
+  const [plan, setPlan] = useState<PlanData | null | undefined>(undefined);
+  const [item, setItem] = useState<number | null>(focusItem);
+  const [reportOn, setReportOn] = useState<{ itemId: number; nonce: number } | null>(null);
+  useEffect(() => setItem(focusItem), [focusItem]);
+  useEffect(() => {
+    let live = true;
+    sideProjectsApi
+      .plan(p.id)
+      .then((d) => live && setPlan(d))
+      .catch(() => live && setPlan(null));
+    return () => {
+      live = false;
+    };
+  }, [p.id, p.updates.length, p.lastActivityAt, p.progress]);
+  const planReady = !!plan && plan.items.some((i) => i.kind === "FEATURE" && i.status !== "CANCELLED");
   const { showToast } = useToast();
   const confirm = useConfirm();
   const dark = useIsDark();
@@ -262,13 +283,55 @@ const ProgressPanel: React.FC<{
     >
       {/* Reports */}
       <div className="min-w-0">
-        <ReportsFeed p={p} meId={meId} onChanged={onChanged} />
+        <ReportsFeed p={p} meId={meId} onChanged={onChanged} plan={plan} focusItem={item} onFocusItem={setItem} reportOn={reportOn} />
       </div>
 
-      {/* Milestones */}
-      <aside className="min-w-0">
+      {/* Plan progress (once a plan exists) or milestones */}
+      <aside className={`min-w-0 space-y-4 ${wide ? "lg:sticky lg:top-0 lg:self-start" : ""}`}>
+        {plan === undefined ? (
+          <div className={`${cardCls} space-y-3 p-4`} aria-busy="true">
+            <Skeleton className="h-12" />
+            <Skeleton className="h-20" />
+            <Skeleton className="h-16" />
+          </div>
+        ) : planReady && plan ? (
+          <>
+            <PlanProgress p={p} plan={plan} canReport={canEdit} onReportOn={(id) => setReportOn({ itemId: id, nonce: Date.now() })} onShowReports={(id) => setItem(id)} />
+            {ms.length > 0 && (
+              <details className={`${cardCls} group px-4 py-3`}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-semibold text-slate-700 dark:text-gray-200">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Target className="h-3.5 w-3.5" aria-hidden /> Milestones from before the plan · {done}/{ms.length}
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-500 group-open:hidden dark:text-gray-400">Show</span>
+                </summary>
+                <p className="mt-2 text-[11px] text-slate-500 dark:text-gray-400">Progress now follows the plan; these milestones are kept for the record.</p>
+                <ul className="mt-2 space-y-1">
+                  {ms.map((m) => (
+                    <li key={m.id} className={`flex items-center gap-2 text-xs ${m.done ? "text-slate-500 line-through dark:text-gray-400" : "text-slate-700 dark:text-gray-200"}`}>
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${m.done ? "bg-green-600" : "bg-slate-300 dark:bg-gray-600"}`} aria-hidden /> {m.title}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </>
+        ) : (
+          <>
+            {canEdit && (
+              <button type="button" onClick={() => openSection("plan")} className={`${cardCls} flex w-full items-start gap-3 p-4 text-left transition hover:bg-blue-50/50 dark:hover:bg-blue-500/[0.06]`}>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-400/15 dark:text-blue-300">
+                  <Target className="h-[18px] w-[18px]" aria-hidden />
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold text-slate-900 dark:text-white">Build the implementation plan</span>
+                  <span className="block text-xs text-slate-500 dark:text-gray-400">Reports are then written against its features and tasks, and progress follows it.</span>
+                </span>
+              </button>
+            )}
+
         <section
-          className={`${cardCls} p-4 ${wide ? "lg:sticky lg:top-0" : ""}`}
+          className={`${cardCls} p-4`}
         >
           <div className="flex items-center gap-3">
             <ProgressRing
@@ -423,6 +486,8 @@ const ProgressPanel: React.FC<{
             )}
           </AnimatePresence>
         </section>
+          </>
+        )}
       </aside>
     </div>
   );

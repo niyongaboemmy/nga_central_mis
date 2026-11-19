@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertOctagon, Annoyed, ArrowRight, CalendarDays, Check, Clock3, FileText, Frown, Laugh, Meh, NotebookPen, RotateCcw, Smile, Undo2, X } from "lucide-react";
-import { failure, sideProjectsApi, type ProjectDetail, type Report } from "../../../api/sideProjects";
+import { AlertOctagon, Annoyed, ArrowRight, CalendarDays, Check, Clock3, FileText, Frown, Laugh, ListChecks, Meh, NotebookPen, RotateCcw, Smile, Undo2, X } from "lucide-react";
+import { failure, sideProjectsApi, type PlanData, type ProjectDetail, type Report } from "../../../api/sideProjects";
+import PlanWorkPicker, { lineKey, type WorkLineDraft } from "./PlanWorkPicker";
 import { useToast } from "../../../contexts/ToastContext";
 import { Field, FormModal, TextArea } from "../form";
 import { Dropzone, ProgressRing, Spinner, fmtBytes, inputCls, primaryBtn, secondaryBtn } from "../ui";
@@ -29,7 +30,18 @@ const blank = (): Form => ({ workDate: isoDay(0), hours: null, mood: null, did: 
  * Record a progress report (or edit one): which day the work was done, hours, mood, what was
  * done / next / blocking, and up to three PDF attachments (minutes, test reports, designs).
  */
-const ReportModal: React.FC<{ p: ProjectDetail; open: boolean; report: Report | null; onClose: () => void; onSaved: () => void }> = ({ p, open, report, onClose, onSaved }) => {
+const ReportModal: React.FC<{
+  p: ProjectDetail;
+  open: boolean;
+  report: Report | null;
+  onClose: () => void;
+  onSaved: () => void;
+  /** The implementation plan; once it has features, a report names what it covers. */
+  plan?: PlanData | null;
+  meId?: number;
+  /** Start a new report on this plan item. */
+  presetItem?: number | null;
+}> = ({ p, open, report, onClose, onSaved, plan, meId = 0, presetItem }) => {
   const { showToast } = useToast();
   const [f, setF] = useState<Form>(blank);
   const [files, setFiles] = useState<File[]>([]);
@@ -37,6 +49,9 @@ const ReportModal: React.FC<{ p: ProjectDetail; open: boolean; report: Report | 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [pct, setPct] = useState<number | null>(null);
+  const [lines, setLines] = useState<WorkLineDraft[]>([]);
+  const planReady = !!plan && plan.items.some((i) => i.kind === "FEATURE" && i.status !== "CANCELLED");
+  const linesHours = lines.some((l) => l.hours !== null) ? Math.round(lines.reduce((s, l) => s + (l.hours ?? 0), 0) * 2) / 2 : null;
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +64,25 @@ const ReportModal: React.FC<{ p: ProjectDetail; open: boolean; report: Report | 
     setRemove([]);
     setErrors({});
     setPct(null);
-  }, [open, report]);
+    setLines(
+      report
+        ? (report.work ?? []).map((w) => ({ key: lineKey(w.itemId, w.taskId), itemId: w.itemId, taskId: w.taskId, hours: w.hours, status: null }))
+        : presetItem
+          ? presetLines(presetItem)
+          : [],
+    );
+  }, [open, report, presetItem]);
+
+  /** A report started on a feature: your tasks in it, or the feature itself when you may report on it. */
+  function presetLines(itemId: number): WorkLineDraft[] {
+    const manage = !!p.rights.manage;
+    const tasks = (plan?.tasks ?? []).filter((t) => t.planItemId === itemId && t.status !== "CANCELLED");
+    const mine = tasks.filter((t) => t.assigneeId === meId && t.status !== "DONE");
+    if (mine.length && !manage) return mine.map((t) => ({ key: lineKey(itemId, t.id), itemId, taskId: t.id, hours: null, status: null }));
+    const it = plan?.items.find((i) => i.id === itemId);
+    if (manage || !tasks.length || it?.ownerId === meId) return [{ key: lineKey(itemId, null), itemId, taskId: null, hours: null, status: null }];
+    return [];
+  }
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((x) => ({ ...x, [k]: v }));
   const kept = (report?.files ?? []).filter((x) => !remove.includes(x.assetId));
@@ -74,7 +107,11 @@ const ReportModal: React.FC<{ p: ProjectDetail; open: boolean; report: Report | 
     if (!f.workDate) e.workDate = "Choose the day";
     else if (f.workDate > today) e.workDate = "That day hasn't come yet";
     else if (f.workDate < minDay) e.workDate = "Reports go back 60 days at most";
-    if (f.hours !== null && (f.hours < 0.5 || f.hours > 24 || Math.round(f.hours * 2) !== f.hours * 2)) e.hours = "Between 0.5 and 24, in half hours";
+    if (linesHours === null && f.hours !== null && (f.hours < 0.5 || f.hours > 24 || Math.round(f.hours * 2) !== f.hours * 2)) e.hours = "Between 0.5 and 24, in half hours";
+    if (planReady && !lines.length) e.work = "Pick at least one feature or task you worked on";
+    if (lines.some((l) => l.hours !== null && (l.hours < 0.5 || l.hours > 24 || Math.round(l.hours * 2) !== l.hours * 2))) e.work = "Hours per item: 0.5 to 24, in half hours";
+    if (linesHours !== null && linesHours > 24) e.work = "A day's report holds at most 24 hours";
+    if (lines.some((l) => l.status === "BLOCKED") && f.blockers.trim().length < 3) e.blockers = "Say what is blocking it";
     setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
@@ -85,7 +122,8 @@ const ReportModal: React.FC<{ p: ProjectDetail; open: boolean; report: Report | 
       blockers: f.blockers.trim(),
       mood: f.mood,
       workDate: f.workDate,
-      hours: f.hours,
+      hours: linesHours ?? f.hours,
+      work: lines.map((l) => ({ itemId: l.itemId, taskId: l.taskId ?? undefined, hours: l.hours, status: l.status })),
     };
     try {
       if (report) await sideProjectsApi.editReport(p.id, report.id, { ...body, removeFiles: remove }, files, files.length ? setPct : undefined);
@@ -139,6 +177,20 @@ const ReportModal: React.FC<{ p: ProjectDetail; open: boolean; report: Report | 
       }
     >
       <div className="space-y-6">
+        {/* What it covers: reports are written against the plan */}
+        {planReady && plan ? (
+          <Field label="What did you work on?" icon={ListChecks} hint="Report on your tasks in the plan: add the hours spent on each and move a task if its state changed.">
+            <PlanWorkPicker plan={plan} meId={meId} manage={!!p.rights.manage} lines={lines} onChange={(x) => (setLines(x), setErrors((e) => ({ ...e, work: "" })))} error={errors.work} />
+          </Field>
+        ) : (
+          plan !== undefined && (
+            <p className="flex items-start gap-2 rounded-2xl bg-blue-50 px-3 py-2.5 text-xs text-blue-800 dark:bg-blue-500/10 dark:text-blue-200">
+              <ListChecks className="mt-px h-4 w-4 shrink-0" aria-hidden />
+              No implementation plan yet. Add features in the Plan tab and reports will be written against them.
+            </p>
+          )
+        )}
+
         {/* When + how long + how it went */}
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Day of the work" icon={CalendarDays} error={errors.workDate}>
@@ -157,6 +209,12 @@ const ReportModal: React.FC<{ p: ProjectDetail; open: boolean; report: Report | 
             </div>
           </Field>
           <Field label="Hours spent" icon={Clock3} optional error={errors.hours}>
+            {linesHours !== null ? (
+              <p className="flex min-h-[36px] items-center gap-2 text-sm text-slate-700 dark:text-gray-200">
+                <span className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold tabular-nums text-white">{linesHours}h</span>
+                <span className="text-xs text-slate-500 dark:text-gray-400">total of the hours per plan item</span>
+              </p>
+            ) : (
             <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Hours spent">
               {HOURS.map((h) => (
                 <button
@@ -184,6 +242,7 @@ const ReportModal: React.FC<{ p: ProjectDetail; open: boolean; report: Report | 
                 className={`${inputCls} !min-h-[36px] !w-20 !rounded-full !px-3 !py-1.5 text-xs`}
               />
             </div>
+            )}
           </Field>
         </div>
 
