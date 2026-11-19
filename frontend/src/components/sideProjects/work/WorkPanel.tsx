@@ -140,7 +140,7 @@ export function StatusMenu<T extends string>({
             onPointerDown={(e) => e.stopPropagation()}
             onKeyDown={onMenuKey}
             style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, width: MENU_W, maxHeight: pos.maxH, transformOrigin: pos.up ? "bottom left" : "top left" }}
-            className="z-[80] flex flex-col overflow-hidden rounded-2xl border border-slate-900/[0.08] bg-white dark:border-white/10 dark:bg-gray-900"
+            className="z-[130] flex flex-col overflow-hidden rounded-2xl border border-slate-900/[0.08] bg-white dark:border-white/10 dark:bg-gray-900"
           >
             <p className="shrink-0 px-3.5 pb-1 pt-3 text-xs font-medium text-slate-500 dark:text-gray-400">Set status</p>
             <div className="min-h-0 overflow-y-auto overscroll-contain p-1.5 pt-0.5 [scrollbar-width:thin]">
