@@ -175,6 +175,9 @@ export const MIS_MANIFEST = defineManifest({
     // Classification (migration 132): Student / NGA Delivery Studio / Individual. Every role except
     // students' and parents'; the service also refuses student accounts.
     SIDE_PROJECTS_CLASSIFY: W("Choose a project's classification (student, Delivery Studio, individual)", "ACADEMICS", SCHOOL_ONLY),
+    // "Set up with AI" (migration 140): upload the project's documents, add an extra prompt, and AI
+    // fills in the new project. Every role except students'; the service also refuses student accounts.
+    SIDE_PROJECTS_AI_SETUP: W("Set up a new project from its documents with AI", "ACADEMICS", SCHOOL_ONLY),
     SIDE_PROJECTS_VIEW: R("See students' side projects in your area", "ACADEMICS", ["summary", "detail"]),
     SIDE_PROJECTS_REVIEW: W("Review side projects (feedback, changes, verify completion)", "ACADEMICS"),
     SIDE_PROJECTS_MANAGE_ANY: W("Manage every side project (import, correct, archive, categories)", "ACADEMICS", { ...SCHOOL_ONLY, restricted: true }),

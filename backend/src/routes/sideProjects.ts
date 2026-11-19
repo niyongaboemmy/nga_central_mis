@@ -20,6 +20,10 @@ import { assertManage } from "../services/sideProjects/access";
 import * as monitor from "../services/sideProjects/monitor";
 import * as notify from "../services/sideProjects/notify";
 import { runImport, TEMPLATE_CSV } from "../services/sideProjects/importer";
+import * as aiSetup from "../services/sideProjects/aiSetup";
+import { personalFor } from "../services/ai/personal/routes";
+import { one } from "../services/sideProjects/core";
+import { sql } from "drizzle-orm";
 
 /**
  * Student side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §8), mounted at /side-projects.
@@ -117,6 +121,7 @@ export function sideProjectsRouter(
         own: perms.includes(CAP.OWN),
         assigned: perms.includes(CAP.ASSIGNED),
         classify: perms.includes(CAP.CLASSIFY) && !(await isStudentAccount(uid(req))),
+        aiSetup: await aiSetup.mayUseAiSetup(uid(req), perms),
         view: v.detail && !isEmptyScope(v.detail) ? "detail" : v.summary && !isEmptyScope(v.summary) ? "summary" : null,
         review: !!v.review && !isEmptyScope(v.review),
         manageAny: v.manageAny,
@@ -350,6 +355,71 @@ export function sideProjectsRouter(
 
   // The caller's tasks across every project (migration 133).
   router.get("/my-tasks", own, handle(async (req) => work.myTasks(uid(req))));
+
+  // ------------------------------------------------------------------ set up with AI (migration 140)
+  // SIDE_PROJECTS_AI_SETUP and never a student account. Documents are read to text here and the
+  // files are dropped at once; the browser keeps them and attaches them through the normal create.
+  const aiOk = async (req: any) => aiSetup.assertAiSetup(uid(req), req.user?.permissions);
+  // 30 AI rounds an hour per person: each one spends the school's free AI quota.
+  const aiHits = new Map<number, number[]>();
+  const aiRate = (req: any) => {
+    const now = Date.now();
+    const hits = (aiHits.get(uid(req)) ?? []).filter((t) => now - t < 60 * 60_000);
+    if (hits.length >= 30) fail(429, "RATE_LIMITED", "That's a lot of AI rounds: wait a little and try again");
+    hits.push(now);
+    aiHits.set(uid(req), hits);
+  };
+  router.get("/ai-setup/providers", own, handle(async (req) => (await aiOk(req), aiSetup.providers())));
+  router.post("/ai-setup/sessions", own, handle(async (req) => (await aiOk(req), aiSetup.createSession(uid(req)))));
+  router.get("/ai-setup/sessions/:sid", own, handle(async (req) => (await aiOk(req), aiSetup.sessionView(uid(req), String(req.params.sid)))));
+  router.post(
+    "/ai-setup/sessions/:sid/files",
+    own,
+    uploadRateLimit,
+    upload.single("file"),
+    handle(async (req) => {
+      try {
+        await aiOk(req);
+      } catch (e) {
+        if (req.file?.path) await import("fs").then((fs) => fs.promises.rm(req.file.path, { force: true })).catch(() => undefined);
+        throw e;
+      }
+      if (!req.file) fail(400, "VALIDATION", "Choose a document", "file");
+      return aiSetup.addFile(uid(req), String(req.params.sid), req.file);
+    }),
+  );
+  router.delete("/ai-setup/sessions/:sid/files/:fid", own, handle(async (req) => (await aiOk(req), aiSetup.removeFile(uid(req), String(req.params.sid), String(req.params.fid)))));
+  router.post(
+    "/ai-setup/sessions/:sid/draft",
+    own,
+    handle(async (req) => {
+      await aiOk(req);
+      aiRate(req);
+      return aiSetup.draftProject(uid(req), String(req.params.sid), { ...(req.body ?? {}), personal: await personalFor(req, "author") });
+    }),
+  );
+  router.post(
+    "/ai-setup/sessions/:sid/refine",
+    own,
+    handle(async (req) => {
+      await aiOk(req);
+      aiRate(req);
+      return aiSetup.refineProject(uid(req), String(req.params.sid), { ...(req.body ?? {}), personal: await personalFor(req, "author") });
+    }),
+  );
+  router.post(
+    "/:id/ai-plan",
+    own,
+    handle(async (req) => {
+      await aiOk(req);
+      const a = await studentAccess(req);
+      assertEdit(a);
+      const has = await one(sql`SELECT COUNT(*) AS n FROM SideProjectPlanItem WHERE project_id = ${a.project.project_id}`);
+      const out = await aiSetup.applyPlan(a, uid(req), req.body?.phases, Number(has?.n ?? 0) === 0);
+      await recordActivity(uid(req), "SIDE_PROJECT_AI_SETUP", `Set up ${a.project.title} with AI (${out.items} plan items, ${out.tasks} tasks)`, "side_project", Number(a.project.project_id));
+      return out;
+    }),
+  );
 
   router.post(
     "/",

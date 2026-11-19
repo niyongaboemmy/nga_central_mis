@@ -15,6 +15,8 @@ export const CAP = {
   ANY: "SIDE_PROJECTS_MANAGE_ANY",
   /** choose a project's classification (migration 132); never a student account */
   CLASSIFY: "SIDE_PROJECTS_CLASSIFY",
+  /** set up a new project from its documents with AI (migration 140); never a student account */
+  AI_SETUP: "SIDE_PROJECTS_AI_SETUP",
 } as const;
 
 /** Teams, plan and tasks (migration 133). */

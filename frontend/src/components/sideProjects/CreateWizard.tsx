@@ -3,13 +3,15 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Calendar, CalendarRange, Check, Flag, GanttChartSquare, Clock, Download, FileCheck2, FileText, FileUp, Github, Globe, Image as ImageIcon, Lightbulb, Link2, Paperclip, PenLine, Rocket, Sparkles, Target, Trash2, UserCheck, Users, Wand2, X,
 } from "lucide-react";
-import { failure, sideProjectsApi, type Category, type Kind, type Status } from "../../api/sideProjects";
+import { aiSetupApi, failure, sideProjectsApi, type AiDraftPhase, type Category, type Kind, type Status } from "../../api/sideProjects";
+import { useToast } from "../../contexts/ToastContext";
+import AiSetup, { type AiApplied } from "./ai/AiSetup";
 import { useSpMe } from "./useMe";
 import { CustomerField } from "./customers/CustomerParts";
 import type { Customer } from "../../api/sideProjects";
 import { CategoryPicker, PersonPicker, TagInput, checkGithub, checkHttps } from "./fields";
 import { Field, FormModal, FormSection, IconInput, OptionCards, TextArea } from "./form";
-import PlanEditor, { MIN_PROJECT_DAYS, addDays, clampEnds, defaultEnds, endsToDates, spanDays } from "./PlanEditor";
+import PlanEditor, { MIN_PROJECT_DAYS, addDays, clampEnds, datesToEnds, defaultEnds, endsToDates, spanDays } from "./PlanEditor";
 import { ABSTRACT_MAX, ABSTRACT_MIN, KIND_META, KINDS, CATEGORY_ICON, Dropzone, ProgressRing, STATUS_META, Spinner, fmtBytes, inputCls, primaryBtn, secondaryBtn, statusColor, useIsDark } from "./ui";
 
 const DOC_ACCEPT = ".pdf,.doc,.docx,.odt,.md,.txt,.ppt,.pptx";
@@ -290,6 +292,17 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
+  const { showToast } = useToast();
+  // Set up with AI (migration 140): "choose" shows the two ways in, when the account may use it.
+  const [setup, setSetup] = useState<"choose" | "ai" | "manual">("choose");
+  const [aiOpened, setAiOpened] = useState(false);
+  const [aiKey, setAiKey] = useState(0);
+  const [aiFrom, setAiFrom] = useState<string | null>(null);
+  const [aiPlan, setAiPlan] = useState<AiDraftPhase[] | null>(null);
+  const [aiCustomer, setAiCustomer] = useState<string | null>(null);
+  const [description, setDescription] = useState("");
+  const [autoSubmit, setAutoSubmit] = useState(false);
+  const [planNote, setPlanNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -321,6 +334,15 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       setCustomer(null);
       setErrors({});
       setDone(false);
+      setSetup("choose");
+      setAiOpened(false);
+      setAiKey((k) => k + 1);
+      setAiFrom(null);
+      setAiPlan(null);
+      setAiCustomer(null);
+      setDescription("");
+      setAutoSubmit(false);
+      setPlanNote(null);
     }
   }, [open, initialStatus]);
 
@@ -392,6 +414,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       const fields: Record<string, unknown> = {
         title: title.trim(),
         abstract: abstract.trim(),
+        description: description.trim() || undefined,
         problemStatement: problem.trim(),
         categoryId,
         techTags: tags,
@@ -427,12 +450,25 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
           failed.push(`${label} (${failure(e).message})`);
         }
       }
+      // The AI plan the owner reviewed: phases, features and their tasks.
+      if (aiPlan?.length) {
+        setPhase("Building the plan");
+        setProgress(0);
+        try {
+          const out = await aiSetupApi.applyPlan(r.id, aiPlan);
+          setPlanNote(`${out.items} plan items and ${out.tasks} tasks`);
+        } catch (e) {
+          failed.push(`the plan (${failure(e).message})`);
+        }
+      }
       if (failed.length) setAttachNote(`Couldn't attach: ${failed.join("; ")}. Add it from the project's tabs.`);
+      showToast(failed.length ? "Project created, with something to finish" : "Project created", failed.length ? "warning" : "success");
       setDone(true);
       setTimeout(() => onCreated(r.id), failed.length ? 3500 : 1100);
     } catch (e) {
       const f = failure(e);
       setErrors({ [f.field ?? "form"]: f.message });
+      showToast(f.message, "error");
       if (f.field === "title" || f.field === "abstract" || f.field === "problemStatement") setStep(0);
       else if (f.field?.startsWith("concept") || f.field === "file") setStep(1);
       else if (f.field === "startDate" || f.field === "targetDate" || f.field?.startsWith("plan")) setStep(3);
@@ -479,7 +515,74 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
   };
   const LAST = STEPS.length - 1;
 
-  const footer = done ? null : (
+  /** Everything the AI drafted goes into the wizard's own fields, so the usual checks still apply. */
+  const applyAi = async (a: AiApplied, then: "review" | "create") => {
+    const d = a.draft;
+    setTitle(d.title);
+    setAbstract(d.abstract);
+    setProblem(d.problemStatement);
+    setDescription(d.description);
+    if (d.categoryId) setCategoryId(d.categoryId);
+    setTags(d.techTags);
+    const holder = (slot: string) => Object.entries(a.slots).find(([, v]) => v === slot)?.[0];
+    const concept = holder("CONCEPT");
+    if (concept && a.files[concept]) {
+      setMode("upload");
+      setFile(a.files[concept]);
+    } else {
+      setMode("write");
+      setFile(null);
+    }
+    setWritten({ ...d.concept });
+    const srsId = holder("SRS");
+    setSrs(srsId ? a.files[srsId] ?? null : null);
+    const planId = holder("IMPLEMENTATION_PLAN");
+    setPlan(planId ? a.files[planId] ?? null : null);
+    const gallery = Object.entries(a.slots)
+      .filter(([, v]) => v === "GALLERY")
+      .map(([id]) => a.files[id])
+      .filter((f): f is File => !!f && !/\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(f.name));
+    setMedia(gallery.slice(0, 10));
+    setMediaErr(gallery.length > 10 ? "Only the first 10 files go to the gallery now. Add the rest later." : null);
+    setGithub(d.githubUrl);
+    setAccess(d.accessUrl);
+    setStart(d.startDate);
+    setTarget(d.targetDate);
+    const total = spanDays(d.startDate, d.targetDate);
+    setEnds(total >= MIN_PROJECT_DAYS ? (d.stageEnds ? clampEnds(datesToEnds(d.startDate, [d.stageEnds.IDEA, d.stageEnds.PLANNING, d.stageEnds.IN_PROGRESS]), total) : defaultEnds(total)) : []);
+    setStatus(startable(d.startIn));
+    if (me?.classify) setKind(d.kind);
+    setAiCustomer(null);
+    if (d.customerName) {
+      try {
+        const found = (await sideProjectsApi.customers(d.customerName)).find((c) => c.name.trim().toLowerCase() === d.customerName.trim().toLowerCase());
+        if (found) {
+          setCustomerMode("CUSTOMER");
+          setCustomer(found);
+        } else setAiCustomer(d.customerName);
+      } catch {
+        setAiCustomer(d.customerName);
+      }
+    }
+    setAiPlan(a.phases.length ? a.phases : null);
+    setAiFrom(a.provider);
+    setErrors({});
+    setSetup("manual");
+    setDir(1);
+    setStep(then === "create" ? LAST : 0);
+    if (then === "create") setAutoSubmit(true);
+    else showToast("Filled in: check each step", "success");
+  };
+  useEffect(() => {
+    if (!autoSubmit) return;
+    setAutoSubmit(false);
+    void submit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSubmit]);
+  const way = setup === "choose" && !me?.aiSetup ? "manual" : setup;
+  const aiTasks = (aiPlan ?? []).reduce((n, p) => n + p.features.reduce((m, f) => m + f.tasks.length, 0), 0);
+
+  const footer = done || way !== "manual" ? null : (
     <>
       <button type="button" className={secondaryBtn} onClick={() => (step === 0 ? onClose() : go(step - 1))} disabled={busy}>
         <ArrowLeft className="h-4 w-4" /> {step === 0 ? "Cancel" : "Back"}
@@ -519,10 +622,23 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
       size="xl"
       icon={Wand2}
       title="New project"
-      subtitle={done ? "All set" : "Five quick steps. The idea, the concept note and the dates are required."}
-      band={done ? undefined : <StepBand step={step} onGo={go} />}
+      subtitle={
+        done
+          ? "All set"
+          : way === "choose"
+            ? "Set it up with AI from your documents, or fill it in yourself."
+            : way === "ai"
+              ? "Add your documents and let AI fill in the whole project."
+              : "Five quick steps. The idea, the concept note and the dates are required."
+      }
+      band={done || way !== "manual" ? undefined : <StepBand step={step} onGo={go} />}
       footer={footer}
     >
+      {aiOpened && me?.aiSetup && !done && (
+        <div hidden={way !== "ai"}>
+          <AiSetup key={aiKey} onApply={applyAi} onManual={() => setSetup("manual")} canClassify={!!me?.classify} />
+        </div>
+      )}
       {done ? (
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative flex flex-col items-center gap-4 py-12 text-center">
           {[...Array(10)].map((_, i) => (
@@ -542,14 +658,57 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
           <div>
             <p className="text-lg font-bold text-slate-900 dark:text-white">{title}</p>
             <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">Added to {STATUS_META[status].label}{attachCount && !attachNote ? ` with ${attachCount} attachment${attachCount > 1 ? "s" : ""}` : ""}</p>
+            {planNote && <p className="mt-1 text-xs font-medium text-blue-700 dark:text-blue-300">AI plan added: {planNote}</p>}
             {attachNote && <p role="alert" className="mx-auto mt-3 max-w-md rounded-2xl bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">{attachNote}</p>}
           </div>
         </motion.div>
-      ) : (
+      ) : way === "choose" ? (
+        <div className="grid gap-4 py-2 sm:grid-cols-2">
+          {([
+            ["ai", Sparkles, "Set up with AI", "Upload all the project's documents, add an extra prompt, and AI fills in everything: the idea, the concept note, dates, files and a plan with tasks. You review it before anything is created."],
+            ["manual", PenLine, "Fill it in myself", "Five short steps: the idea, the concept note, attachments, the timeline, links and team."],
+          ] as const).map(([k, Icon, t, c]) => (
+            <button
+              key={k}
+              type="button"
+              data-autofocus={k === "ai" ? true : undefined}
+              onClick={() => (setSetup(k), k === "ai" && setAiOpened(true))}
+              className={`group flex flex-col gap-3 rounded-3xl border p-5 text-left transition hover:border-blue-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-600/20 ${k === "ai" ? "border-blue-200 bg-blue-50/70 dark:border-blue-500/30 dark:bg-blue-500/10" : "border-slate-900/[0.07] bg-white dark:border-white/10 dark:bg-gray-800/40"}`}
+            >
+              <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${k === "ai" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 dark:bg-gray-700 dark:text-gray-200"}`}>
+                <Icon className="h-5 w-5" aria-hidden />
+              </span>
+              <span>
+                <span className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+                  {t}
+                  {k === "ai" && <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Fastest</span>}
+                </span>
+                <span className="mt-1 block text-xs leading-relaxed text-slate-600 dark:text-gray-300">{c}</span>
+              </span>
+              <span className="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-blue-700 group-hover:gap-2 dark:text-blue-300">
+                Start <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : way === "ai" ? null : (
         <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_280px]">
           <div className="relative min-w-0">
             <AnimatePresence mode="wait" custom={dir}>
               <motion.div key={step} custom={dir} variants={variants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.18 }} className="space-y-6">
+                {aiFrom && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-blue-50 px-4 py-3 dark:bg-blue-500/10">
+                    <Sparkles className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300" aria-hidden />
+                    <p className="min-w-0 flex-1 text-xs text-slate-700 dark:text-gray-200">
+                      <span className="font-semibold">Filled in by AI</span> ({aiFrom}) from your documents. Check it and change anything.
+                      {aiPlan && step === 3 && <span className="block">The plan ({aiPlan.length} phases, {aiTasks} tasks) is added when you create the project.</span>}
+                      {aiCustomer && step === 4 && <span className="block">The documents name the customer <span className="font-semibold">{aiCustomer}</span>: choose or register them below.</span>}
+                    </p>
+                    <button type="button" onClick={() => setSetup("ai")} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100 dark:bg-gray-900 dark:text-blue-300">
+                      <Wand2 className="h-3 w-3" aria-hidden /> Back to AI
+                    </button>
+                  </div>
+                )}
                 {step === 0 && (
                   <>
                     <Field label="Project title" htmlFor="sp-title" counter={{ value: title, min: 3, max: 150 }} error={err("title")}>

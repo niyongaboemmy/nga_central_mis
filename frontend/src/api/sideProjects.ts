@@ -436,7 +436,57 @@ export interface Me {
   classify?: boolean;
   /** "own": a student sees only their customers and their projects' customers */
   customers?: "all" | "own";
+  /** may set a new project up from its documents with AI (SIDE_PROJECTS_AI_SETUP, never a student) */
+  aiSetup?: boolean;
 }
+
+// ------------------------------------------------------------------ set up with AI (migration 140)
+export type AiDocSlot = "CONCEPT" | "SRS" | "IMPLEMENTATION_PLAN" | "GALLERY" | "SKIP";
+export interface AiSetupFile {
+  id: string;
+  name: string;
+  size: number;
+  kind: string | null;
+  pages: number | null;
+  chars: number;
+  status: "READ" | "NO_TEXT" | "REFUSED";
+  note: string | null;
+}
+export interface AiDraftTask { title: string; priority: Priority; estimateHours: number | null }
+export interface AiDraftFeature { title: string; description: string; priority: Priority; estimateHours: number | null; tasks: AiDraftTask[] }
+export interface AiDraftPhase { title: string; description: string; stage: Stage | null; features: AiDraftFeature[] }
+export interface AiDraft {
+  title: string;
+  abstract: string;
+  problemStatement: string;
+  description: string;
+  concept: { users: string; solution: string; impact: string };
+  techTags: string[];
+  categoryId: number | null;
+  category: string;
+  kind: "DELIVERY_STUDIO" | "INDIVIDUAL";
+  customerName: string;
+  githubUrl: string;
+  accessUrl: string;
+  startDate: string;
+  targetDate: string;
+  stageEnds: { IDEA: string; PLANNING: string; IN_PROGRESS: string } | null;
+  startIn: "IDEA" | "PLANNING" | "IN_PROGRESS";
+  documents: Array<{ fileId: string; name: string; slot: AiDocSlot; why: string }>;
+  phases: AiDraftPhase[];
+  questions: string[];
+  assumptions: string[];
+  summary: string;
+}
+export interface AiTurn { role: "user" | "ai"; text: string; at: string }
+export interface AiDraftResult {
+  draft: AiDraft;
+  issues: Array<{ field: string; message: string }>;
+  reply: string;
+  turns: AiTurn[];
+  provider: { name: string; label: string; model: string | null };
+}
+export interface AiProviders { auto: boolean; list: Array<{ name: string; label: string; ready: boolean }> }
 
 export interface FilterOptions {
   years: Array<{ id: number; name: string; isCurrent: boolean }>;
@@ -708,6 +758,22 @@ export interface ReportDraft {
   notifiedAt: string | null;
   projectTitle?: string;
 }
+
+/** AI rounds can take a minute on free tiers: no client timeout. */
+const AI_CALL = { timeout: 0 };
+export const aiSetupApi = {
+  providers: () => api.get<Data<AiProviders>>(`${B}/ai-setup/providers`).then((r) => r.data.data),
+  start: () => api.post<Data<{ id: string; maxFiles: number }>>(`${B}/ai-setup/sessions`).then((r) => r.data.data),
+  addFile: (sid: string, file: File, progress?: Progress) =>
+    api.post<Data<AiSetupFile>>(`${B}/ai-setup/sessions/${sid}/files`, toForm({}, { file }), onUp(progress)).then((r) => r.data.data),
+  removeFile: (sid: string, fileId: string) => api.delete(`${B}/ai-setup/sessions/${sid}/files/${fileId}`),
+  draft: (sid: string, body: { prompt: string; provider: string }) =>
+    api.post<Data<AiDraftResult>>(`${B}/ai-setup/sessions/${sid}/draft`, body, AI_CALL).then((r) => r.data.data),
+  refine: (sid: string, body: { message: string; provider: string; phases?: AiDraftPhase[] }) =>
+    api.post<Data<AiDraftResult>>(`${B}/ai-setup/sessions/${sid}/refine`, body, AI_CALL).then((r) => r.data.data),
+  applyPlan: (projectId: number, phases: AiDraftPhase[]) =>
+    api.post<Data<{ phases: number; items: number; tasks: number }>>(`${B}/${projectId}/ai-plan`, { phases }, { timeout: 60_000 }).then((r) => r.data.data),
+};
 
 const G = "/side-projects/git";
 export const gitApi = {
