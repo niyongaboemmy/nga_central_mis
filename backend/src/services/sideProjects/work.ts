@@ -463,6 +463,11 @@ export async function moveTask(a: ProjectAccess, by: number, taskId: number, bod
   await touch(projectId, await getCurrentAcademicYearId());
   if (to === "IN_REVIEW") await notifyWork(await managerIds(projectId), "side_project_task_review", `Review: ${t.title}`, `A task in ${a.project.title} is ready for review.`, projectId, by);
   if (to === "BLOCKED") await notifyWork(await managerIds(projectId), "side_project_task_blocked", `Blocked: ${t.title}`, note ?? "A task is blocked.", projectId, by);
+  if (to === "DONE") {
+    // Done: whoever created it and the people who plan hear about it.
+    const to2 = [...new Set([...(await managerIds(projectId)), ...(t.created_by ? [Number(t.created_by)] : [])])];
+    await notifyWork(to2, "side_project_task_done", `Done: ${t.title}`, `A task in ${a.project.title} was completed.`, projectId, by);
+  }
   return { status: to };
 }
 
@@ -536,6 +541,22 @@ export async function myTasks(userId: number) {
 }
 
 /** Overdue-task nudges for the sweep: once per task per day, to the assignee. */
+/** Tasks due tomorrow: the assignee is reminded once. */
+export async function nudgeDueSoonTasks() {
+  const today = todayYmd();
+  const rows = await many(sql`
+    SELECT t.task_id AS id, t.title, t.project_id AS projectId, t.assignee_user_id AS assignee
+    FROM SideProjectTask t JOIN SideProject sp ON sp.project_id = t.project_id AND sp.deleted_at IS NULL AND sp.archived_at IS NULL
+    WHERE t.status NOT IN ('DONE', 'CANCELLED') AND t.due_date = DATE_ADD(${today}, INTERVAL 1 DAY) AND t.assignee_user_id IS NOT NULL
+      AND (t.due_soon_nudged_on IS NULL OR t.due_soon_nudged_on <> ${today})
+    LIMIT 500`);
+  for (const r of rows) {
+    await notifyWork([Number(r.assignee)], "side_project_task_due", `Due tomorrow: ${r.title}`, "Finish it or report where it stands.", Number(r.projectId), null);
+    await db.execute(sql`UPDATE SideProjectTask SET due_soon_nudged_on = ${today} WHERE task_id = ${r.id}`);
+  }
+  return rows.length;
+}
+
 export async function nudgeOverdueTasks() {
   const today = todayYmd();
   const rows = await many(sql`

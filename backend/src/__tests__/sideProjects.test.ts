@@ -1284,3 +1284,69 @@ describe("progress reports are written against the plan (migration 138)", () => 
     expect(r.body.field).toBe("blockers");
   });
 });
+
+describe("project notifications", () => {
+  const notes = async (userId: number, kind: string) =>
+    rows(await db.execute(sql`SELECT title, body, link FROM Notification WHERE user_id = ${userId} AND kind = ${kind} ORDER BY notification_id DESC`)) as any[];
+  let p: number;
+  beforeAll(async () => {
+    owners.add(insights);
+    p = await createProject(insights, "Notified project", { supervisorId: String(supervisor) });
+  });
+
+  it("invites (with position), answers, positions and departures", async () => {
+    await api().post(`/side-projects/${p}/members`).set(as(insights)).send({ userId: carol, roleTitle: "QA tester" });
+    expect((await notes(carol, "side_project_invite"))[0].body).toMatch(/as QA tester/);
+    await api().post(`/side-projects/invitations/${p}`).set(as(carol)).send({ accept: true });
+    expect((await notes(insights, "side_project_invite_answer"))[0].title).toMatch(/joined Notified project/);
+    await api().patch(`/side-projects/${p}/members/${carol}`).set(as(insights)).send({ roleTitle: "Test lead" });
+    expect((await notes(carol, "side_project_position"))[0].body).toMatch(/Test lead/);
+    await api().delete(`/side-projects/${p}/members/${carol}`).set(as(carol));
+    expect((await notes(insights, "side_project_member_left"))[0].title).toMatch(/left Notified project/);
+  });
+
+  it("status changes reach the team and the supervisor", async () => {
+    const r = await api().post(`/side-projects/${p}/transition`).set(as(insights)).send({ to: "PLANNING" });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const sup = await notes(supervisor, "side_project_status");
+    expect(sup[0].title).toMatch(/moved to Planning/);
+    expect(sup[0].link).toMatch(/assigned-projects/);
+  });
+
+  it("a report (and its blocker) reaches the owner and the supervisor", async () => {
+    await api().post(`/side-projects/${p}/members`).set(as(insights)).send({ userId: bob });
+    await api().post(`/side-projects/invitations/${p}`).set(as(bob)).send({ accept: true });
+    const r = await api().post(`/side-projects/${p}/updates`).set(as(bob)).send({ did: "Set up the repository", hours: 2, blockers: "No access to the server" });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect((await notes(insights, "side_project_report"))[0].body).toMatch(/reported \(2h\): Set up the repository/);
+    expect((await notes(supervisor, "side_project_report"))[0].link).toMatch(/assigned-projects/);
+    expect((await notes(supervisor, "side_project_report_blocker"))[0].body).toMatch(/No access to the server/);
+    expect(await notes(bob, "side_project_report")).toHaveLength(0); // never the author
+  });
+
+  it("reminds about the closing date, a late project and unreported assigned tasks, once each", async () => {
+    await db.execute(sql`UPDATE SideProject SET target_date = DATE_ADD(UTC_DATE(), INTERVAL 2 DAY) WHERE project_id = ${p}`);
+    await sweepSideProjects();
+    expect((await notes(insights, "side_project_closing"))[0].title).toMatch(/closes in 2 days/);
+    const before = (await notes(insights, "side_project_closing")).length;
+    await sweepSideProjects();
+    expect(rows(await db.execute(sql`SELECT COUNT(*) AS n FROM SideProjectEvent WHERE project_id = ${p} AND type = 'NUDGE_CLOSING'`))[0].n).toBe(1);
+    expect((await notes(insights, "side_project_closing")).length).toBe(before);
+
+    await db.execute(sql`UPDATE SideProject SET target_date = DATE_SUB(UTC_DATE(), INTERVAL 1 DAY) WHERE project_id = ${p}`);
+    await sweepSideProjects();
+    expect((await notes(supervisor, "side_project_late"))[0].title).toMatch(/past its closing date/);
+
+    const item = (await api().post(`/side-projects/${p}/plan/items`).set(as(insights)).send({ title: "Dashboard", kind: "FEATURE" })).body.data.id;
+    await api().post(`/side-projects/${p}/tasks`).set(as(insights)).send({ planItemId: item, title: "Chart of readings", assigneeId: carol === bob ? 0 : bob, dueDate: day(1) });
+    await db.execute(sql`UPDATE SideProjectTask SET created_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 DAY) WHERE project_id = ${p}`);
+    await db.execute(sql`UPDATE SideProjectUpdate SET work_date = DATE_SUB(UTC_DATE(), INTERVAL 10 DAY) WHERE project_id = ${p}`);
+    const res = await sweepSideProjects();
+    expect(res.reportReminders).toBeGreaterThanOrEqual(1);
+    expect((await notes(bob, "side_project_report_reminder"))[0].title).toMatch(/Report on your tasks in Notified project/);
+    expect((await notes(bob, "side_project_task_due"))[0].title).toMatch(/Due tomorrow: Chart of readings/);
+    const again = await sweepSideProjects();
+    expect(again.reportReminders).toBe(0);
+    expect(again.tasksDueSoon).toBe(0);
+  });
+});

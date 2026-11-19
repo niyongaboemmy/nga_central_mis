@@ -5,6 +5,7 @@
 --   SideProjectTaskLog.update_id  task logs created from a report's per-task hours, so task and
 --                           teammate hours include reported work without typing it twice; they
 --                           are rewritten when the report is edited and removed with it.
+--   SideProjectTask.due_soon_nudged_on  the day the assignee was reminded the task is due tomorrow.
 -- Idempotent; MySQL 5.7 and 8.
 CREATE TABLE IF NOT EXISTS `SideProjectUpdateWork` (
   `work_id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -23,4 +24,8 @@ CREATE TABLE IF NOT EXISTS `SideProjectUpdateWork` (
 
 SET @s := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'SideProjectTaskLog' AND COLUMN_NAME = 'update_id') > 0,
   'SELECT 1', 'ALTER TABLE `SideProjectTaskLog` ADD COLUMN `update_id` BIGINT NULL AFTER `note`, ADD KEY `idx_sp_tasklog_update` (`update_id`)');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+
+SET @s := IF((SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'SideProjectTask' AND COLUMN_NAME = 'due_soon_nudged_on') > 0,
+  'SELECT 1', 'ALTER TABLE `SideProjectTask` ADD COLUMN `due_soon_nudged_on` DATE NULL AFTER `overdue_nudged_on`');
 PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
