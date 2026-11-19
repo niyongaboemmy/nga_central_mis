@@ -55,6 +55,7 @@ let answer: any;
 const fake = (name: string, opts: { fail?: boolean } = {}) => ({
   name,
   isConfigured: () => true,
+  supportsStrictSchema: true,
   generateJSON: async (params: any) => {
     calls.push({ provider: name, prompt: params.prompt });
     if (opts.fail) throw Object.assign(new Error("503 overloaded"), { status: 503 });
