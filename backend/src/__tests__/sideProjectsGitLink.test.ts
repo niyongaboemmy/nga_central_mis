@@ -1,0 +1,333 @@
+// Connect with a link (migration 141): no GitHub App on the server. Public and private (token)
+// repositories, the polling sync (branches, commits, pull requests, ETags, rate limits), matching
+// people by MIS email / typed username / "That's me", task suggestions and "pick once", and the
+// draft catching up when it is opened — against the test database with a fake GitHub REST API.
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import crypto from "crypto";
+import express from "express";
+import http from "http";
+import request from "supertest";
+import { sql } from "drizzle-orm";
+import { installFakeFileServer } from "../test/fakeFileServer";
+
+installFakeFileServer();
+
+import { db } from "../db";
+import { createUser } from "../test/fixtures";
+import { buildPdf } from "../test/pdfFixture";
+import { sideProjectsRouter } from "../routes/sideProjects";
+import { sideProjectsGitRouter } from "../routes/sideProjectsGit";
+import type { Viewer } from "../services/sideProjects/access";
+import { setGitHubFetch } from "../services/sideProjects/git/github";
+import { syncDue } from "../services/sideProjects/git/linkMode";
+
+const rows = (r: unknown): any[] => (Array.isArray(r) && Array.isArray(r[0]) ? r[0] : (r as any[]));
+const q = async (s: any) => rows(await db.execute(s));
+const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+
+// ── a fake GitHub REST API (no app) ─────────────────────────────────────────
+const APP_ENV = ["GITHUB_APP_ID", "GITHUB_APP_SLUG", "GITHUB_APP_PRIVATE_KEY", "GITHUB_WEBHOOK_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "GITHUB_API_URL", "GITHUB_TOKEN", "AI_VAULT_KEK_CURRENT", "AI_VAULT_KEK_1"];
+const savedEnv = Object.fromEntries(APP_ENV.map((k) => [k, process.env[k]]));
+const PUB = { id: 810001, full_name: "aimee/orders-public", html_url: "https://github.com/aimee/orders-public", default_branch: "main", private: false };
+const PRIV = { id: 810002, full_name: "studio/orders-private", html_url: "https://github.com/studio/orders-private", default_branch: "main", private: true };
+const TOKEN = "github_pat_11AAAAAAA0123456789_abcdefghijklmnopqrstuvwxyz";
+type FakeRepo = { branches: Array<{ name: string; sha: string }>; commits: Record<string, any[]>; pulls: any[]; files: Record<string, string[]> };
+const fake: Record<string, FakeRepo> = {
+  [PUB.full_name]: { branches: [], commits: {}, pulls: [], files: {} },
+  [PRIV.full_name]: { branches: [], commits: {}, pulls: [], files: {} },
+};
+const calls: Array<{ url: string; auth: string | null; etag: string | null }> = [];
+let limitHit = false;
+const json = (body: unknown, status = 200, headers: Record<string, string> = {}) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...headers } });
+const etagOf = (body: unknown) => `"${crypto.createHash("sha1").update(JSON.stringify(body)).digest("hex")}"`;
+const ghFetch = (async (input: any, init: any = {}) => {
+  const url = new URL(String(input));
+  const auth = init.headers?.Authorization ?? null;
+  const inm = init.headers?.["If-None-Match"] ?? null;
+  calls.push({ url: url.pathname + url.search, auth, etag: inm });
+  if (limitHit) return json({ message: "API rate limit exceeded" }, 403, { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) + 1800) });
+  const m = /^\/repos\/([^/]+\/[^/]+)(\/.*)?$/.exec(url.pathname);
+  if (url.pathname.startsWith("/users/")) {
+    const login = url.pathname.slice(7);
+    if (login === "nobody-here") return json({ message: "Not Found" }, 404);
+    return json({ id: login === "jkarenzi" ? 5501 : 5502, login, name: login, avatar_url: null });
+  }
+  if (!m) return json({ message: "Not Found" }, 404);
+  const meta = m[1] === PUB.full_name ? PUB : m[1] === PRIV.full_name ? PRIV : null;
+  if (!meta || (meta.private && auth !== `Bearer ${TOKEN}`)) return json({ message: "Not Found" }, 404);
+  const r = fake[meta.full_name];
+  const rest = m[2] ?? "";
+  if (!rest) return json(meta);
+  const withEtag = (body: unknown) => {
+    const e = etagOf(body);
+    return inm === e ? new Response(null, { status: 304, headers: { etag: e } }) : json(body, 200, { etag: e });
+  };
+  if (rest === "/branches") return withEtag(r.branches.map((b) => ({ name: b.name, commit: { sha: b.sha } })));
+  if (rest === "/pulls") return withEtag(r.pulls);
+  const one = /^\/commits\/([0-9a-f]+)$/.exec(rest);
+  if (one) return json({ sha: one[1], files: (r.files[one[1]] ?? ["src/app.ts"]).map((filename) => ({ filename })) });
+  if (rest === "/commits") return json([...(r.commits[url.searchParams.get("sha") ?? "main"] ?? [])].reverse());
+  return json({ message: "Not Found" }, 404);
+}) as any;
+
+const sha = (s: string) => crypto.createHash("sha1").update(s).digest("hex");
+/** Push commits onto a fake branch (newest last), moving its head. */
+function push(repo: string, branch: string, list: Array<{ msg: string; login?: string | null; email: string; files?: string[]; minsAgo?: number }>) {
+  const r = fake[repo];
+  r.commits[branch] ??= [];
+  for (const c of list) {
+    const id = sha(`${repo}${branch}${c.msg}${Math.random()}`);
+    r.commits[branch].push({
+      sha: id,
+      html_url: `https://github.com/${repo}/commit/${id}`,
+      author: c.login ? { login: c.login } : null,
+      commit: { message: c.msg, author: { name: c.login ?? c.email, email: c.email, date: new Date(Date.now() - (c.minsAgo ?? 30) * 60_000).toISOString() } },
+    });
+    if (c.files) r.files[id] = c.files;
+  }
+  const head = r.commits[branch][r.commits[branch].length - 1].sha;
+  const b = r.branches.find((x) => x.name === branch);
+  if (b) b.sha = head;
+  else r.branches.push({ name: branch, sha: head });
+  return head;
+}
+
+// ── app under test ─────────────────────────────────────────────────────────
+const users: number[] = [];
+const testAuth = (req: any, res: any, next: any) => {
+  const id = Number(req.get("X-Test-User"));
+  if (!id) return res.status(401).end();
+  req.user = { userId: id, permissions: ["SIDE_PROJECTS_MANAGE_OWN"] };
+  next();
+};
+const viewerOf = async (req: any) => ({ userId: Number(req.user.userId), summary: null, detail: null, review: null, manageAny: false }) as Viewer;
+const app = express();
+app.use(express.json());
+app.use("/side-projects/git", sideProjectsGitRouter(testAuth, viewerOf));
+app.use("/side-projects", sideProjectsRouter(testAuth, (_req, _res, next) => next(), viewerOf, (_req, _res, next) => next()));
+app.use((err: any, _req: any, res: any, _next: any) => res.status(500).json({ success: false, message: String(err?.message ?? err), sql: err?.sqlMessage }));
+let server: http.Server;
+const api = () => request(server);
+const as = (id: number) => ({ "X-Test-User": String(id) });
+
+let lead: number, dev: number, freelancer: number;
+let pubProject: number, privProject: number, key: string;
+const tasks: Record<string, number> = {};
+
+async function createProject(by: number, title: string) {
+  const r = await api()
+    .post("/side-projects")
+    .set(as(by))
+    .field("title", title)
+    .field("problemStatement", "Shops order by phone and WhatsApp so orders get lost and deliveries are late.")
+    .field("abstract", "A web app where shops order vegetables online and farmers see each day's orders in one place.")
+    .field("startDate", day(-20))
+    .field("targetDate", day(60))
+    .field("status", "IN_PROGRESS")
+    .attach("concept", buildPdf("Concept: farm orders portal."), "concept.pdf");
+  expect(r.status, JSON.stringify(r.body)).toBe(200);
+  return r.body.data.id as number;
+}
+async function addTask(pid: number, by: number, title: string, assigneeId: number | null) {
+  const plan = await api().get(`/side-projects/${pid}/plan`).set(as(by));
+  const feature = plan.body.data.items.find((i: any) => i.kind === "FEATURE");
+  const r = await api().post(`/side-projects/${pid}/tasks`).set(as(by)).send({ title, planItemId: feature.id, assigneeId, priority: "MEDIUM" });
+  expect(r.status, JSON.stringify(r.body)).toBe(200);
+  return r.body.data.id as number;
+}
+const status = async (id: number) => (await q(sql`SELECT status FROM SideProjectTask WHERE task_id = ${id}`))[0]?.status;
+
+beforeAll(async () => {
+  for (const k of APP_ENV) delete process.env[k];
+  process.env.GITHUB_API_URL = "https://gh-rest.test";
+  process.env.AI_VAULT_KEK_CURRENT = "1";
+  process.env.AI_VAULT_KEK_1 = crypto.randomBytes(32).toString("base64");
+  setGitHubFetch(ghFetch);
+  server = await new Promise<http.Server>((resolve) => {
+    const srv = http.createServer(app).listen(0, "127.0.0.1", () => resolve(srv));
+  });
+  lead = await createUser({ userType: "STAFF" });
+  dev = await createUser({ userType: "STAFF" });
+  freelancer = await createUser({ userType: "STAFF" });
+  users.push(lead, dev, freelancer);
+  await db.execute(sql`UPDATE User SET email = ${`dev${dev}@studio.test`} WHERE user_id = ${dev}`);
+  pubProject = await createProject(lead, `Orders public ${Date.now()}`);
+  privProject = await createProject(lead, `Orders private ${Date.now()}`);
+  for (const pid of [pubProject, privProject]) {
+    await api().post(`/side-projects/${pid}/plan/generate`).set(as(lead)).send({ template: "web" });
+    for (const u of [dev, freelancer]) {
+      expect((await api().post(`/side-projects/${pid}/members`).set(as(lead)).send({ userId: u, roleKey: "DEVELOPER", roleTitle: "Developer" })).status).toBe(200);
+      expect((await api().post(`/side-projects/invitations/${pid}`).set(as(u)).send({ accept: true })).status).toBe(200);
+    }
+  }
+  tasks.form = await addTask(pubProject, lead, "Build the shop order form", dev);
+  tasks.list = await addTask(pubProject, lead, "Farmer's daily orders list", dev);
+  tasks.pay = await addTask(pubProject, lead, "Mobile money payments", dev);
+});
+
+afterAll(async () => {
+  await new Promise((resolve) => server.close(resolve));
+  setGitHubFetch(null);
+  for (const [k, v] of Object.entries(savedEnv)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  const ul = sql.join(users.map((i) => sql`${i}`), sql`, `);
+  const ids = (await q(sql`SELECT project_id AS id FROM SideProject WHERE owner_user_id IN (${ul})`)).map((r) => Number(r.id));
+  if (ids.length) {
+    const pl = sql.join(ids.map((i) => sql`${i}`), sql`, `);
+    const tl = (await q(sql`SELECT task_id AS id FROM SideProjectTask WHERE project_id IN (${pl})`)).map((r) => Number(r.id));
+    if (tl.length) await db.execute(sql`DELETE FROM SideProjectTaskEvent WHERE task_id IN (${sql.join(tl.map((i) => sql`${i}`), sql`, `)})`);
+    for (const t of ["GitCommit", "GitBranch", "GitPullRequest", "GitRepoLink", "SideProjectReportDraft", "SideProjectTask", "SideProjectPlanItem", "SideProjectDocument", "SideProjectUpdate", "SideProjectEvent", "SideProjectMember", "SideProjectStageLog"]) {
+      await db.execute(sql`DELETE FROM ${sql.raw(t)} WHERE project_id IN (${pl})`).catch(() => undefined);
+    }
+    await db.execute(sql`DELETE FROM SideProject WHERE project_id IN (${pl})`);
+  }
+  await db.execute(sql`DELETE FROM GitIdentity WHERE user_id IN (${ul})`);
+  await db.execute(sql`DELETE FROM GitAuthorMap WHERE key_value IN ('jean@laptop.local', 'jkarenzi')`);
+  await db.execute(sql`DELETE FROM FileAsset WHERE owner_user_id IN (${ul})`);
+  await db.execute(sql`DELETE FROM Notification WHERE user_id IN (${ul})`).catch(() => undefined);
+});
+
+describe("connect with a link (no app)", () => {
+  it("the panel works without the app: link mode on, no app, project link suggested", async () => {
+    await api().patch(`/side-projects/${pubProject}`).set(as(lead)).send({ githubUrl: PUB.html_url });
+    const r = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(lead));
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.data).toMatchObject({ enabled: true, appEnabled: false, vault: true, suggestedUrl: PUB.html_url, link: null });
+    const s = await api().get("/side-projects/git/status").set(as(dev));
+    expect(s.body.data).toMatchObject({ enabled: true, oauth: false });
+  });
+
+  it("a public repository connects at once and the first sync links branches, commits and people", async () => {
+    key = (await q(sql`SELECT task_key FROM SideProject WHERE project_id = ${pubProject}`))[0]?.task_key;
+    // Before connecting: the developer branches off for a task, and works on a branch without a key.
+    push(PUB.full_name, "main", [{ msg: "Initial commit", email: "lead@else.test" }]);
+    push(PUB.full_name, `feat/${key ?? "KEY"}-${tasks.form}-order-form`, [
+      { msg: "Order form fields", email: `dev${dev}@studio.test`, minsAgo: 90 },
+      { msg: "Validate quantities", email: `dev${dev}@studio.test`, minsAgo: 60 },
+      { msg: "Update lockfile", email: `dev${dev}@studio.test`, files: ["package-lock.json"], minsAgo: 50 },
+    ]);
+    push(PUB.full_name, "feat/daily-list", [{ msg: "Daily orders list page", email: `dev${dev}@studio.test`, minsAgo: 20 }]);
+    push(PUB.full_name, "feat/ui-polish", [{ msg: "Tidy the header", login: "jkarenzi", email: "jean@laptop.local", minsAgo: 10 }]);
+    fake[PUB.full_name].pulls = [];
+
+    const notManager = await api().post(`/side-projects/git/projects/${pubProject}/connect-link`).set(as(dev)).send({ url: PUB.html_url });
+    expect(notManager.status).toBe(403);
+    const r = await api().post(`/side-projects/git/projects/${pubProject}/connect-link`).set(as(lead)).send({ url: "github.com/aimee/orders-public.git" });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.data.fullName).toBe(PUB.full_name);
+    expect(r.body.data.sync.commits).toBeGreaterThanOrEqual(5);
+    // Public: no token sent anywhere.
+    expect(calls.every((c) => !c.auth)).toBe(true);
+
+    key = (await q(sql`SELECT task_key FROM SideProject WHERE project_id = ${pubProject}`))[0].task_key;
+    expect(await status(tasks.form)).toBe("IN_PROGRESS");
+    const commits = await q(sql`SELECT title, author_user_id, task_id, counted, branch FROM GitCommit WHERE project_id = ${pubProject} ORDER BY commit_id`);
+    const byTitle = Object.fromEntries(commits.map((c) => [c.title, c]));
+    // Matched by the MIS email, no OAuth.
+    expect(Number(byTitle["Order form fields"].author_user_id)).toBe(dev);
+    expect(Number(byTitle["Order form fields"].task_id)).toBe(tasks.form);
+    // Lockfile-only commit is not work (files were looked up).
+    expect(Number(byTitle["Update lockfile"].counted)).toBe(0);
+    expect(byTitle["Tidy the header"].author_user_id).toBeNull();
+
+    const panel = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(freelancer));
+    expect(panel.body.data.link).toMatchObject({ fullName: PUB.full_name, mode: "LINK", syncError: null });
+    expect(panel.body.data.link.syncedAt).toBeTruthy();
+    // Every teammate sees unmatched authors (to say "That's me").
+    expect(panel.body.data.unclaimed.some((u: any) => u.login === "jkarenzi")).toBe(true);
+  });
+
+  it("the draft suggests the task for the unkeyed branch, and one pick links later commits", async () => {
+    const d = await api().get(`/side-projects/git/projects/${pubProject}/draft?polish=0`).set(as(dev));
+    expect(d.status, JSON.stringify(d.body)).toBe(200);
+    const line = d.body.data.draft.lines.find((l: any) => l.key === "u:feat/daily-list");
+    expect(line.suggestedTaskId).toBe(tasks.list);
+    const e = await api().patch(`/side-projects/git/drafts/${d.body.data.draft.id}`).set(as(dev)).send({ lines: [{ key: line.key, taskId: tasks.list }] });
+    expect(e.status, JSON.stringify(e.body)).toBe(200);
+    expect(Number((await q(sql`SELECT task_id FROM GitBranch WHERE project_id = ${pubProject} AND name = 'feat/daily-list'`))[0].task_id)).toBe(tasks.list);
+    // A later push on that branch needs no key and no pick.
+    push(PUB.full_name, "feat/daily-list", [{ msg: "Sort the list by farmer", email: `dev${dev}@studio.test`, minsAgo: 1 }]);
+    const s = await api().post(`/side-projects/git/projects/${pubProject}/sync`).set(as(dev));
+    expect(s.status, JSON.stringify(s.body)).toBe(200);
+    expect(s.body.data.commits).toBe(1);
+    expect(Number((await q(sql`SELECT task_id FROM GitCommit WHERE project_id = ${pubProject} AND title = 'Sort the list by farmer'`))[0].task_id)).toBe(tasks.list);
+    const again = await api().post(`/side-projects/git/projects/${pubProject}/sync`).set(as(dev));
+    expect(again.status).toBe(429);
+  });
+
+  it("unchanged branches and pull requests cost a free 304; pull requests move tasks", async () => {
+    calls.length = 0;
+    await db.execute(sql`UPDATE GitRepoLink SET synced_at = UTC_TIMESTAMP() - INTERVAL 20 MINUTE WHERE project_id = ${pubProject}`);
+    await syncDue();
+    const branchCall = calls.find((c) => c.url.startsWith(`/repos/${PUB.full_name}/branches`));
+    expect(branchCall?.etag).toBeTruthy();
+    expect(calls.some((c) => c.url.includes("/commits?"))).toBe(false);
+
+    fake[PUB.full_name].pulls = [
+      { number: 4, title: `${key}-${tasks.form} Shop order form`, body: "", html_url: `${PUB.html_url}/pull/4`, state: "open", draft: false, merged_at: null, user: { login: null, id: null }, head: { ref: `feat/${key}-${tasks.form}-order-form`, sha: "f".repeat(40) }, base: { ref: "main" }, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), closed_at: null },
+    ];
+    await db.execute(sql`UPDATE GitRepoLink SET synced_at = UTC_TIMESTAMP() - INTERVAL 20 MINUTE WHERE project_id = ${pubProject}`);
+    await syncDue();
+    const pr = (await q(sql`SELECT state, task_ids FROM GitPullRequest WHERE project_id = ${pubProject} AND number = 4`))[0];
+    expect(pr.state).toBe("OPEN");
+    expect(JSON.parse(pr.task_ids)).toEqual([tasks.form]);
+  });
+
+  it("people match themselves: a typed GitHub username, or That's me on an email", async () => {
+    const bad = await api().put("/side-projects/git/identity").set(as(freelancer)).send({ login: "nobody-here" });
+    expect(bad.status).toBe(400);
+    const ok = await api().put("/side-projects/git/identity").set(as(freelancer)).send({ login: "@jkarenzi" });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(Number((await q(sql`SELECT author_user_id FROM GitCommit WHERE project_id = ${pubProject} AND title = 'Tidy the header'`))[0].author_user_id)).toBe(freelancer);
+    // One GitHub account, one person.
+    const taken = await api().put("/side-projects/git/identity").set(as(dev)).send({ login: "jkarenzi" });
+    expect(taken.status).toBe(409);
+
+    push(PUB.full_name, "feat/ui-polish", [{ msg: "Footer links", login: null, email: "jean@laptop.local", minsAgo: 1 }]);
+    await db.execute(sql`UPDATE GitRepoLink SET synced_at = UTC_TIMESTAMP() - INTERVAL 20 MINUTE WHERE project_id = ${pubProject}`);
+    await syncDue();
+    const claim = await api().post(`/side-projects/git/projects/${pubProject}/authors/claim`).set(as(freelancer)).send({ email: "jean@laptop.local" });
+    expect(claim.status, JSON.stringify(claim.body)).toBe(200);
+    expect(Number((await q(sql`SELECT author_user_id FROM GitCommit WHERE project_id = ${pubProject} AND title = 'Footer links'`))[0].author_user_id)).toBe(freelancer);
+    // Someone else can't take it now.
+    push(PUB.full_name, "feat/ui-polish", [{ msg: "More footer", login: null, email: "jean@laptop.local", minsAgo: 1 }]);
+    const steal = await api().post(`/side-projects/git/projects/${pubProject}/authors/claim`).set(as(dev)).send({ email: "jean@laptop.local" });
+    expect([404, 409]).toContain(steal.status);
+  });
+
+  it("a private repository asks for a token, keeps it sealed, and uses it", async () => {
+    push(PRIV.full_name, "main", [{ msg: "Start", email: `dev${dev}@studio.test` }]);
+    const without = await api().post(`/side-projects/git/projects/${privProject}/connect-link`).set(as(lead)).send({ url: PRIV.html_url });
+    expect(without.status).toBe(400);
+    expect(without.body).toMatchObject({ code: "TOKEN_NEEDED", field: "token" });
+    const junk = await api().post(`/side-projects/git/projects/${privProject}/connect-link`).set(as(lead)).send({ url: PRIV.html_url, token: "hello" });
+    expect(junk.body.field).toBe("token");
+    calls.length = 0;
+    const r = await api().post(`/side-projects/git/projects/${privProject}/connect-link`).set(as(lead)).send({ url: PRIV.html_url, token: TOKEN });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.data.private).toBe(true);
+    expect(calls.filter((c) => c.url.startsWith(`/repos/${PRIV.full_name}`)).every((c) => c.auth === `Bearer ${TOKEN}`)).toBe(true);
+    const stored = (await q(sql`SELECT token_sealed, token_hint FROM GitRepoLink WHERE project_id = ${privProject}`))[0];
+    expect(stored.token_sealed).not.toContain(TOKEN);
+    const panel = await api().get(`/side-projects/git/projects/${privProject}`).set(as(lead));
+    expect(JSON.stringify(panel.body)).not.toContain(TOKEN);
+    expect(panel.body.data.link.tokenHint).toBeTruthy();
+  });
+
+});
+
+describe("rate limit", () => {
+  it("is stored on the link and shown to the team", async () => {
+    limitHit = true;
+    try {
+      await db.execute(sql`UPDATE GitRepoLink SET synced_at = UTC_TIMESTAMP() - INTERVAL 20 MINUTE WHERE project_id = ${privProject}`);
+      await syncDue();
+      const panel = await api().get(`/side-projects/git/projects/${privProject}`).set(as(dev));
+      expect(panel.body.data.link.syncError).toMatch(/hourly limit/);
+    } finally {
+      limitHit = false;
+    }
+  });
+});

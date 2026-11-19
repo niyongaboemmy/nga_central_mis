@@ -228,6 +228,16 @@ export async function refreshDraft(projectId: number, userId: number, now = new 
       if (!cur.taskId && old.taskId) { cur.taskId = old.taskId; cur.itemId = old.itemId; cur.title = old.title; cur.taskStatus = old.taskStatus; }
     }
   }
+  // Unlinked work: suggest the open task whose words best match the branch and commit titles.
+  const open = await many(sql`
+    SELECT task_id, title FROM SideProjectTask WHERE project_id = ${projectId} AND status NOT IN ('DONE','CANCELLED')
+      AND (assignee_user_id = ${userId} OR assignee_user_id IS NULL)`);
+  for (const l of lines.values()) {
+    if (l.taskId) continue;
+    const text = `${l.key.startsWith("u:") ? l.key.slice(2) : ""} ${l.commits.map((c) => c.title).join(" ")} ${l.prs.map((p) => p.title).join(" ")}`;
+    const best = bestTask(text, open.map((t) => ({ id: Number(t.task_id), title: String(t.title) })));
+    if (best) l.suggestedTaskId = best;
+  }
   const list = [...lines.values()].sort((a, b) => (a.taskId ? 0 : 1) - (b.taskId ? 0 : 1));
 
   // Next steps and blockers from the plan and pull requests.
@@ -257,6 +267,48 @@ export async function refreshDraft(projectId: number, userId: number, now = new 
   return openDraft(projectId, userId);
 }
 
+const STOP = new Set(["the", "and", "for", "with", "from", "into", "add", "fix", "feat", "chore", "update", "wip", "task", "branch", "this", "that", "new", "use", "make"]);
+const words = (s: string) =>
+  new Set(
+    s
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .map((w) => w.replace(/(ing|ed|es|s)$/, ""))
+      .filter((w) => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w)),
+  );
+
+/** The task whose title shares the most words with the work (at least one), else null. */
+export function bestTask(text: string, tasks: Array<{ id: number; title: string }>): number | null {
+  const have = words(text);
+  if (!have.size) return null;
+  let best: { id: number; score: number } | null = null;
+  for (const t of tasks) {
+    const tw = words(t.title);
+    if (!tw.size) continue;
+    let hit = 0;
+    for (const w of tw) if (have.has(w)) hit++;
+    const score = hit / Math.sqrt(tw.size);
+    if (hit && (!best || score > best.score)) best = { id: t.id, score };
+  }
+  return best?.id ?? null;
+}
+
+/** A task picked for an unlinked draft line is remembered on the branch and its commits. */
+async function rememberPick(projectId: number, userId: number, l: DraftLine, taskId: number) {
+  const shas = l.commits.map((c) => c.sha);
+  if (shas.length) {
+    await db.execute(sql`UPDATE GitCommit SET task_id = ${taskId} WHERE project_id = ${projectId} AND task_id IS NULL AND sha IN (${sql.join(shas.map((x) => sql`${x}`), sql`, `)})`);
+  }
+  const branch = l.key.startsWith("u:") ? l.key.slice(2) : null;
+  if (branch && branch !== "default" && !branch.startsWith("PR #")) {
+    const link = await linkForProject(projectId);
+    if (link && branch !== link.defaultBranch) {
+      await db.execute(sql`UPDATE GitBranch SET task_id = ${taskId} WHERE project_id = ${projectId} AND name = ${branch} AND task_id IS NULL`);
+      await db.execute(sql`UPDATE GitCommit SET task_id = ${taskId} WHERE project_id = ${projectId} AND branch = ${branch} AND task_id IS NULL AND author_user_id = ${userId}`);
+    }
+  }
+}
+
 /** The person edits their draft (wording, hours, task picks, which lines to include). */
 export async function editDraft(id: number, userId: number, body: any): Promise<Draft> {
   const d = await draftById(id);
@@ -281,6 +333,8 @@ export async function editDraft(id: number, userId: number, body: any): Promise<
         if (patch.taskId && !t) fail(400, "VALIDATION", "That task isn't in this project's plan", "taskId");
         l.taskId = t ? Number(t.task_id) : null;
         l.itemId = t ? Number(t.plan_item_id) : null;
+        // Pick once: the branch (and these commits) stay linked, so the next draft needs no pick.
+        if (t) await rememberPick(d!.projectId, userId, l, Number(t.task_id));
         l.title = t ? t.title : l.title;
         l.taskStatus = t ? t.status : null;
       }

@@ -173,7 +173,7 @@ describe("permissions and seeding", () => {
 
   it("migration 128 seeded the permissions, the student and super-admin grants and the categories", async () => {
     const perms = rows(await db.execute(sql`SELECT name, depths, scopeable, restricted FROM Permission WHERE name LIKE 'SIDE_PROJECTS_%' ORDER BY name`));
-    expect(perms.map((p) => p.name)).toEqual(["SIDE_PROJECTS_ASSIGNED", "SIDE_PROJECTS_CLASSIFY", "SIDE_PROJECTS_MANAGE_ANY", "SIDE_PROJECTS_MANAGE_OWN", "SIDE_PROJECTS_REVIEW", "SIDE_PROJECTS_VIEW"]);
+    expect(perms.map((p) => p.name)).toEqual(["SIDE_PROJECTS_AI_SETUP", "SIDE_PROJECTS_ASSIGNED", "SIDE_PROJECTS_CLASSIFY", "SIDE_PROJECTS_MANAGE_ANY", "SIDE_PROJECTS_MANAGE_OWN", "SIDE_PROJECTS_REVIEW", "SIDE_PROJECTS_VIEW"]);
     const grants = rows(await db.execute(sql`
       SELECT r.name AS role, p.name AS perm FROM RolePermission rp JOIN Role r ON r.role_id = rp.role_id JOIN Permission p ON p.perm_id = rp.perm_id
       WHERE p.name LIKE 'SIDE_PROJECTS_%' AND r.name IN ('STUDENT', 'SUPER_ADMIN')`));

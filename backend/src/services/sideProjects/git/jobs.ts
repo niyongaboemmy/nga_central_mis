@@ -128,10 +128,13 @@ export async function reconcile(now = new Date()): Promise<number> {
 /** One housekeeping pass (every 10 minutes per tenant). */
 export async function gitHousekeeping(now = new Date()) {
   const pending = await processPending();
+  // Repositories connected with their link (no app): poll them (migration 141).
+  const { syncDue } = await import("./linkMode");
+  const synced = await syncDue();
   const notified = await notifyDrafts(now);
   const auto = await autoSubmitDrafts(now);
   const reconciled = kigaliNow(now).getUTCHours() < 5 ? await reconcile(now) : 0;
-  return { pending, notified, auto, reconciled };
+  return { pending, synced, notified, auto, reconciled };
 }
 
 /**

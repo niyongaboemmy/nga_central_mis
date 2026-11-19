@@ -1,5 +1,8 @@
 # GitHub App setup: Git-driven project reporting
 
+
+> **The app is optional (migration 141).** Without it, a project lead pastes the repository's address in the project's GitHub tab. Public repositories connect at once; a private one needs a read-only fine-grained token (Contents and Pull requests: Read-only), which is sealed by the key vault (`AI_VAULT_KEK_*`). The MIS then syncs every 10 minutes, on "Sync now", and when someone opens their report draft. People are matched by their MIS email on commits, the GitHub username they type, or "That's me". Optional `GITHUB_TOKEN` (any account's read-only token) raises the shared limit for public repositories from 60 to 5,000 requests an hour. Set the app up only when you want instant (webhook) updates.
+
 Git-driven reporting (branches, commits and pull requests linked to project tasks, automatic task moves and weekly report drafts) needs one GitHub App. Design: `GIT_AUTOMATED_REPORTING_ANALYSIS.md`. Code: `backend/src/services/sideProjects/git/`, migrations `139` (tenant) and `platform/005`.
 
 There is no GitHub organisation. The app is owned by a personal account, and each repository owner installs it on their own account, for the repositories they choose.
