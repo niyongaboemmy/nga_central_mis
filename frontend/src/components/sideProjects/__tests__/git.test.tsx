@@ -21,6 +21,10 @@ const git = vi.hoisted(() => ({
   setPrefs: vi.fn(),
   disconnect: vi.fn(),
   unlink: vi.fn(),
+  connectLink: vi.fn(),
+  sync: vi.fn(),
+  claimLogin: vi.fn(),
+  claimAuthor: vi.fn(),
 }));
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("../../../api/sideProjects", async (orig) => ({ ...(await orig<object>()), gitApi: git }));
@@ -96,6 +100,14 @@ describe("git parts", () => {
 });
 
 describe("draft card", () => {
+  it("offers the suggested task in one tap and says the branch will follow", async () => {
+    git.draft.mockResolvedValue({ draft: draft(), canPolish: false });
+    git.editDraft.mockResolvedValue(draft({ lines: [{ ...draft().lines[0] }, { ...draft().lines[1], taskId: 27, itemId: 11, title: "Build the shop order form" }] }));
+    render(<DraftCard p={project} plan={plan} meId={2} onSubmitted={() => undefined} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Build the shop order form\?/ }));
+    await waitFor(() => expect(git.editDraft).toHaveBeenCalledWith(5, { lines: [{ key: "u:feat/misc", taskId: 27 }] }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Linked to Build the shop order form. Later commits on this branch follow", "success"));
+  });
   it("shows the draft, lets you change hours and submits", async () => {
     git.draft.mockResolvedValue({ draft: draft(), canPolish: false });
     git.editDraft.mockImplementation(async (_id: number, body: any) => draft({ lines: draft().lines.map((l) => (body.lines?.[0]?.key === l.key ? { ...l, hours: body.lines[0].hours ?? l.hours, hoursSource: "TYPED" } : l)) }));
@@ -144,21 +156,65 @@ const panel = (over: Partial<GitProjectPanel> = {}): GitProjectPanel => ({
 });
 
 describe("GitHub tab", () => {
-  it("not connected: the two steps, then connect a repository", async () => {
-    git.project.mockResolvedValue(panel());
-    git.status.mockResolvedValue({ enabled: true, identity: null, prefs: { aiPolish: true } });
+  it("not connected: paste the address, a private repository asks for a token, then connects", async () => {
+    git.project.mockResolvedValue(panel({ suggestedUrl: "https://github.com/aimee/farm-orders", appEnabled: false, vault: true }));
+    git.status.mockResolvedValue({ enabled: true, oauth: false, identity: null, prefs: { aiPolish: true } });
+    git.connectLink
+      .mockRejectedValueOnce({ response: { data: { code: "TOKEN_NEEDED", field: "token", message: "This repository is private. Add a read-only token to connect it" } } })
+      .mockResolvedValueOnce({ fullName: "aimee/farm-orders", private: true, sync: { commits: 12 } });
+    render(<GitPanel p={project} meId={1} />);
+    expect(screen.getByLabelText("Loading the GitHub connection")).toBeTruthy();
+    // The project's own GitHub link is already filled in.
+    expect(await screen.findByDisplayValue("https://github.com/aimee/farm-orders")).toBeTruthy();
+    expect(screen.getByText("0/3 done")).toBeTruthy();
+    // No app on this server: no install button, no GitHub sign-in.
+    expect(screen.queryByRole("button", { name: /Install on GitHub/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Sign in with GitHub/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Connect$/ }));
+    const tokenBox = await screen.findByLabelText("Read-only token");
+    expect(screen.getByText(/Open GitHub → New fine-grained token/)).toBeTruthy();
+    fireEvent.change(tokenBox, { target: { value: "github_pat_11ABCDEFG0123456789_abcdefghij" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Connect$/ }));
+    await waitFor(() => expect(git.connectLink).toHaveBeenLastCalledWith(9, { url: "https://github.com/aimee/farm-orders", token: "github_pat_11ABCDEFG0123456789_abcdefghij", pathPrefix: null }));
+    expect(toast).toHaveBeenCalledWith("Connected aimee/farm-orders: 12 commits read", "success");
+  });
+  it("a teammate types their GitHub username or says That's me", async () => {
+    git.project.mockResolvedValue(
+      panel({
+        canManage: false,
+        link: { fullName: "aimee/farm-orders", htmlUrl: "https://github.com/aimee/farm-orders", defaultBranch: "main", pathPrefix: null, installationId: null, settings: { automations: true, autoSubmitDays: 2, ignoredPaths: [], aiPolish: true, checks: false }, lastEventAt: null, mode: "LINK", syncedAt: new Date().toISOString(), syncError: null },
+        unclaimed: [{ login: null, email: "aimee@laptop.local", name: "Aimée", commits: 3, last: "" }],
+      }),
+    );
+    git.status.mockResolvedValue({ enabled: true, oauth: false, identity: null, prefs: { aiPolish: true } });
+    git.claimLogin.mockResolvedValue({ login: "aimee-uwera", name: null, avatarUrl: null });
+    git.claimAuthor.mockResolvedValue({});
+    git.sync.mockResolvedValue({ ok: true, commits: 2, prs: 0 });
+    render(<GitPanel p={project} meId={1} />);
+    expect(await screen.findByText(/synced/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Your GitHub username"), { target: { value: "@aimee-uwera" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Save$/ }));
+    await waitFor(() => expect(git.claimLogin).toHaveBeenCalledWith("@aimee-uwera"));
+    expect(toast).toHaveBeenCalledWith("GitHub username saved", "success");
+    fireEvent.click(screen.getByRole("button", { name: /That's me/ }));
+    await waitFor(() => expect(git.claimAuthor).toHaveBeenCalledWith(9, { login: null, email: "aimee@laptop.local" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sync now/ }));
+    await waitFor(() => expect(git.sync).toHaveBeenCalledWith(9));
+    expect(toast).toHaveBeenCalledWith("Synced: 2 new commits, 0 pull request updates", "success");
+  });
+  it("with the app configured, it is offered as the instant option", async () => {
+    git.project.mockResolvedValue(panel({ appEnabled: true }));
+    git.status.mockResolvedValue({ enabled: true, oauth: true, identity: null, prefs: { aiPolish: true } });
     git.installations.mockResolvedValue([{ id: 900, account: "aimee", type: "User", suspended: false }]);
     git.repos.mockResolvedValue([{ id: 7, full_name: "aimee/farm-orders", html_url: "", default_branch: "main", private: true, projectId: null }]);
     git.connect.mockResolvedValue({});
     render(<GitPanel p={project} meId={1} />);
-    expect(screen.getByLabelText("Loading the GitHub connection")).toBeTruthy();
-    expect(await screen.findByText("Install NGA Projects on your GitHub account")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Connect GitHub/ })).toBeTruthy();
-    const connect = await screen.findByRole("button", { name: /Connect repository/ });
+    expect(await screen.findByRole("button", { name: /Sign in with GitHub/ })).toBeTruthy();
+    fireEvent.click(screen.getByText("More options"));
+    const connect = await screen.findByRole("button", { name: /Connect with the app/ });
     await waitFor(() => expect((connect as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(connect);
     await waitFor(() => expect(git.connect).toHaveBeenCalledWith(9, { installationId: 900, repoId: 7, pathPrefix: null }));
-    expect(toast).toHaveBeenCalledWith("Repository connected", "success");
   });
   it("connected: stats, automations and unclaimed authors", async () => {
     git.project.mockResolvedValue(
@@ -172,8 +228,9 @@ describe("GitHub tab", () => {
     git.settings.mockResolvedValue({});
     render(<GitPanel p={project} meId={1} />);
     expect(await screen.findByText("aimee/farm-orders")).toBeTruthy();
+    expect(screen.getByText("3/3 done")).toBeTruthy();
     expect(screen.getByText("Commits linked")).toBeTruthy();
-    expect(screen.getByText(/Your GitHub: @patrick/)).toBeTruthy();
+    expect(screen.getByText(/You are @patrick on GitHub/)).toBeTruthy();
     fireEvent.click(screen.getByRole("switch", { name: "Move tasks from GitHub" }));
     await waitFor(() => expect(git.settings).toHaveBeenCalledWith(9, { automations: false }));
     expect(screen.getByText("Commits from people we couldn't match")).toBeTruthy();

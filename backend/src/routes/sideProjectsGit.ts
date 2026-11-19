@@ -15,6 +15,8 @@ import { taskIdIn } from "../services/sideProjects/work";
 import { recordEditorActivity } from "../services/sideProjects/git/jobs";
 import { apiUrl } from "../services/reminders/webPush";
 import { aiDecisionFor } from "../services/ai/gate";
+import { isVaultConfigured } from "../services/secrets/vault";
+import * as linkMode from "../services/sideProjects/git/linkMode";
 
 /**
  * Git-driven reporting, signed-in side (GIT_AUTOMATED_REPORTING_ANALYSIS.md §10).
@@ -63,7 +65,9 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
       const idt = await one(sql`SELECT login, name, avatar_url, prefs FROM GitIdentity WHERE user_id = ${uid(req)}`);
       let prefs: any = {};
       try { prefs = idt?.prefs ? JSON.parse(idt.prefs) : {}; } catch { prefs = {}; }
-      return { enabled: githubEnabled(), identity: idt ? { login: idt.login, name: idt.name, avatarUrl: idt.avatar_url } : null, prefs: { aiPolish: prefs.aiPolish !== false } };
+      // Link mode (migration 141) needs no app, so GitHub reporting is always available;
+      // "Connect GitHub" (OAuth) only when the app is configured, typing the username always.
+      return { enabled: true, oauth: githubEnabled(), identity: idt ? { login: idt.login, name: idt.name, avatarUrl: idt.avatar_url } : null, prefs: { aiPolish: prefs.aiPolish !== false } };
     }),
   );
   router.get(
@@ -75,6 +79,7 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
       return { url: authorizeUrl(state, apiUrl("/integrations/github/oauth/callback")) };
     }),
   );
+  router.put("/identity", handle(async (req) => linkMode.claimLogin(uid(req), req.body?.login)));
   router.delete(
     "/identity",
     handle(async (req) => {
@@ -139,7 +144,8 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
           SELECT owner_user_id AS user_id FROM SideProject WHERE project_id = ${projectId}
           UNION SELECT user_id FROM SideProjectMember WHERE project_id = ${projectId} AND status = 'ACCEPTED') t
         JOIN User u ON u.user_id = t.user_id LEFT JOIN UserProfile pr ON pr.user_id = u.user_id LEFT JOIN GitIdentity gi ON gi.user_id = u.user_id`);
-      const unclaimed = a.canManage
+      // Every teammate sees unmatched authors, so they can say "That's me"; managers also assign.
+      const unclaimed = a.canEdit
         ? await many(sql`
             SELECT COALESCE(author_login, '') AS login, COALESCE(author_email, '') AS email, MAX(author_name) AS name, COUNT(*) AS commits, ${iso("MAX(authored_at)")} AS last
             FROM GitCommit WHERE project_id = ${projectId} AND author_user_id IS NULL AND counted = 1
@@ -151,13 +157,18 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
         FROM GitCommit c LEFT JOIN UserProfile pr ON pr.user_id = c.author_user_id
         WHERE c.project_id = ${projectId} ORDER BY c.authored_at DESC LIMIT 10`);
       const stats = await one(sql`SELECT COUNT(*) AS commits, COUNT(DISTINCT task_id) AS tasks, ${iso("MAX(pushed_at)")} AS last FROM GitCommit WHERE project_id = ${projectId} AND counted = 1`);
+      const info = link ? await linkMode.linkModeInfo(projectId) : null;
       return {
-        enabled: githubEnabled(),
+        enabled: true,
+        appEnabled: githubEnabled(),
+        vault: isVaultConfigured(),
+        suggestedUrl: (await one(sql`SELECT github_url FROM SideProject WHERE project_id = ${projectId}`))?.github_url ?? null,
         canManage: a.canManage,
         canEdit: a.canEdit,
         taskKey: key,
         link: link
-          ? { fullName: link.fullName, htmlUrl: link.htmlUrl, defaultBranch: link.defaultBranch, pathPrefix: link.pathPrefix, installationId: link.installationId, settings: link.settings, lastEventAt: (await one(sql`SELECT ${iso("last_event_at")} AS last_event_at FROM GitRepoLink WHERE link_id = ${link.linkId}`))?.last_event_at ?? null }
+          ? { fullName: link.fullName, htmlUrl: link.htmlUrl, defaultBranch: link.defaultBranch, pathPrefix: link.pathPrefix, installationId: link.installationId, settings: link.settings,
+              mode: info?.mode ?? "APP", tokenHint: info?.tokenHint ?? null, syncedAt: info?.syncedAt ?? null, syncError: info?.syncError ?? null, lastEventAt: (await one(sql`SELECT ${iso("last_event_at")} AS last_event_at FROM GitRepoLink WHERE link_id = ${link.linkId}`))?.last_event_at ?? null }
           : null,
         settings: link?.settings ?? settingsOf(null, a.project.kind),
         team: team.map((t) => ({ id: Number(t.id), name: t.name, login: t.login ?? null, avatarUrl: t.avatar_url ?? null })),
@@ -200,6 +211,42 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
       await db.execute(sql`UPDATE SideProject SET github_url = ${repo!.html_url} WHERE project_id = ${projectId} AND (github_url IS NULL OR github_url = '')`);
       await ensureTaskKey(projectId);
       return { ok: true, fullName: repo!.full_name };
+    }),
+  );
+  // Connect with the repository's address (no app): public at once, private with a read-only token.
+  router.post(
+    "/projects/:id/connect-link",
+    handle(async (req) => {
+      const a = await teamAccess(req);
+      assertManage(a);
+      return linkMode.connectByUrl(Number(a.project.project_id), uid(req), req.body ?? {});
+    }),
+  );
+  // "Sync now" for link-mode repositories (once every 30 seconds per project).
+  const lastSync = new Map<number, number>();
+  router.post(
+    "/projects/:id/sync",
+    handle(async (req) => {
+      const a = await teamAccess(req);
+      const projectId = Number(a.project.project_id);
+      const link = await one(sql`SELECT link_id, access_mode FROM GitRepoLink WHERE project_id = ${projectId} AND status = 'ACTIVE'`);
+      if (!link) fail(409, "NOT_CONNECTED", "Connect the repository first");
+      if (link!.access_mode !== "LINK") return { ok: true, live: true };
+      if (Date.now() - (lastSync.get(projectId) ?? 0) < 30_000) fail(429, "TOO_SOON", "Synced a moment ago. Try again in half a minute");
+      lastSync.set(projectId, Date.now());
+      try {
+        return { ok: true, ...(await linkMode.syncLink(Number(link!.link_id))) };
+      } catch (e: any) {
+        if (e instanceof linkMode.SyncError) fail(502, "SYNC_FAILED", e.message);
+        throw e;
+      }
+    }),
+  );
+  router.post(
+    "/projects/:id/authors/claim",
+    handle(async (req) => {
+      const a = await teamAccess(req);
+      return linkMode.claimAuthor(Number(a.project.project_id), uid(req), req.body ?? {});
     }),
   );
   router.delete(
@@ -310,6 +357,8 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
     handle(async (req) => {
       const a = await teamAccess(req);
       const projectId = Number(a.project.project_id);
+      // A repository connected with its link is polled: catch up before the draft is built.
+      await linkMode.syncIfStale(projectId, 3);
       let d = await drafts.refreshDraft(projectId, uid(req));
       const canPolish = d ? await mayPolish(req, projectId) : false;
       // Agreed default: AI wording on where the school policy allows (always editable).

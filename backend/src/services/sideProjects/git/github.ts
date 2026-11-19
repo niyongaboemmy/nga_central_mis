@@ -175,3 +175,40 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<{
   // The token is not kept: identity is all the MIS needs.
   return { user: { id: user.id, login: user.login, name: user.name ?? null, avatar_url: user.avatar_url ?? null }, emails };
 }
+
+// ─── Link mode: the plain REST API, without the app (migration 141) ───────────
+
+export interface ApiReply<T = any> {
+  status: number;
+  data: T | null;
+  etag: string | null;
+  /** requests left this hour (GitHub's x-ratelimit-remaining), when known */
+  remaining: number | null;
+  /** when the hourly limit resets (ms since epoch), when known */
+  resetAt: number | null;
+}
+
+/**
+ * One GET on api.github.com for a repository connected with its link: public repositories as
+ * they are (GITHUB_TOKEN, when set, lifts the server's shared 60-an-hour limit), private ones
+ * with their own read-only token. An ETag makes an unchanged answer a free 304.
+ */
+export async function restGet<T = any>(path: string, opts: { token?: string | null; etag?: string | null } = {}): Promise<ApiReply<T>> {
+  const base = (process.env.GITHUB_API_URL || "https://api.github.com").replace(/\/$/, "");
+  const token = opts.token || process.env.GITHUB_TOKEN || null;
+  const headers: Record<string, string> = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "nga-projects" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (opts.etag) headers["If-None-Match"] = opts.etag;
+  const res = await fetchImpl(path.startsWith("http") ? path : `${base}${path}`, { headers });
+  const num = (h: string) => (res.headers.get(h) == null ? null : Number(res.headers.get(h)));
+  const reply = { status: res.status, etag: res.headers.get("etag"), remaining: num("x-ratelimit-remaining"), resetAt: num("x-ratelimit-reset") ? Number(num("x-ratelimit-reset")) * 1000 : null };
+  if (res.status === 304) return { ...reply, data: null };
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  return { ...reply, data };
+}

@@ -681,16 +681,26 @@ export interface GitSettings {
 
 export interface GitStatus {
   enabled: boolean;
+  /** "Connect GitHub" (OAuth) is offered only when the GitHub App is configured */
+  oauth?: boolean;
   identity: { login: string; name: string | null; avatarUrl: string | null } | null;
   prefs: { aiPolish: boolean };
 }
 
 export interface GitProjectPanel {
   enabled: boolean;
+  /** the NGA Projects app is configured (instant updates by webhook) */
+  appEnabled?: boolean;
+  /** the server can keep a private repository's token */
+  vault?: boolean;
+  /** the project's GitHub link, to connect in one click */
+  suggestedUrl?: string | null;
   canManage: boolean;
   canEdit: boolean;
   taskKey: string | null;
-  link: { fullName: string; htmlUrl: string; defaultBranch: string; pathPrefix: string | null; installationId: number | null; settings: GitSettings; lastEventAt: string | null } | null;
+  link: { fullName: string; htmlUrl: string; defaultBranch: string; pathPrefix: string | null; installationId: number | null; settings: GitSettings; lastEventAt: string | null;
+    /** LINK: connected with its address and polled; APP: the GitHub App */
+    mode?: "APP" | "LINK"; tokenHint?: string | null; syncedAt?: string | null; syncError?: string | null } | null;
   settings: GitSettings;
   team: Array<{ id: number; name: string; login: string | null; avatarUrl: string | null }>;
   unclaimed: Array<{ login: string | null; email: string | null; name: string | null; commits: number; last: string }>;
@@ -786,6 +796,14 @@ export const gitApi = {
   installations: () => api.get<Data<GitInstallation[]>>(`${G}/installations`).then((r) => r.data.data),
   repos: (installationId: number) => api.get<Data<GitRepo[]>>(`${G}/installations/${installationId}/repos`).then((r) => r.data.data),
   connect: (id: number, body: { installationId: number; repoId: number; pathPrefix?: string | null }) => api.post(`${G}/projects/${id}/connect`, body),
+  /** Connect with the repository's address (no app); a private one needs a read-only token. */
+  connectLink: (id: number, body: { url: string; token?: string; pathPrefix?: string | null }) =>
+    api.post<Data<{ fullName: string; private: boolean; sync: { commits?: number; prs?: number; branches?: number; error?: string } }>>(`${G}/projects/${id}/connect-link`, body, { timeout: 120_000 }).then((r) => r.data.data),
+  sync: (id: number) => api.post<Data<{ ok: true; commits?: number; prs?: number; branches?: number; live?: boolean }>>(`${G}/projects/${id}/sync`, {}, { timeout: 120_000 }).then((r) => r.data.data),
+  /** "My GitHub username is …" */
+  claimLogin: (login: string) => api.put<Data<{ login: string; name: string | null; avatarUrl: string | null }>>(`${G}/identity`, { login }).then((r) => r.data.data),
+  /** "That's me" on an author the MIS couldn't match */
+  claimAuthor: (id: number, body: { login?: string | null; email?: string | null }) => api.post(`${G}/projects/${id}/authors/claim`, body),
   unlink: (id: number) => api.delete(`${G}/projects/${id}/link`),
   settings: (id: number, body: Partial<GitSettings> & { taskKey?: string; pathPrefix?: string | null }) =>
     api.patch<Data<{ taskKey: string; settings: GitSettings }>>(`${G}/projects/${id}/settings`, body).then((r) => r.data.data),

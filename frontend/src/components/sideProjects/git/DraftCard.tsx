@@ -66,8 +66,10 @@ const DraftCard: React.FC<{ p: ProjectDetail; plan: PlanData | null; meId: numbe
     try {
       const next = await gitApi.editDraft(d.id, { lines: [{ key: l.key, ...patch }] });
       setD(next);
+      return true;
     } catch (e) {
       showToast(failure(e).message, "error");
+      return false;
     } finally {
       setBusy(null);
     }
@@ -168,13 +170,26 @@ const DraftCard: React.FC<{ p: ProjectDetail; plan: PlanData | null; meId: numbe
                   ) : (
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">{l.title}</span>
+                      {(() => {
+                        const sug = l.suggestedTaskId ? myTasks.find((t) => t.id === l.suggestedTaskId) : null;
+                        return sug ? (
+                          <button
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => patchLine(l, { taskId: sug.id }).then((ok) => ok && showToast(`Linked to ${sug.title}. Later commits on this branch follow`, "success"))}
+                            className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                          >
+                            <ListChecks className="h-3 w-3" aria-hidden /> {sug.title}?
+                          </button>
+                        ) : null;
+                      })()}
                       <SelectField
                         aria-label={`Task for ${l.title}`}
                         value={l.suggestedTaskId && !l.taskId ? "" : ""}
                         onChange={(e) => e.target.value && patchLine(l, { taskId: Number(e.target.value) })}
                         className="min-w-[12rem] rounded-full border border-amber-300 bg-white px-2.5 py-1 text-xs dark:border-amber-500/40 dark:bg-gray-900"
                       >
-                        <option value="">{l.suggestedTaskId ? `Pick a task (suggested: ${myTasks.find((t) => t.id === l.suggestedTaskId)?.title ?? "your task in progress"})` : "Pick the task this was for…"}</option>
+                        <option value="">{l.suggestedTaskId ? "Another task…" : "Pick the task this was for…"}</option>
                         {myTasks.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.title}
