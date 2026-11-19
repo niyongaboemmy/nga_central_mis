@@ -46,6 +46,8 @@ import earlyWarningRoutes from "./routes/earlyWarning";
 import competencyRoutes from "./routes/competency";
 import safeguardingRoutes from "./routes/safeguarding";
 import sideProjectsRoutes from "./routes/sideProjects";
+import sideProjectsGitRoutes from "./routes/sideProjectsGit";
+import { githubIntegrationRouter } from "./routes/githubIntegration";
 import desktopRoutes from "./routes/desktop";
 import { desktopToolsRouter } from "./routes/desktopTools";
 import { authenticate } from "./middleware/auth";
@@ -81,6 +83,10 @@ app.use(tenantMiddleware);
 // Anthropic's / OpenAI's servers, with open CORS and no cookies), its 30 MB parser and the
 // request log (token requests carry secrets). services/mcp/routes.ts.
 app.use(mcpPublicRouter());
+
+// GitHub (GIT_AUTOMATED_REPORTING_ANALYSIS.md §9): webhook deliveries are verified over the
+// exact bytes GitHub signed, so this sits before CORS and the JSON parser.
+app.use("/integrations/github", githubIntegrationRouter());
 
 // CORS configuration
 app.use(
@@ -251,6 +257,7 @@ app.use("/cover", staffCoverRoutes);
 app.use("/early-warning", earlyWarningRoutes);
 app.use("/competency", competencyRoutes);
 app.use("/safeguarding", safeguardingRoutes);
+app.use("/side-projects/git", sideProjectsGitRoutes);
 app.use("/side-projects", sideProjectsRoutes);
 
 app.post("/test-post", (req, res) =>

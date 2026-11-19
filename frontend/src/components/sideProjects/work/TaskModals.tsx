@@ -3,6 +3,7 @@ import { ArrowRight, CalendarDays, Check, Clock3, Flag, ListChecks, Pencil, Plus
 import { failure, sideProjectsApi, type PlanData, type Priority, type ProjectDetail, type Task, type TaskDetail, type TaskStatus } from "../../../api/sideProjects";
 import { useToast } from "../../../contexts/ToastContext";
 import { useConfirm } from "../../../contexts/ConfirmContext";
+import { TaskDevSection } from "../git/GitParts";
 import UserAvatar from "../../ui/UserAvatar";
 import SelectField from "../../ui/SelectField";
 import { Field, FormModal, IconInput, TextArea } from "../form";
@@ -434,6 +435,9 @@ export const TaskDetailModal: React.FC<{
                 )}
               </section>
             )}
+
+            {/* Development: branch name to copy, linked branch / PRs / commits */}
+            <TaskDevSection projectId={p.id} taskId={t.id} />
 
             {/* History */}
             <section aria-label="History">

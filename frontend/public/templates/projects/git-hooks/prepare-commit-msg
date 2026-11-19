@@ -1,0 +1,28 @@
+#!/bin/sh
+# NGA Projects: add the task key from your branch name to every commit message.
+#
+#   Branch  feat/FOP-27-build-the-order-form
+#   You     git commit -m "Add quantity validation"
+#   Result  "FOP-27 Add quantity validation"
+#
+# Install (in your repository):
+#   cp prepare-commit-msg .git/hooks/prepare-commit-msg && chmod +x .git/hooks/prepare-commit-msg
+#
+# Nothing is sent anywhere; it only edits the commit message on your machine.
+
+MSG_FILE="$1"
+SOURCE="$2"
+
+# Leave merges, squashes and amended messages alone.
+case "$SOURCE" in merge|squash|commit) exit 0 ;; esac
+
+BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null) || exit 0
+KEY=$(printf '%s' "$BRANCH" | grep -oE '[A-Za-z]{2,5}-[0-9]+' | head -n 1 | tr '[:lower:]' '[:upper:]')
+[ -z "$KEY" ] && exit 0
+
+# Already mentions the key? Keep it as is.
+if grep -qiE "(^|[^A-Za-z0-9])$KEY([^0-9]|$)" "$MSG_FILE"; then exit 0; fi
+
+FIRST=$(head -n 1 "$MSG_FILE")
+REST=$(tail -n +2 "$MSG_FILE")
+printf '%s %s\n%s' "$KEY" "$FIRST" "$REST" > "$MSG_FILE"

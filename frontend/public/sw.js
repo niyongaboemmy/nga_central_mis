@@ -64,7 +64,9 @@ const showFromPayload = async (payload) => {
             { action: "ack", title: "✅ Got it" },
             { action: "snooze", title: "⏰ Snooze 5 min" },
           ]
-        : [],
+        : Array.isArray(data.actions)
+          ? data.actions.slice(0, 2).map((a) => ({ action: String(a.action), title: String(a.title) }))
+          : [],
   };
   await self.registration.showNotification(title, options);
   // Tell open pages so the bell / Now & Next refresh without polling.
@@ -114,6 +116,16 @@ self.addEventListener("notificationclick", (event) => {
   }
   if (event.action === "ack" && data.ackUrl) {
     event.waitUntil(post(data.ackUrl));
+    return;
+  }
+  // Signed one-tap actions (e.g. "Submit as is" on a Git report draft): POST, then confirm.
+  const custom = Array.isArray(data.actions) ? data.actions.find((a) => a.action === event.action && a.url) : null;
+  if (custom) {
+    event.waitUntil(
+      fetch(custom.url, { method: "POST", mode: "cors", credentials: "omit" })
+        .then((r) => self.registration.showNotification(r.ok ? "Report submitted ✅" : "Couldn't submit", { body: r.ok ? "Your team lead has been told." : "Open the MIS to review it.", icon: "/android-chrome-192x192.png", badge: "/badge-96x96.png", data: { url: data.url } }))
+        .catch(() => openOrFocus(data.url || "/")),
+    );
     return;
   }
   // A tap on the body counts as "seen" too.

@@ -18,12 +18,14 @@ export const setNoticePushSender = (fn: PushSender | null) => {
   defaultSender = fn ?? sendWebPush;
 };
 
-export type PersonNotice = NotifyUserInput & { push?: boolean; ttlSeconds?: number };
+/** pushData: extra fields for the push payload, e.g. actions: [{action, title, url?}] (sw.js). */
+export type PersonNotice = NotifyUserInput & { push?: boolean; ttlSeconds?: number; pushData?: Record<string, unknown> };
 
 export const notifyPerson = async (n: PersonNotice, sender: PushSender = defaultSender) => {
   const delivered: string[] = [];
   try {
-    await notifyUser({ ...n, title: n.title.slice(0, 255), body: n.body?.slice(0, 500) });
+    const { pushData: _p, push: _q, ttlSeconds: _t, ...notice } = n;
+    await notifyUser({ ...notice, title: n.title.slice(0, 255), body: n.body?.slice(0, 500) });
     delivered.push("in_app");
   } catch (error) {
     logger.error("[notice] in-app notice failed", { error });
@@ -43,7 +45,7 @@ export const notifyPerson = async (n: PersonNotice, sender: PushSender = default
         dir: "ltr",
         tag: topicFor(`${n.kind}:${n.subjectType}:${n.subjectId}`),
         silent: false,
-        data: { kind: n.kind, url },
+        data: { ...(n.pushData ?? {}), kind: n.kind, url },
       },
     });
     let ok = 0;

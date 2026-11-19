@@ -169,7 +169,7 @@ export async function deleteUpdate(a: ProjectAccess, by: number, updateId: numbe
 /** Reports of a project, newest work first, with their PDFs. */
 export async function reportsOf(projectId: number) {
   const rows = await many(sql`
-    SELECT u.update_id AS id, u.did, u.next_steps AS nextSteps, u.blockers, u.mood, u.hours, u.stage,
+    SELECT u.update_id AS id, u.did, u.next_steps AS nextSteps, u.blockers, u.mood, u.hours, u.stage, u.source,
            DATE_FORMAT(COALESCE(u.work_date, u.created_at), '%Y-%m-%d') AS workDate,
            ${iso("u.created_at")} AS createdAt, ${iso("u.edited_at")} AS editedAt,
            u.author_id AS authorId, ${fullName("p")} AS author

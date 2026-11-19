@@ -9,6 +9,7 @@ import SelectField from "../../ui/SelectField";
 import { Field, FormModal, IconInput, TextArea } from "../form";
 import { ProgressRing, STAGES, STATUS_META, Skeleton, Spinner, cardCls, inputCls, primaryBtn, secondaryBtn, statusColor, useIsDark } from "../ui";
 import { PLAN_FLOW, PLAN_META, PRIORITIES, PRIORITY_META, PriorityMark, StatusChip, TASK_META, fmtDay, todayYmd } from "./meta";
+import { PrChip } from "../git/GitParts";
 import { StatusMenu, type Teammate } from "./WorkPanel";
 import { TaskDetailModal, TaskModal } from "./TaskModals";
 
@@ -417,6 +418,7 @@ const PlanView: React.FC<{ p: ProjectDetail; data: PlanData; team: Teammate[]; m
                   <button key={t.id} type="button" onClick={() => setDetail(t.id)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-white dark:hover:bg-gray-900">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${TASK_META[t.status].dot}`} aria-hidden />
                     <span className={`min-w-0 flex-1 truncate ${t.status === "DONE" ? "text-slate-500 line-through dark:text-gray-400" : "text-slate-700 dark:text-gray-200"}`}>{t.title}</span>
+                    {t.pr && <PrChip pr={t.pr} compact />}
                     <span className="text-slate-500 dark:text-gray-400">{TASK_META[t.status].label}</span>
                     {t.assigneeName && <UserAvatar name={t.assigneeName} userId={t.assigneeId ?? undefined} size={18} decorative />}
                   </button>

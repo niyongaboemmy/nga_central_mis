@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import DraftCard from "../git/DraftCard";
 import {
   DndContext,
   KeyboardSensor,
@@ -282,7 +283,8 @@ const ProgressPanel: React.FC<{
       className={`grid gap-4 ${wide ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}`}
     >
       {/* Reports */}
-      <div className="min-w-0">
+      <div className="min-w-0 space-y-4">
+        {p.rights.edit && <DraftCard p={p} plan={plan ?? null} meId={meId} onSubmitted={onChanged} focus={new URLSearchParams(window.location.search).get("draft") === "1"} />}
         <ReportsFeed p={p} meId={meId} onChanged={onChanged} plan={plan} focusItem={item} onFocusItem={setItem} reportOn={reportOn} />
       </div>
 
