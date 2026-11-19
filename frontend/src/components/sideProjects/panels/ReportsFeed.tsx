@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { SourceBadge } from "../git/GitParts";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertOctagon,
@@ -228,6 +229,12 @@ const WorkChips: React.FC<{ work: ReportWork[]; onPickItem?: (itemId: number) =>
             {w.taskId ? <ListChecks className="h-3 w-3 shrink-0" aria-hidden /> : <CircleDot className="h-3 w-3 shrink-0" aria-hidden />}
             <span className="truncate">{w.taskTitle ?? w.itemTitle}</span>
             {w.hours !== null && <span className="shrink-0 tabular-nums text-blue-700/80 dark:text-blue-300/80">· {w.hours}h</span>}
+            {w.evidence && (w.evidence.commits.length > 0 || w.evidence.prs.length > 0) && (
+              <span className="shrink-0 text-blue-700/80 dark:text-blue-300/80" title={`${w.evidence.commits.length} commits${w.evidence.prs.length ? `, PR ${w.evidence.prs.map((n) => `#${n}`).join(", ")}` : ""} on GitHub`}>
+                · {w.evidence.commits.length} {w.evidence.commits.length === 1 ? "commit" : "commits"}
+                {w.evidence.prs.length ? ` · #${w.evidence.prs.join(", #")}` : ""}
+              </span>
+            )}
             {meta && <span className="shrink-0 text-blue-700/80 dark:text-blue-300/80">→ {meta.label}</span>}
           </button>
         </li>
@@ -301,6 +308,7 @@ const ReportItem: React.FC<{
                   decorative
                 />{" "}
                 {r.author}
+                <SourceBadge source={r.source} />
               </p>
             )}
             <p

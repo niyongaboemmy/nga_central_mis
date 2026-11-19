@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertOctagon, Annoyed, ArrowRight, CalendarDays, Check, Clock3, FileText, Frown, Laugh, ListChecks, Meh, NotebookPen, RotateCcw, Smile, Undo2, X } from "lucide-react";
-import { failure, sideProjectsApi, type PlanData, type ProjectDetail, type Report } from "../../../api/sideProjects";
+import { AlertOctagon, Annoyed, ArrowRight, CalendarDays, Check, Clock3, FileText, Frown, Github, Laugh, ListChecks, Meh, NotebookPen, RotateCcw, Smile, Undo2, X } from "lucide-react";
+import { failure, gitApi, sideProjectsApi, type PlanData, type ProjectDetail, type Report } from "../../../api/sideProjects";
 import PlanWorkPicker, { lineKey, type WorkLineDraft } from "./PlanWorkPicker";
 import { useToast } from "../../../contexts/ToastContext";
 import { Field, FormModal, TextArea } from "../form";
@@ -50,6 +50,27 @@ const ReportModal: React.FC<{
   const [busy, setBusy] = useState(false);
   const [pct, setPct] = useState<number | null>(null);
   const [lines, setLines] = useState<WorkLineDraft[]>([]);
+  const [importing, setImporting] = useState(false);
+
+  /** Fill the report from the person's GitHub work since their last report (their draft). */
+  const importGit = async () => {
+    setImporting(true);
+    try {
+      const { draft } = await gitApi.draft(p.id, { polish: false });
+      const usable = (draft?.lines ?? []).filter((l) => l.include && (l.taskId || l.itemId));
+      if (!draft || !usable.length) {
+        showToast("Nothing new from GitHub since your last report", "info");
+        return;
+      }
+      setF((x) => ({ ...x, did: draft.did || x.did, nextSteps: draft.nextSteps || x.nextSteps, blockers: draft.blockers || x.blockers }));
+      setLines(usable.map((l) => ({ key: lineKey(l.itemId!, l.taskId), itemId: l.itemId!, taskId: l.taskId, hours: l.hours, status: null })));
+      showToast(`Filled from ${draft.commitCount} ${draft.commitCount === 1 ? "commit" : "commits"}. Check the hours`, "success");
+    } catch (e) {
+      showToast(failure(e, "Couldn't read your GitHub work").message, "error");
+    } finally {
+      setImporting(false);
+    }
+  };
   const planReady = !!plan && plan.items.some((i) => i.kind === "FEATURE" && i.status !== "CANCELLED");
   const linesHours = lines.some((l) => l.hours !== null) ? Math.round(lines.reduce((s, l) => s + (l.hours ?? 0), 0) * 2) / 2 : null;
 
@@ -178,6 +199,20 @@ const ReportModal: React.FC<{
     >
       <div className="space-y-6">
         {/* What it covers: reports are written against the plan */}
+        {!report && planReady && (
+          <button
+            type="button"
+            onClick={importGit}
+            disabled={importing || busy}
+            className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-blue-300 bg-blue-50/60 px-3 py-2.5 text-left transition hover:bg-blue-50 disabled:opacity-60 dark:border-blue-500/40 dark:bg-blue-500/10 dark:hover:bg-blue-500/15"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">{importing ? <Spinner className="h-4 w-4" /> : <Github className="h-4 w-4" />}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-blue-900 dark:text-blue-100">Import from GitHub</span>
+              <span className="block text-xs text-blue-800/80 dark:text-blue-200/80">Fill this report from your commits and pull requests since your last report.</span>
+            </span>
+          </button>
+        )}
         {planReady && plan ? (
           <Field label="What did you work on?" icon={ListChecks} hint="Report on your tasks in the plan: add the hours spent on each and move a task if its state changed.">
             <PlanWorkPicker plan={plan} meId={meId} manage={!!p.rights.manage} lines={lines} onChange={(x) => (setLines(x), setErrors((e) => ({ ...e, work: "" })))} error={errors.work} />

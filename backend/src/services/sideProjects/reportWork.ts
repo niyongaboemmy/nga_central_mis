@@ -143,7 +143,7 @@ export async function workOf(updateIds: number[]) {
   if (!updateIds.length) return [];
   const rows = await many(sql`
     SELECT w.update_id AS updateId, w.plan_item_id AS itemId, i.title AS itemTitle, i.kind AS itemKind, ph.title AS phaseTitle,
-           w.task_id AS taskId, t.title AS taskTitle, w.hours, w.status_to AS status
+           w.task_id AS taskId, t.title AS taskTitle, w.hours, w.status_to AS status, w.evidence, w.hours_source AS hoursSource
     FROM SideProjectUpdateWork w
     JOIN SideProjectPlanItem i ON i.item_id = w.plan_item_id
     LEFT JOIN SideProjectPlanItem ph ON ph.item_id = i.parent_id
@@ -160,6 +160,15 @@ export async function workOf(updateIds: number[]) {
     taskTitle: r.taskTitle ?? null,
     hours: r.hours == null ? null : Number(r.hours),
     status: r.status ?? null,
+    // Git evidence behind the line (migration 139): commit SHAs and PR numbers.
+    evidence: (() => {
+      try {
+        return r.evidence ? (JSON.parse(r.evidence) as { commits: string[]; prs: number[] }) : null;
+      } catch {
+        return null;
+      }
+    })(),
+    hoursSource: r.hoursSource ?? null,
   }));
 }
 

@@ -145,6 +145,10 @@ export async function planOf(projectId: number) {
   };
 }
 
+/** True when a JSON id list column (e.g. "[27,128]") contains the task id expression exactly. */
+export const taskIdIn = (col: string, idExpr: string) =>
+  sql.raw(`(${col} LIKE CONCAT('%[', ${idExpr}, ']%') OR ${col} LIKE CONCAT('%[', ${idExpr}, ',%') OR ${col} LIKE CONCAT('%,', ${idExpr}, ',%') OR ${col} LIKE CONCAT('%,', ${idExpr}, ']%'))`);
+
 export async function tasksOf(where: SQL) {
   const r = await many(sql`
     SELECT t.task_id AS id, t.project_id AS projectId, t.plan_item_id AS planItemId, t.title, t.description, t.status, t.priority,
@@ -152,7 +156,10 @@ export async function tasksOf(where: SQL) {
            t.estimate_hours AS estimateHours, t.blocked_reason AS blockedReason, t.sort,
            ${iso("t.started_at")} AS startedAt, ${iso("t.completed_at")} AS completedAt, ${iso("t.status_changed_at")} AS statusChangedAt,
            ${iso("t.created_at")} AS createdAt, t.created_by AS createdBy,
-           (SELECT COALESCE(SUM(l.hours), 0) FROM SideProjectTaskLog l WHERE l.task_id = t.task_id) AS spentHours
+           (SELECT COALESCE(SUM(l.hours), 0) FROM SideProjectTaskLog l WHERE l.task_id = t.task_id) AS spentHours,
+           (SELECT CONCAT(gp.number, '|', gp.state, '|', gp.draft, '|', COALESCE(gp.review_state, ''), '|', gp.url) FROM GitPullRequest gp
+             WHERE gp.project_id = t.project_id AND ${taskIdIn("gp.task_ids", "t.task_id")} ORDER BY gp.opened_at DESC LIMIT 1) AS gitPr,
+           (SELECT COUNT(*) FROM GitCommit gc WHERE gc.task_id = t.task_id AND gc.counted = 1) AS gitCommits
     FROM SideProjectTask t LEFT JOIN UserProfile ap ON ap.user_id = t.assignee_user_id
     WHERE ${where}
     ORDER BY FIELD(t.status, 'IN_PROGRESS', 'BLOCKED', 'IN_REVIEW', 'TODO', 'DONE', 'CANCELLED'), t.sort, t.task_id`);
@@ -168,6 +175,13 @@ export async function tasksOf(where: SQL) {
     spentHours: Number(t.spentHours || 0),
     sort: Number(t.sort),
     overdue: !!t.dueDate && t.dueDate < today && t.status !== "DONE" && t.status !== "CANCELLED",
+    // Git (migration 139): the latest pull request naming this task, and its commit count.
+    pr: t.gitPr
+      ? (([n, state, draft, review, url]: string[]) => ({ number: Number(n), state, draft: draft === "1", reviewState: review || null, url }))(String(t.gitPr).split("|"))
+      : null,
+    commits: Number(t.gitCommits || 0),
+    gitPr: undefined,
+    gitCommits: undefined,
   }));
 }
 

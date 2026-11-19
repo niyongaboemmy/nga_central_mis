@@ -570,6 +570,71 @@ export const MIS_TOOLS: MisTool[] = [
       };
     },
   },
+  {
+    name: "mis_get_my_project_report_drafts",
+    title: "My project report drafts",
+    description:
+      "Lists the person's open progress-report drafts for their projects, written from their GitHub work (tasks, commits, pull requests, estimated hours). Read-only. The person reviews and submits a draft in the MIS (openUrl).",
+    kind: "read",
+    pupilData: false,
+    source: "mis",
+    inputSchema: OBJ({}, []),
+    async run(p) {
+      const { myDrafts } = await import("../sideProjects/git/drafts");
+      const list = await myDrafts(p.userId);
+      return {
+        summary: list.length ? `${list.length} open report draft(s).` : "No open report drafts: nothing new from GitHub since the last report.",
+        result: list.map((d) => ({
+          draft_id: d.id,
+          project: d.projectTitle,
+          what_i_did: cap(d.did, 1500),
+          next_steps: cap(d.nextSteps, 600),
+          blockers: cap(d.blockers, 600),
+          estimated_hours: d.hours,
+          lines: d.lines.filter((l) => l.include).map((l) => ({ task: l.taskId ? l.title : "Unlinked work", hours: l.hours, commits: l.commits.map((c) => c.title).slice(0, 10), pull_requests: l.prs.map((x) => `#${x.number} ${x.state}`) })),
+        })),
+        openUrl: url("/my-projects"),
+      };
+    },
+  },
+  {
+    name: "mis_update_project_report_draft",
+    title: "Reword a project report draft",
+    description:
+      "Rewrites the wording of one of the person's open progress-report drafts (what was done, next steps, blockers). It does NOT submit the report: the person submits it themselves in the MIS (openUrl). Get draft ids from mis_get_my_project_report_drafts.",
+    kind: "draft",
+    pupilData: false,
+    source: "mis",
+    inputSchema: OBJ(
+      {
+        draft_id: { type: "integer", description: "From mis_get_my_project_report_drafts" },
+        what_i_did: { type: "string", maxLength: 2000 },
+        next_steps: { type: "string", maxLength: 1000 },
+        blockers: { type: "string", maxLength: 1000 },
+      },
+      ["draft_id"],
+    ),
+    async run(p, args) {
+      const draftId = id(args, "draft_id")!;
+      const { draftById, editDraft } = await import("../sideProjects/git/drafts");
+      const d = await draftById(draftId);
+      if (!d || d.userId !== p.userId || d.status !== "OPEN") throw new ToolError("NOT_FOUND", "No open draft with that id. Call mis_get_my_project_report_drafts.");
+      const body: Record<string, unknown> = {};
+      const did = text(args, "what_i_did", 2000);
+      const next = text(args, "next_steps", 1000);
+      const blockers = text(args, "blockers", 1000);
+      if (did !== null) body.did = did;
+      if (next !== null) body.nextSteps = next;
+      if (blockers !== null) body.blockers = blockers;
+      if (!Object.keys(body).length) throw new ToolError("BAD_ARGUMENTS", "Give at least one of what_i_did, next_steps or blockers.");
+      await editDraft(draftId, p.userId, body);
+      return {
+        summary: "Draft updated. It is not submitted: review and submit it in the MIS.",
+        result: { draft_id: draftId, submitted: false },
+        openUrl: url(`/my-projects?project=${d.projectId}&tab=progress&draft=1`),
+      };
+    },
+  },
 ];
 
 const BY_NAME = new Map(MIS_TOOLS.map((t) => [t.name, t]));

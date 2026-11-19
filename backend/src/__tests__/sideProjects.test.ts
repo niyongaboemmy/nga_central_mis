@@ -853,7 +853,7 @@ describe("teams, implementation plan and tasks (migration 133)", () => {
   });
 
   it("logs work on a task (assignee or manager) and counts it", async () => {
-    expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/logs`).set(as(bob)).send({ hours: 2, workDate: day(1) })).body.field).toBe("workDate");
+    expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/logs`).set(as(bob)).send({ hours: 2, workDate: day(2) })).body.field).toBe("workDate"); // day(2): beyond the Kigali tolerance of latestToday()
     expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/logs`).set(as(bob)).send({ hours: 0.3 })).body.field).toBe("hours");
     expect((await api().post(`/side-projects/${tp}/tasks/${bobTask}/logs`).set(as(bob)).send({ hours: 2, note: "Sign-in form" })).status).toBe(200);
     const t = (await api().get(`/side-projects/${tp}/tasks/${bobTask}`).set(as(bob))).body.data;

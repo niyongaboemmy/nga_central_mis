@@ -74,6 +74,9 @@ export interface Task {
   createdBy: number | null;
   spentHours: number;
   overdue: boolean;
+  /** Git (migration 139): the latest pull request naming this task, and its commit count. */
+  pr?: { number: number; state: "OPEN" | "MERGED" | "CLOSED"; draft: boolean; reviewState: string | null; url: string } | null;
+  commits?: number;
   projectTitle?: string;
   planItemTitle?: string;
 }
@@ -215,6 +218,8 @@ export interface Report {
   authorId: number;
   author: string;
   files: ReportFile[];
+  /** MANUAL, GIT (a submitted GitHub draft) or GIT_AUTO (submitted by the project's policy). */
+  source?: "MANUAL" | "GIT" | "GIT_AUTO";
   /** The plan items / tasks this report covers (migration 138). */
   work?: ReportWork[];
 }
@@ -228,6 +233,8 @@ export interface ReportWork {
   taskTitle: string | null;
   hours: number | null;
   status: string | null;
+  evidence?: { commits: string[]; prs: number[] } | null;
+  hoursSource?: "TYPED" | "GIT_ESTIMATE" | "EDITOR" | "COMMIT" | null;
 }
 
 /** One line of a report: a feature or a task, the hours spent and an optional new state. */
@@ -610,4 +617,120 @@ export const sideProjectsApi = {
   importSheet: (file: File, dryRun: boolean) =>
     api.post<Data<ImportResult>>(`${B}/admin/import`, toForm({}, { file }), { ...onUp(), params: { dryRun: dryRun ? 1 : 0 } }).then((r) => r.data.data),
   templateUrl: () => `${API_BASE_URL}${B}/import/template.csv?token=${encodeURIComponent(getToken() ?? "")}`,
+};
+
+// ─── Git-driven reporting (GIT_AUTOMATED_REPORTING_ANALYSIS.md) ───────────────
+
+export interface GitSettings {
+  automations: boolean;
+  autoSubmitDays: number | null;
+  ignoredPaths: string[];
+  aiPolish: boolean;
+  checks: boolean;
+}
+
+export interface GitStatus {
+  enabled: boolean;
+  identity: { login: string; name: string | null; avatarUrl: string | null } | null;
+  prefs: { aiPolish: boolean };
+}
+
+export interface GitProjectPanel {
+  enabled: boolean;
+  canManage: boolean;
+  canEdit: boolean;
+  taskKey: string | null;
+  link: { fullName: string; htmlUrl: string; defaultBranch: string; pathPrefix: string | null; installationId: number | null; settings: GitSettings; lastEventAt: string | null } | null;
+  settings: GitSettings;
+  team: Array<{ id: number; name: string; login: string | null; avatarUrl: string | null }>;
+  unclaimed: Array<{ login: string | null; email: string | null; name: string | null; commits: number; last: string }>;
+  prs: Array<{ number: number; title: string; url: string; state: string; draft: boolean; reviewState: string | null; author: string | null; openedAt: string; mergedAt: string | null }>;
+  commits: Array<{ sha: string; title: string; url: string | null; at: string; taskId: number | null; author: string | null }>;
+  stats: { commits: number; tasks: number; last: string | null };
+}
+
+export interface GitInstallation {
+  id: number;
+  account: string;
+  type: string;
+  suspended: boolean;
+}
+
+export interface GitRepo {
+  id: number;
+  full_name: string;
+  html_url: string;
+  default_branch: string;
+  private: boolean;
+  projectId: number | null;
+}
+
+export interface GitTaskDev {
+  key: string;
+  branchName: string;
+  command: string;
+  connected: boolean;
+  branches: Array<{ name: string; createdAt: string; lastCommitAt: string | null; deleted: boolean }>;
+  prs: Array<{ number: number; title: string; url: string; state: string; draft: boolean; reviewState: string | null; openedAt: string; mergedAt: string | null }>;
+  commits: Array<{ sha: string; title: string; url: string | null; at: string; author: string | null }>;
+}
+
+export interface DraftLine {
+  key: string;
+  taskId: number | null;
+  itemId: number | null;
+  title: string;
+  taskStatus: string | null;
+  suggestedTaskId: number | null;
+  commits: Array<{ sha: string; title: string; url: string | null; at: string }>;
+  prs: Array<{ number: number; title: string; state: string; url: string }>;
+  hours: number | null;
+  hoursSource: "GIT_ESTIMATE" | "EDITOR" | "COMMIT" | "TYPED" | null;
+  hoursEdited?: boolean;
+  include: boolean;
+}
+
+export interface ReportDraft {
+  id: number;
+  projectId: number;
+  userId: number;
+  from: string;
+  to: string;
+  did: string;
+  nextSteps: string;
+  blockers: string;
+  lines: DraftLine[];
+  hours: number | null;
+  commitCount: number;
+  edited: boolean;
+  aiPolished: boolean;
+  status: string;
+  notifiedAt: string | null;
+  projectTitle?: string;
+}
+
+const G = "/side-projects/git";
+export const gitApi = {
+  status: () => api.get<Data<GitStatus>>(`${G}/status`).then((r) => r.data.data),
+  connectUrl: (returnTo: string) => api.get<Data<{ url: string }>>(`${G}/connect-url`, { params: { returnTo } }).then((r) => r.data.data.url),
+  disconnect: () => api.delete(`${G}/identity`),
+  setPrefs: (body: { aiPolish: boolean }) => api.patch<Data<{ aiPolish: boolean }>>(`${G}/identity/prefs`, body).then((r) => r.data.data),
+  project: (id: number) => api.get<Data<GitProjectPanel>>(`${G}/projects/${id}`).then((r) => r.data.data),
+  installUrl: (id: number) => api.post<Data<{ url: string }>>(`${G}/projects/${id}/install-url`).then((r) => r.data.data.url),
+  installations: () => api.get<Data<GitInstallation[]>>(`${G}/installations`).then((r) => r.data.data),
+  repos: (installationId: number) => api.get<Data<GitRepo[]>>(`${G}/installations/${installationId}/repos`).then((r) => r.data.data),
+  connect: (id: number, body: { installationId: number; repoId: number; pathPrefix?: string | null }) => api.post(`${G}/projects/${id}/connect`, body),
+  unlink: (id: number) => api.delete(`${G}/projects/${id}/link`),
+  settings: (id: number, body: Partial<GitSettings> & { taskKey?: string; pathPrefix?: string | null }) =>
+    api.patch<Data<{ taskKey: string; settings: GitSettings }>>(`${G}/projects/${id}/settings`, body).then((r) => r.data.data),
+  mapAuthor: (id: number, body: { login?: string | null; email?: string | null; userId?: number; ignore?: boolean }) => api.post(`${G}/projects/${id}/authors`, body),
+  taskDev: (id: number, taskId: number) => api.get<Data<GitTaskDev>>(`${G}/projects/${id}/tasks/${taskId}`).then((r) => r.data.data),
+  draft: (id: number, opts: { polish?: boolean } = {}) =>
+    api.get<Data<{ draft: ReportDraft | null; canPolish: boolean }>>(`${G}/projects/${id}/draft`, { params: opts.polish === false ? { polish: 0 } : {} }).then((r) => r.data.data),
+  editDraft: (draftId: number, body: { did?: string; nextSteps?: string; blockers?: string; lines?: Array<{ key: string; include?: boolean; hours?: number | null; taskId?: number | null }> }) =>
+    api.patch<Data<ReportDraft>>(`${G}/drafts/${draftId}`, body).then((r) => r.data.data),
+  submitDraft: (draftId: number, body: Record<string, unknown> = {}) => api.post<Data<{ reportId: number }>>(`${G}/drafts/${draftId}/submit`, body).then((r) => r.data.data),
+  dismissDraft: (draftId: number) => api.post(`${G}/drafts/${draftId}/dismiss`),
+  polishDraft: (draftId: number) => api.post<Data<ReportDraft>>(`${G}/drafts/${draftId}/polish`).then((r) => r.data.data),
+  myDrafts: () => api.get<Data<ReportDraft[]>>(`${G}/drafts`).then((r) => r.data.data),
 };

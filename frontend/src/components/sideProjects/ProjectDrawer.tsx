@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Briefcase,
   UserCheck,
+  Github,
 } from "lucide-react";
 import {
   failure,
@@ -59,6 +60,7 @@ import {
   useIsDark,
 } from "./ui";
 import KindControl from "./KindControl";
+import GitPanel from "./git/GitPanel";
 import { useSpMe } from "./useMe";
 
 type Tab =
@@ -69,7 +71,7 @@ type Tab =
   | "progress"
   | "timeline"
   | "feedback"
-  | "team";
+  | "team" | "github";
 
 export interface DrawerProps {
   projectId: number | null;
@@ -211,6 +213,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
           count: p.members.length + 1,
           hide: mode === "staff" && p.members.length === 0,
         },
+        { key: "github", icon: Github, label: "GitHub", hide: mode === "staff" && !p.rights.edit },
         { key: "timeline", icon: Clock, label: "Timeline" },
       ]
     : [];
@@ -277,6 +280,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
     feedback: "Comments and reviews",
     team: "Who works on it, their roles and their work",
     timeline: "Everything that happened",
+    github: "The repository, task keys and automations that write your reports",
   };
   const visibleTabs = tabs.filter((t) => !t.hide);
   const current = visibleTabs.find((t) => t.key === tab) ?? visibleTabs[0];
@@ -543,6 +547,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
                       {tab === "feedback" && <FeedbackPanel p={p} meId={meId} staff={mode === "staff"} onChanged={changed} />}
                       {tab === "team" && <TeamPanel p={p} meId={meId} onChanged={changed} onLeft={() => (onChanged(), onClose())} />}
                       {tab === "timeline" && <TimelinePanel p={p} />}
+                      {tab === "github" && <GitPanel p={p} meId={meId} />}
                     </motion.div>
                   </AnimatePresence>
                 )}

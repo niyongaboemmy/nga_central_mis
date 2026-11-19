@@ -8,6 +8,7 @@ import UserAvatar from "../../ui/UserAvatar";
 import SelectField from "../../ui/SelectField";
 import { cardCls, chipCls, primaryBtn } from "../ui";
 import { PriorityMark, StatusChip, TASK_FLOW, TASK_META, fmtDay } from "./meta";
+import { PrChip } from "../git/GitParts";
 import type { Teammate } from "./WorkPanel";
 import { BlockedReason, TaskDetailModal, TaskModal, planOptions } from "./TaskModals";
 
@@ -32,6 +33,7 @@ const TaskCard: React.FC<{ t: Task; itemTitle: string; onOpen: () => void; dragg
         {t.status === "BLOCKED" && t.blockedReason && <p className="mt-1 line-clamp-2 text-[11px] text-red-700 dark:text-red-300">{t.blockedReason}</p>}
         <div className="mt-2.5 flex items-center gap-2">
           <PriorityMark priority={t.priority} />
+          {t.pr && <PrChip pr={t.pr} compact />}
           {t.dueDate && (
             <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums ${t.overdue ? "font-bold text-red-700 dark:text-red-300" : "text-slate-500 dark:text-gray-400"}`}>
               <CalendarDays className="h-3 w-3" aria-hidden /> {fmtDay(t.dueDate)}

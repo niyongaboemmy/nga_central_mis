@@ -98,6 +98,20 @@ if (config.nodeEnv !== "test") {
   setTimeout(runSideProjectsSweep, 4 * 60_000);
   setInterval(runSideProjectsSweep, 12 * 60 * 60 * 1000).unref();
 
+  // Git reporting: retry webhook deliveries, Friday "your report is ready", auto-submit,
+  // nightly reconcile with GitHub (GIT_AUTOMATED_REPORTING_ANALYSIS.md §7, §9.1).
+  const runGitHousekeeping = tenantJob("side-projects-git", async (tenant) => {
+    try {
+      const { gitHousekeeping } = await import("./services/sideProjects/git/jobs");
+      const r = await gitHousekeeping();
+      if (r.pending || r.notified || r.auto || r.reconciled) logger.info(`[side-projects] t${tenant.tid} git: ${r.pending} events, ${r.notified} drafts sent, ${r.auto} auto-submitted, ${r.reconciled} repos reconciled`);
+    } catch (error) {
+      logger.error("[side-projects] git housekeeping failed", { error, tid: tenant.tid });
+    }
+  });
+  setTimeout(runGitHousekeeping, 5 * 60_000);
+  setInterval(runGitHousekeeping, 10 * 60 * 1000).unref();
+
   // My AI: once a day, re-check people's own AI keys used in the last 30 days, so a revoked
   // key or an empty account shows up in My AI before the next call fails.
   const runKeySweep = tenantJob("my-ai-key-sweep", async (tenant) => {
