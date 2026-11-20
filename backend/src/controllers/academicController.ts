@@ -1296,6 +1296,7 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
       color: Subject.color,
       rqf_level: Subject.rqf_level,
       learning_hours: Subject.learning_hours,
+      module_weight: Subject.module_weight,
       grade_id: GradeFromClass.grade_id,
       grade_name: GradeFromClass.name,
       program_id: ProgramFromClass.program_id,
@@ -1349,6 +1350,7 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
         color: row.color,
         rqf_level: row.rqf_level,
         learning_hours: row.learning_hours,
+        module_weight: row.module_weight ?? null,
         grades: [],
       });
     }
@@ -1418,6 +1420,15 @@ export const getSubject = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Subject retrieved successfully", subject[0]);
 });
 
+/** A module weight (report cards): a whole number 1-1000, or null/"" for none. */
+export function parseModuleWeight(v: unknown): number | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null || v === "") return null;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1 || n > 1000) throw new ValidationError("The module weight must be a whole number from 1 to 1000");
+  return n;
+}
+
 export const createSubject = asyncHandler(async (req: any, res: any) => {
   const {
     code,
@@ -1428,11 +1439,13 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
     color,
     rqf_level,
     learning_hours,
+    module_weight,
   } = req.body;
 
   if (!name) {
     throw new ValidationError("Subject name is required");
   }
+  const weight = parseModuleWeight(module_weight);
 
   const sanitizedCode = code ? sanitizeString(code) : undefined;
   const sanitizedName = sanitizeString(name);
@@ -1531,6 +1544,7 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
       color: resolvedColor,
       rqf_level: rqf_level || null,
       learning_hours: learning_hours || null,
+      module_weight: weight ?? null,
     },
     201,
   );
@@ -1548,6 +1562,7 @@ export const updateSubject = asyncHandler(async (req: any, res: any) => {
     color,
     rqf_level,
     learning_hours,
+    module_weight,
   } = req.body;
 
   if (isNaN(subjectId)) {
@@ -1640,6 +1655,10 @@ export const updateSubject = asyncHandler(async (req: any, res: any) => {
 
   if (learning_hours !== undefined) {
     updateData.learning_hours = learning_hours ? sanitizeString(learning_hours) : null;
+  }
+
+  if (module_weight !== undefined) {
+    updateData.module_weight = parseModuleWeight(module_weight) ?? null;
   }
 
   await db

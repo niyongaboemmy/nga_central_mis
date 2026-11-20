@@ -55,6 +55,8 @@ interface SubjectFormData {
   color: string;
   rqf_level: string;
   learning_hours: string;
+  /** The module's weight on TVET report cards (learning hours, credits x 10). */
+  module_weight: number | null;
 }
 
 interface GradeAssignment {
@@ -213,6 +215,25 @@ const SubjectDetailsForm: React.FC<{
     />
     <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 -mt-2">
       RQF Level and Learning Hours appear on this subject's Scheme of Work printed cover page.
+    </p>
+
+    <Input
+      label="Module weight (report cards)"
+      type="number"
+      error={formErrors?.module_weight}
+      min={1}
+      max={1000}
+      value={formData.module_weight ?? ""}
+      onChange={(e) =>
+        setFormData((prev) => ({
+          ...prev,
+          module_weight: e.target.value ? parseInt(e.target.value) : null,
+        }))
+      }
+      placeholder="e.g., 80"
+    />
+    <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 -mt-2">
+      Learning hours of the module (credits x 10, e.g. 30, 60, 80, 120). TVET report cards score FA, CA and IA out of it.
     </p>
 
     <div className="space-y-1.5">
@@ -501,6 +522,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     color: "#3B82F6",
     rqf_level: "",
     learning_hours: "",
+    module_weight: null,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -541,6 +563,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       color: "#3B82F6",
       rqf_level: "",
       learning_hours: "",
+    module_weight: null,
     });
     setFormErrors({});
     setSubmitError(null);
@@ -660,6 +683,12 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       }
     }
 
+    if (formData.module_weight !== null && formData.module_weight !== undefined) {
+      if (!Number.isInteger(formData.module_weight) || formData.module_weight < 1 || formData.module_weight > 1000) {
+        errors.module_weight = "The module weight is a whole number from 1 to 1000";
+      }
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -679,6 +708,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           color: formData.color,
           rqf_level: formData.rqf_level.trim() || null,
           learning_hours: formData.learning_hours.trim() || null,
+          module_weight: formData.module_weight,
           grades: undefined,
           category_name: undefined,
         };
@@ -762,6 +792,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       color: subject.color || "#3B82F6",
       rqf_level: subject.rqf_level || "",
       learning_hours: subject.learning_hours || "",
+      module_weight: subject.module_weight ?? null,
     });
     setCurrentStep(1);
     setShowEditModal(true);
@@ -790,6 +821,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           color: formData.color,
           rqf_level: formData.rqf_level.trim() || null,
           learning_hours: formData.learning_hours.trim() || null,
+          module_weight: formData.module_weight,
         });
 
         // Handle grade assignment - assign/remove based on selections

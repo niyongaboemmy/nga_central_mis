@@ -44,6 +44,8 @@ export interface Subject {
   // Scheme of Work PDF cover-page fields, shared by every scheme of this subject.
   rqf_level?: string | null;
   learning_hours?: string | null;
+  /** The module's weight on TVET report cards (learning hours, credits x 10). */
+  module_weight?: number | null;
   grades?: Array<{
     grade_id: number;
     grade_name: string;
