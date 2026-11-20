@@ -532,7 +532,8 @@ describe("confirming and precedence", () => {
     expect(findRefs("Merge pull request #56 from niyongaboemmy/feat/multi-tenancy", "ANCM", { allowBare: true })).toEqual([]);
     expect(findRefs("feat(side-projects): several repositories (#141)", "ANCM", { allowBare: true })).toEqual([]);
     expect(findRefs("Fix the form for #27 (#141)", "ANCM", { allowBare: true })).toEqual([]);
-    expect(findRefs("Fix the form for task #27 (#141)", "ANCM", { allowBare: true })).toEqual([27]);
+    expect(findRefs("Fix the form for task #27 (#141)", "ANCM", { allowBare: true })).toEqual([]);
+    expect(findRefs("Fix the form, ANCM-27 (#141)", "ANCM", { allowBare: true })).toEqual([27]);
     expect(findRefs("Body: what PR #50 showed, see #52 and Merge pull request #56 in a sentence", "ANCM", { allowBare: true })).toEqual([]);
     expect(closingRefs("Fixes #56 and closes ANCM-27", "ANCM")).toEqual([27]);
     expect(findRefs("Merge pull request #12 from x/feat/ANCM-27-form", "ANCM", { allowBare: true })).toEqual([27]);

@@ -218,7 +218,8 @@ describe("task keys, references and commands", () => {
     // A bare #12 is a GitHub pull request / issue number, never a task.
     expect(findRefs("fix #12 now", "FOP", { allowBare: true })).toEqual([]);
     expect(findRefs("fix task #12 now", "FOP")).toEqual([]);
-    expect(findRefs("fix task #12 now", "FOP", { allowBare: true })).toEqual([12]);
+    expect(findRefs("fix task #12 now", "FOP", { allowBare: true })).toEqual([]);
+    expect(findRefs("Task 53 went to Done when PR #54 merged", "FOP", { allowBare: true })).toEqual([]);
     expect(closingRefs("Closes FOP-27, fixes #30", "FOP")).toEqual([27]);
   });
   it("parses commit commands", () => {
