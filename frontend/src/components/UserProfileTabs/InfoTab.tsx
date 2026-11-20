@@ -31,6 +31,7 @@ interface EditedInfo {
   address?: string;
   external_id?: string;
   phone_number?: string;
+  registration_number?: string;
 }
 
 interface InfoTabProps {
@@ -184,13 +185,26 @@ const InfoTab: React.FC<InfoTabProps> = ({
                 icon={Hash}
                 index={4}
                 className="md:col-span-2"
-                hint="Assigned automatically on creation, or from the Generate Reg. Numbers action in Users Management -- not editable here"
+                error={errors.registration_number}
+                hint={
+                  canManageUsers
+                    ? `Change it to a custom or corrected number (up to 20 letters, digits, - / _ .). It must be unique; generated numbers continue after it.${
+                        (editedInfo.registration_number ?? "") !== (user.profile?.registration_number ?? "") && user.profile?.registration_number
+                          ? ` Was ${user.profile.registration_number}.`
+                          : ""
+                      }`
+                    : "Only someone who can manage users can change it"
+                }
               >
                 <input
                   type="text"
-                  value={user.profile?.registration_number || "Not yet assigned"}
-                  disabled
-                  className={`${inputBase} ${inputOk} ${inputDisabled} font-mono`}
+                  value={canManageUsers ? (editedInfo.registration_number ?? "") : user.profile?.registration_number || "Not yet assigned"}
+                  disabled={!canManageUsers}
+                  maxLength={20}
+                  placeholder="e.g. 120823-0001"
+                  aria-label="Registration number"
+                  onChange={(e) => set({ registration_number: e.target.value })}
+                  className={`${inputBase} ${errors.registration_number ? inputErr : inputOk} ${!canManageUsers ? inputDisabled : ""} font-mono`}
                 />
               </Field>
             )}
