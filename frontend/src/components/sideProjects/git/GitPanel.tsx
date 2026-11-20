@@ -455,8 +455,14 @@ const GitPanel: React.FC<{ p: ProjectDetail; meId: number }> = ({ p, meId }) => 
             )}
           </Step>
 
-          <Step n={3} done={step3} title="Work on a task">
+          <Step n={3} done={step3} title={step3 ? `Commits are reaching tasks (${panel.stats.tasks} ${panel.stats.tasks === 1 ? "task" : "tasks"})` : "Work on a task"}>
             <div className="space-y-2 text-xs text-slate-600 dark:text-gray-300">
+              {!step3 && panel.stats.commits > 0 && (
+                <p className="rounded-xl bg-blue-50/70 px-3 py-2 text-slate-700 dark:bg-blue-500/10 dark:text-gray-200">
+                  <span className="font-semibold">Not done yet:</span> none of the {panel.stats.commits} {panel.stats.commits === 1 ? "commit" : "commits"} so far names a task. This step is
+                  done as soon as one branch, commit or pull request mentions <span className="font-mono font-semibold">{exampleKey}-&lt;task&gt;</span>, or you pick a task in your report draft.
+                </p>
+              )}
               <p>
                 Open a task and copy its branch name. Anything with <span className="font-mono font-semibold">{exampleKey}-27</span> in the branch, commit or pull request title links to task 27. Forgot the key? Pick the task once in your report draft; later commits on that branch follow.
               </p>

@@ -21,6 +21,7 @@ import type { Viewer } from "../services/sideProjects/access";
 import { setGitHubFetch } from "../services/sideProjects/git/github";
 import { syncDue } from "../services/sideProjects/git/linkMode";
 import { suggestAuthor } from "../routes/sideProjectsGit";
+import { findRefs } from "../services/sideProjects/git/refs";
 
 const rows = (r: unknown): any[] => (Array.isArray(r) && Array.isArray(r[0]) ? r[0] : (r as any[]));
 const q = async (s: any) => rows(await db.execute(s));
@@ -456,6 +457,43 @@ describe("teammates' GitHub usernames", () => {
     const panel = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(lead));
     expect(panel.body.data.team.find((t: any) => t.id === freelancer).login).toBeNull();
     expect(panel.body.data.unclaimed.some((u: any) => u.login === "kezo-dev")).toBe(true);
+  });
+});
+
+describe("confirming and precedence", () => {
+  const author = async (title: string) => (await q(sql`SELECT author_user_id FROM GitCommit WHERE project_id = ${pubProject} AND title = ${title}`))[0]?.author_user_id ?? null;
+  const resync = async () => {
+    await db.execute(sql`UPDATE GitRepoLink SET synced_at = UTC_TIMESTAMP() - INTERVAL 20 MINUTE WHERE project_id = ${pubProject}`);
+    await syncDue();
+  };
+
+  it("an unconfirmed username is confirmed from its noreply commit email at the next sync", async () => {
+    // dev is @dev-ghost, linked unverified in the previous block.
+    expect(Number((await q(sql`SELECT github_user_id FROM GitIdentity WHERE user_id = ${dev}`))[0].github_user_id)).toBeLessThan(0);
+    push(PUB.full_name, "main", [{ msg: "Ghost via web", login: "dev-ghost", email: "88001+dev-ghost@users.noreply.github.com", minsAgo: 1 }]);
+    await resync();
+    expect(Number((await q(sql`SELECT github_user_id FROM GitIdentity WHERE user_id = ${dev}`))[0].github_user_id)).toBe(88001);
+    const panel = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(lead));
+    expect(panel.body.data.team.find((t: any) => t.id === dev).verified).toBe(true);
+  });
+
+  it("a linked GitHub login wins over a commit email that belongs to another MIS account", async () => {
+    // The lead's MIS email is someone's personal git email: their commits went to the lead.
+    const leadEmail = `lead${lead}@studio.test`;
+    await db.execute(sql`UPDATE User SET email = ${leadEmail} WHERE user_id = ${lead}`);
+    push(PUB.full_name, "main", [{ msg: "Second account work", login: "kezo-dev", email: leadEmail, minsAgo: 1 }]);
+    await resync();
+    expect(Number(await author("Second account work"))).toBe(lead);
+    const ok = await api().put(`/side-projects/git/projects/${pubProject}/team/${freelancer}/github`).set(as(lead)).send({ login: "kezo-dev" });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(Number(await author("Second account work"))).toBe(freelancer);
+  });
+
+  it("GitHub's pull request numbers are not task references", () => {
+    expect(findRefs("Merge pull request #56 from niyongaboemmy/feat/multi-tenancy", "ANCM", { allowBare: true })).toEqual([]);
+    expect(findRefs("feat(side-projects): several repositories (#141)", "ANCM", { allowBare: true })).toEqual([]);
+    expect(findRefs("Fix the form for #27 (#141)", "ANCM", { allowBare: true })).toEqual([27]);
+    expect(findRefs("Merge pull request #12 from x/feat/ANCM-27-form", "ANCM", { allowBare: true })).toEqual([27]);
   });
 });
 

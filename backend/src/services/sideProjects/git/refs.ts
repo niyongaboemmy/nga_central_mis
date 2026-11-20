@@ -33,7 +33,14 @@ export function findRefs(text: string | null | undefined, key: string | null, op
     const re = new RegExp(`(?:^|[^A-Za-z0-9])${esc(key)}-(\\d{1,10})(?![0-9])`, "gi");
     for (const m of text.matchAll(re)) out.add(Number(m[1]));
   }
-  if (opts.allowBare) for (const m of text.matchAll(/(?:^|[\s(\[/])#(\d{1,10})(?![0-9])/g)) out.add(Number(m[1]));
+  if (opts.allowBare) {
+    // GitHub's own pull request numbers are not task ids: "Merge pull request #56 from ...",
+    // and the "(#141)" a squash merge appends to the title.
+    const plain = text
+      .replace(/^Merge pull request #\d+/gim, "")
+      .replace(/\s\(#\d+\)\s*$/gm, "");
+    for (const m of plain.matchAll(/(?:^|[\s(\[/])#(\d{1,10})(?![0-9])/g)) out.add(Number(m[1]));
+  }
   return [...out];
 }
 
