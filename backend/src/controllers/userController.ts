@@ -1095,6 +1095,10 @@ export const updateUser = asyncHandler(async (req: any, res: any) => {
     if (normalized !== "ACTIVE" && req.user?.userId === userId) {
       throw new ValidationError("Cannot disable your own account");
     }
+    if (normalized === "ACTIVE" && existingUser[0].status !== "ACTIVE") {
+      const refusal = await reactivationRefusal(userId);
+      if (refusal) return res.status(403).json(refusal);
+    }
     updateData.status = normalized;
     deactivated =
       normalized !== "ACTIVE" && existingUser[0].status === "ACTIVE";
@@ -1878,6 +1882,17 @@ export const disableUser = asyncHandler(async (req: any, res: any) => {
 });
 
 // Enable user
+/**
+ * Re-activating someone counts against the package's head-count limit exactly like
+ * creating them (otherwise people could be added inactive and switched on later).
+ * Returns the 403 body when it doesn't fit, or null.
+ */
+async function reactivationRefusal(userId: number): Promise<ReturnType<typeof limitRefusal> | null> {
+  const [p] = await db.select({ t: UserProfile.user_type }).from(UserProfile).where(eq(UserProfile.user_id, userId)).limit(1);
+  const limit = await checkPeopleLimit(p?.t ?? null);
+  return limit.ok ? null : limitRefusal(limit);
+}
+
 export const enableUser = asyncHandler(async (req: any, res: any) => {
   const { id } = req.params;
   const userId = parseInt(id);
@@ -1900,6 +1915,10 @@ export const enableUser = asyncHandler(async (req: any, res: any) => {
 
   if (user.length === 0) {
     throw new NotFoundError("User not found");
+  }
+  if (user[0].status !== "ACTIVE") {
+    const refusal = await reactivationRefusal(userId);
+    if (refusal) return res.status(403).json(refusal);
   }
 
   // Update user status to ACTIVE

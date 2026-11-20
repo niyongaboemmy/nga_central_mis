@@ -14,6 +14,7 @@
 import type { Response } from "express";
 import { PoolConnection, RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import { controlPool } from "../../db/platform";
+import { PRIMARY_TENANT_ID } from "../../vendor/nga-tenancy";
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError } from "../../errors/CustomError";
 import { platformAudit } from "../../tenancy/audit";
 import logger from "../../utils/logger";
@@ -260,6 +261,22 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<number> 
   if (!input.applicationId === !input.tenantId) {
     throw coded(new ValidationError("An invoice is for one application or one school."), "INVALID_INVOICE_TARGET");
   }
+  if (input.tenantId) {
+    // The primary school is never billed (a paid invoice would move it off the top package),
+    // and an archived school can't buy anything.
+    const [[t]] = await controlPool().query<RowDataPacket[]>("SELECT tenant_id, status, is_primary FROM Tenant WHERE tenant_id = ?", [input.tenantId]);
+    if (!t) throw new NotFoundError("School not found");
+    if (Number(t.tenant_id) === PRIMARY_TENANT_ID || Number(t.is_primary) === 1)
+      throw coded(new ValidationError("The primary school is not invoiced."), "PRIMARY_TENANT");
+    if (String(t.status) === "ARCHIVED") throw coded(new ValidationError("An archived school can't be invoiced."), "INVALID_INVOICE_TARGET");
+  }
+  const DAY = /^\d{4}-\d{2}-\d{2}$/;
+  for (const [label, v] of [["periodStart", input.periodStart], ["periodEnd", input.periodEnd]] as const) {
+    if (v != null && v !== "" && (!DAY.test(String(v)) || Number.isNaN(Date.parse(String(v)))))
+      throw coded(new ValidationError(`${label} must be a date (YYYY-MM-DD).`), "INVALID_PERIOD");
+  }
+  if (input.periodStart && input.periodEnd && String(input.periodStart) > String(input.periodEnd))
+    throw coded(new ValidationError("The period must end after it starts."), "INVALID_PERIOD");
   const cycle = input.billingCycle === "YEAR" ? "YEAR" : "TERM";
   const pkg = await packagePrice(input.packageCode, cycle);
   let lines = input.lines !== undefined ? cleanLines(input.lines) : null;
@@ -382,6 +399,10 @@ export async function voidInvoice(id: number, reason: string, actorId: number | 
   assertTransition("invoice", String(row.status), "VOID");
   const note = [row.notes, `Void: ${String(reason).trim()}`].filter(Boolean).join("\n");
   await controlPool().query("UPDATE Invoice SET status = 'VOID', notes = ? WHERE invoice_id = ? AND status = ?", [note, id, row.status]);
+  // A voided change invoice ends the change it paid for, so the school can ask again.
+  await controlPool()
+    .query("UPDATE SubscriptionChange SET status = 'CANCELLED' WHERE invoice_id = ? AND status IN ('PENDING','SCHEDULED')", [id])
+    .catch((err) => logger.warn(`[billing] cancel change of invoice ${id}: ${(err as Error)?.message ?? err}`));
   void platformAudit({ action: "invoice.void", actorUserId: actorId, targetTid: row.tenant_id ?? null, payload: { invoiceId: id, reason } });
   return getInvoice(id, "platform");
 }

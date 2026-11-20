@@ -62,6 +62,10 @@ function refusePrimary(t: RowDataPacket, what: string) {
   if (isPrimaryRow(t)) throw new TenantActionError(409, "PRIMARY_TENANT", `The primary school can't be ${what}.`);
 }
 
+function refuseArchived(t: RowDataPacket, what: string) {
+  if (String(t.status) === "ARCHIVED") throw new TenantActionError(409, "INVALID_TRANSITION", `An archived school can't be ${what}.`);
+}
+
 function needReason(reason: unknown): string {
   const r = typeof reason === "string" ? reason.trim() : "";
   if (r.length < 3) throw new ValidationError("A reason is required.");
@@ -136,6 +140,10 @@ export async function reactivateTenant(tid: number, reason: unknown, actor: Plat
   const t = await tenantRow(tid);
   refusePrimary(t, "reactivated");
   if (String(t.status) === "ACTIVE") throw new TenantActionError(409, "INVALID_TRANSITION", "This school is already active.");
+  // Only a school in grace or suspended comes back: a PENDING one is still being set up.
+  if (!["GRACE", "SUSPENDED"].includes(String(t.status))) {
+    throw new TenantActionError(409, "INVALID_TRANSITION", `A ${String(t.status).toLowerCase()} school can't be reactivated.`);
+  }
   await reactivateTenantRow(tid, why);
   await publishTenantChanged(tid);
   await platformAudit({ action: "tenant.reactivate", actorUserId: actor.userId, ip: actor.ip ?? null, targetTid: tid, payload: { reason: why, from: t.status } });
@@ -259,6 +267,10 @@ export async function changeTenantPackage(tid: number, code: unknown, reason: un
   }
   const from = String(t.package_code);
   await setTenantPackage(tid, pkgCode);
+  // The operator's choice wins: a change the school asked for earlier must not re-apply later.
+  await controlPool()
+    .query("UPDATE SubscriptionChange SET status = 'CANCELLED' WHERE tenant_id = ? AND status IN ('PENDING','SCHEDULED')", [tid])
+    .catch((err) => logger.warn(`[tenantMgmt] cancel pending changes t${tid}: ${(err as Error)?.message ?? err}`));
   await publishTenantChanged(tid, { packageChanged: from !== pkgCode });
   await platformAudit({ action: "tenant.package", actorUserId: actor.userId, ip: actor.ip ?? null, targetTid: tid, payload: { reason: why, from, to: pkgCode } });
 }
@@ -282,8 +294,10 @@ export async function addOverride(
   if (body.expiresAt) {
     expires = new Date(String(body.expiresAt));
     if (Number.isNaN(expires.getTime())) throw new ValidationError("expiresAt must be a date.");
+    if (expires.getTime() <= Date.now()) throw new ValidationError("The expiry date must be in the future.");
   }
   const t = await tenantRow(tid);
+  refuseArchived(t, "given overrides");
   if (isPrimaryRow(t) && (!enabled || (kind === "LIMIT" && value !== null))) {
     throw new TenantActionError(409, "PRIMARY_TENANT", "The primary school's entitlements can't be reduced.");
   }
@@ -299,6 +313,7 @@ export async function addOverride(
 export async function removeOverride(tid: number, overrideId: number, actor: PlatformActorInfo) {
   const [rows] = await controlPool().query<RowDataPacket[]>("SELECT * FROM TenantEntitlementOverride WHERE id = ? AND tenant_id = ?", [overrideId, tid]);
   if (!rows[0]) throw new NotFoundError("Override not found");
+  refuseArchived(await tenantRow(tid), "changed");
   await controlPool().query("DELETE FROM TenantEntitlementOverride WHERE id = ?", [overrideId]);
   await publishTenantChanged(tid, { packageChanged: String(rows[0].ent_key) in APP_KEYS });
   await platformAudit({ action: "tenant.override.remove", actorUserId: actor.userId, ip: actor.ip ?? null, targetTid: tid, payload: { id: overrideId, key: rows[0].ent_key } });
@@ -307,8 +322,11 @@ export async function removeOverride(tid: number, overrideId: number, actor: Pla
 /** An operator's TenantSystem OVERRIDE row (never touched by package derivation). */
 export async function setTenantApp(tid: number, systemId: number, status: unknown, actor: PlatformActorInfo) {
   if (status !== "ACTIVE" && status !== "DISABLED") throw new ValidationError("status must be ACTIVE or DISABLED.");
+  if (!Number.isInteger(systemId) || systemId <= 0) throw new ValidationError("Choose an app.");
   const t = await tenantRow(tid);
   refusePrimary(t, "given app overrides (it has every app)");
+  // Archive switched every app off; turning one back on would undo it.
+  refuseArchived(t, "given apps");
   await controlPool().query(
     "INSERT INTO TenantSystem (tenant_id, system_id, status, source) VALUES (?, ?, ?, 'OVERRIDE') ON DUPLICATE KEY UPDATE status = VALUES(status), source = 'OVERRIDE'",
     [tid, systemId, status],

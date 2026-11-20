@@ -170,7 +170,7 @@ router.post(
     if (tid === 1 || Number(t.is_primary) === 1) throw new TenantActionError(409, "PRIMARY_TENANT", "The primary school has no subscription to change.");
     const code = typeof req.body?.packageCode === "string" ? req.body.packageCode.trim().toLowerCase() : "";
     const to = code ? await packageRow(code) : null;
-    if (!to || Number(to.is_active) !== 1) throw new ValidationError("Choose an available package.");
+    if (!to || Number(to.is_active) !== 1 || Number(to.is_public ?? 1) !== 1) throw new ValidationError("Choose an available package.");
     const fromCode = String(t.package_code);
     if (fromCode === code) throw new ValidationError("This is already your package.");
     const from = await packageRow(fromCode);

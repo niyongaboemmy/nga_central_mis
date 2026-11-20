@@ -43,7 +43,8 @@ import {
   Building2,
   School,
 } from "lucide-react";
-import LOGO from "../assets/logo.png";
+import TenantLogo from "./brand/TenantLogo";
+import { loadBranding, readLastSchool } from "../hooks/useTenantBranding";
 
 interface LoginProps {
   onLoginSuccess?: () => void;
@@ -612,22 +613,47 @@ const FeatureCarousel = () => {
 };
 
 // Branded left panel — desktop split-screen; compact banner on mobile
+/**
+ * The sign-in page shows the logo of the school this browser last signed in to
+ * (remembered by useTenantBranding), refreshed from GET /tenant/branding; NGA's
+ * shield otherwise.
+ */
+const useLoginBrand = () => {
+  const [brand, setBrand] = useState(() => {
+    const last = readLastSchool();
+    return last
+      ? { isPrimary: last.isPrimary, name: last.isPrimary ? "NGA MIS" : last.name, logoUrl: last.logoUrl }
+      : { isPrimary: true, name: "NGA MIS", logoUrl: null as string | null };
+  });
+  useEffect(() => {
+    let alive = true;
+    void loadBranding(readLastSchool()?.slug ?? "").then((d) => alive && d && setBrand((b) => ({ ...b, logoUrl: d.logo_url ?? null })));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return brand;
+};
+
 const LoginBrandPanel = () => {
+  const brand = useLoginBrand();
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 dark:from-blue-950 dark:via-blue-900 dark:to-blue-950">
       {/* Compact mobile banner */}
       <div className="lg:hidden relative z-10 flex items-center justify-between gap-3 px-5 py-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center p-1.5 shrink-0">
-            <img
-              src={LOGO}
-              alt="NGA MIS"
-              className="w-full h-full object-contain"
-            />
+            <TenantLogo src={brand.logoUrl} name={brand.name} isPrimary={brand.isPrimary} className="w-full h-full" rounded="rounded-md" />
           </div>
           <div>
-            <p className="text-white font-bold leading-tight tracking-tight">
-              NGA<span className="font-light text-blue-100"> MIS</span>
+            <p className="text-white font-bold leading-tight tracking-tight truncate max-w-[12rem]">
+              {brand.isPrimary ? (
+                <>
+                  NGA<span className="font-light text-blue-100"> MIS</span>
+                </>
+              ) : (
+                brand.name
+              )}
             </p>
           </div>
         </div>
@@ -664,15 +690,17 @@ const LoginBrandPanel = () => {
                 whileHover={{ scale: 1.05, rotate: -3 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
-                <img
-                  src={LOGO}
-                  alt="NGA MIS"
-                  className="w-full h-full object-contain"
-                />
+                <TenantLogo src={brand.logoUrl} name={brand.name} isPrimary={brand.isPrimary} className="w-full h-full" rounded="rounded-lg" />
               </motion.div>
               <div className="leading-tight">
-                <span className="text-white text-xl font-bold tracking-tight block">
-                  NGA<span className="font-light text-blue-100">MIS</span>
+                <span className="text-white text-xl font-bold tracking-tight block truncate max-w-[18rem]">
+                  {brand.isPrimary ? (
+                    <>
+                      NGA<span className="font-light text-blue-100">MIS</span>
+                    </>
+                  ) : (
+                    brand.name
+                  )}
                 </span>
               </div>
             </div>

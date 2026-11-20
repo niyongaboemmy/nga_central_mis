@@ -5,6 +5,7 @@ import { School, Server, Activity, Database, GraduationCap, LayoutGrid, MonitorC
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
 import { useTenantBranding } from "../../hooks/useTenantBranding";
+import TenantLogo from "../brand/TenantLogo";
 import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
 import { requestAppsDialog } from "../apps/openAppsDialog";
@@ -1098,9 +1099,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       >
         {!isCollapsed && (
           <div className="flex items-center space-x-3 min-w-0">
-            {/* Another school's name and logo; NGA keeps the original header. */}
-            {!brand.isPrimary && brand.logoUrl && (
-              <img src={brand.logoUrl} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+            {/* The signed-in school's logo (NGA falls back to its shield). */}
+            {(brand.isPrimary || brand.logoUrl) && (
+              <TenantLogo src={brand.logoUrl} name={brand.name} isPrimary={brand.isPrimary} className="w-7 h-7" />
             )}
             <span className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark truncate" title={brand.isPrimary ? undefined : brand.name}>
               {brand.isPrimary ? "Menus" : brand.name}

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
-import LOGO from "../../assets/logo.png";
+import TenantLogo from "../brand/TenantLogo";
 import { useTenantBranding } from "../../hooks/useTenantBranding";
 import { useUser } from "../../contexts/UserContext";
 import SystemsMenu from "./SystemsMenu";
@@ -43,16 +43,12 @@ const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const location = useLocation();
   const { user, logout } = useUser();
-  // NGA keeps its own mark; any other school shows its name and logo (MIS-S10).
+  // The signed-in school's name and logo (MIS-S10).
   const brand = useTenantBranding();
-  const brandMark = (size: string) =>
-    brand.isPrimary || brand.logoUrl ? (
-      <img src={brand.isPrimary ? LOGO : brand.logoUrl!} alt={brand.isPrimary ? "NGA Central MIS" : brand.name} className={`${size} rounded-full object-cover`} />
-    ) : (
-      <span aria-hidden="true" className={`${size} rounded-full bg-blue-600 text-white font-bold flex items-center justify-center`}>
-        {brand.name.slice(0, 1).toUpperCase()}
-      </span>
-    );
+  // Every school, NGA included, shows the logo uploaded in Tenants & Schools.
+  const brandMark = (size: string) => (
+    <TenantLogo src={brand.logoUrl} name={brand.isPrimary ? "NGA Central MIS" : brand.name} isPrimary={brand.isPrimary} className={size} />
+  );
   const brandName = brand.isPrimary ? "NGA MIS" : brand.name;
   // My AI (own AI keys): staff hold AI_PERSONAL_PROVIDERS, students the _STUDENT variant.
   const access = useAccess();

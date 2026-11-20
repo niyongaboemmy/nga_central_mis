@@ -75,6 +75,8 @@ export async function listTenantSessions(tid: number) {
 }
 
 export async function grantSession(tid: number, userId: number, body: { hours?: unknown; mode?: unknown; reason?: unknown }) {
+  // A support token acts as the person who granted it: never for the managing school's own staff.
+  if (tid === PRIMARY_TENANT_ID) throw new TenantActionError(409, "PRIMARY_TENANT", "The primary school doesn't use support access.");
   const max = Number(await getPlatformSetting("support.max_hours")) || 24;
   const hours = Number(body.hours);
   if (!Number.isFinite(hours) || hours < 1 || hours > max) throw new ValidationError(`Hours must be between 1 and ${max}.`);
@@ -126,6 +128,7 @@ export async function openSession(sessionId: number, platformUserId: number, ip:
     throw new TenantActionError(410, "SUPPORT_SESSION_ENDED", "This support session has ended.");
   }
   const tid = Number(s.tenant_id);
+  if (tid === PRIMARY_TENANT_ID) throw new TenantActionError(409, "PRIMARY_TENANT", "The primary school doesn't use support access.");
   const tenant = await getTenant(tid);
   const refusal = tenantRefusal(tenant);
   if (!tenant || refusal) throw new TenantActionError(409, refusal?.code ?? "TENANT_UNKNOWN", refusal?.message ?? "This school is not available.");

@@ -22,7 +22,53 @@ export interface School {
   status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
   created_at?: string;
   updated_at?: string;
+  /** Changes with every logo upload (School.updated_at in ms); the logo URL's cache key. */
+  logo_version?: number | null;
 }
+
+/** Field rules shared with the server (schoolController readSchoolBody). */
+export const SCHOOL_LIMITS = {
+  name: 150,
+  school_code: 20,
+  address: 255,
+  district: 100,
+  contact_email: 150,
+  contact_phone: 50,
+  sector: 100,
+  trade: 150,
+  qualification_title: 255,
+  head_teacher_name: 150,
+} as const;
+export type SchoolTextField = keyof typeof SCHOOL_LIMITS;
+
+export function validateSchool(values: Partial<School>): Partial<Record<SchoolTextField, string>> {
+  const errors: Partial<Record<SchoolTextField, string>> = {};
+  for (const [field, max] of Object.entries(SCHOOL_LIMITS) as [SchoolTextField, number][]) {
+    const v = String(values[field] ?? "").trim();
+    if (v.length > max) errors[field] = `At most ${max} characters`;
+  }
+  const name = String(values.name ?? "").trim();
+  if (!name) errors.name = "The school needs a name";
+  else if (name.length < 2) errors.name = "Too short";
+  const code = String(values.school_code ?? "").trim();
+  if (code && !/^[A-Za-z0-9][A-Za-z0-9-]{1,19}$/.test(code)) errors.school_code = "2-20 letters, digits or dashes";
+  const email = String(values.contact_email ?? "").trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.contact_email = "Doesn't look like an email address";
+  const phone = String(values.contact_phone ?? "").trim();
+  const digits = phone.replace(/\D/g, "").length;
+  if (phone && (!/^\+?[0-9][0-9 ()-]{5,24}$/.test(phone) || digits < 7 || digits > 15)) errors.contact_phone = "Use a phone number such as +250 788 000 000";
+  return errors;
+}
+
+/** Only the editable text fields and status -- never the logo paths (those change only by upload). */
+export function schoolPayload(values: Partial<School>): Partial<School> {
+  const out: Record<string, unknown> = {};
+  for (const field of Object.keys(SCHOOL_LIMITS)) out[field] = String((values as any)[field] ?? "").trim();
+  if (values.status) out.status = values.status;
+  return out as Partial<School>;
+}
+
+export const LOGO_MAX_BYTES = 5 * 1024 * 1024;
 
 export type SchoolLogoSlot = "primary" | "partner" | "documents";
 
@@ -31,21 +77,29 @@ export type SchoolLogoSlot = "primary" | "partner" | "documents";
 export const getSchoolLogoUrl = (
   schoolId: number,
   slot: SchoolLogoSlot = "primary",
-  cacheBust?: string | number,
+  cacheBust?: string | number | null,
 ): string =>
-  `${API_BASE_URL}/schools/${schoolId}/logo/${slot}${cacheBust ? `?t=${cacheBust}` : ""}`;
+  `${API_BASE_URL}/schools/${schoolId}/logo/${slot}${cacheBust ? `?v=${cacheBust}` : ""}`;
 
+/** Uploads one logo slot; resolves with the school as saved. */
 export const uploadSchoolLogo = async (
   schoolId: number,
   file: File,
   slot: SchoolLogoSlot = "primary",
-): Promise<void> => {
+): Promise<School | null> => {
   const formData = new FormData();
-  formData.append("file", file);
+  // "slot" before "file": multer reads fields in order (see the file-server upload-order trap).
   formData.append("slot", slot);
-  await api.post(`/schools/${schoolId}/logo`, formData, {
+  formData.append("file", file);
+  const res = await api.post(`/schools/${schoolId}/logo`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
+  return (res.data?.data as School) ?? null;
+};
+
+export const removeSchoolLogo = async (schoolId: number, slot: SchoolLogoSlot): Promise<School | null> => {
+  const res = await api.delete(`/schools/${schoolId}/logo/${slot}`);
+  return (res.data?.data as School) ?? null;
 };
 
 export const getSchools = async (
@@ -76,10 +130,11 @@ export const createSchool = async (
   schoolData: Partial<School>,
   onSuccess?: () => void,
   onError?: (error: any) => void,
-): Promise<void> => {
+): Promise<School | null> => {
   try {
-    await api.post("/schools", schoolData);
+    const res = await api.post("/schools", schoolData);
     if (onSuccess) onSuccess();
+    return (res.data?.data as School) ?? null;
   } catch (error) {
     if (onError) onError(error);
     throw error;
