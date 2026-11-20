@@ -101,7 +101,7 @@ const ApplicationDetailPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Link to="/platform/applications" className="rounded-full p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="Back to applications">
+        <Link to="/platform/applications" className="rounded-full p-2 text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800" aria-label="Back to applications">
           <ArrowLeft className="h-5 w-5" aria-hidden />
         </Link>
         <h1 className="min-w-0 flex-1 truncate text-xl font-bold text-slate-900 dark:text-white">{a.schoolName}</h1>
@@ -166,7 +166,7 @@ const ApplicationDetailPage: React.FC = () => {
       </div>
 
       {actions.length > 0 && (
-        <div className="sticky bottom-0 z-30 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95 sm:-mx-6 sm:px-6">
+        <div className="sticky bottom-0 z-30 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-gray-700 dark:bg-gray-900/95 sm:-mx-6 sm:px-6">
           <div className="flex flex-wrap justify-end gap-2" role="toolbar" aria-label="Decision">
             {actions.map((x) => {
               const meta = ACTION_META[x];
@@ -250,9 +250,9 @@ const SchoolTab: React.FC<{ d: ApplicationDetail }> = ({ d }) => {
         <dl className="grid gap-3 sm:grid-cols-2">
           {rows.map(([Icon, label, value]) => (
             <div key={label} className="flex items-start gap-2">
-              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500 dark:text-slate-300" aria-hidden />
+              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500 dark:text-gray-300" aria-hidden />
               <div className="min-w-0">
-                <dt className="text-xs text-slate-600 dark:text-slate-300">{label}</dt>
+                <dt className="text-xs text-slate-600 dark:text-gray-300">{label}</dt>
                 <dd className="break-words text-sm font-medium text-slate-900 dark:text-white">{value || "—"}</dd>
               </div>
             </div>
@@ -263,7 +263,7 @@ const SchoolTab: React.FC<{ d: ApplicationDetail }> = ({ d }) => {
             {a.requestedApps.map((k) => {
               const Icon = entIcon(k);
               return (
-                <li key={k} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                <li key={k} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-gray-800 dark:text-gray-200">
                   <Icon className="h-3.5 w-3.5" aria-hidden />
                   {APP_LABELS[k] ?? k}
                 </li>
@@ -271,21 +271,21 @@ const SchoolTab: React.FC<{ d: ApplicationDetail }> = ({ d }) => {
             })}
           </ul>
         )}
-        {a.notes && <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">{a.notes}</p>}
+        {a.notes && <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700 dark:bg-gray-800 dark:text-gray-200">{a.notes}</p>}
       </Card>
       <Card>
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200">{initials(d.applicant.fullName)}</span>
           <div className="min-w-0">
             <p className="truncate font-semibold text-slate-900 dark:text-white">{d.applicant.fullName}</p>
-            <p className="flex items-center gap-1 truncate text-xs text-slate-600 dark:text-slate-300">
+            <p className="flex items-center gap-1 truncate text-xs text-slate-600 dark:text-gray-300">
               {d.applicant.email}
               {d.applicant.emailVerified && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-label="Verified" />}
             </p>
-            {d.applicant.phone && <p className="text-xs text-slate-600 dark:text-slate-300">{d.applicant.phone}</p>}
+            {d.applicant.phone && <p className="text-xs text-slate-600 dark:text-gray-300">{d.applicant.phone}</p>}
           </div>
         </div>
-        <dl className="mt-4 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+        <dl className="mt-4 space-y-1 text-xs text-slate-600 dark:text-gray-300">
           <div className="flex justify-between">
             <dt>Ref</dt>
             <dd className="font-semibold text-slate-900 dark:text-white">{a.ref ?? "—"}</dd>
@@ -348,8 +348,8 @@ const DocCard: React.FC<{ appId: number; doc: ApplicationDocument; onPreview: ()
     if (next) onDoc(next);
   };
   return (
-    <li className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-      <button type="button" onClick={onPreview} className="flex h-36 w-full items-center justify-center bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-slate-800">
+    <li className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      <button type="button" onClick={onPreview} className="flex h-36 w-full items-center justify-center bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-gray-800">
         {isPdf(doc.url) ? <FileText className="h-12 w-12 text-slate-400" aria-hidden /> : <img src={doc.url} alt="" className="h-full w-full object-cover" />}
         <span className="sr-only">Preview {DOC_LABELS[doc.kind] ?? doc.kind}</span>
       </button>
@@ -404,7 +404,7 @@ const ChecklistTab: React.FC<{ d: ApplicationDetail; onChange: (c: ApplicationDe
   return (
     <Card>
       <div className="mb-3 flex items-center gap-3">
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" aria-hidden>
+        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-gray-700" aria-hidden>
           <motion.div className="h-full rounded-full bg-emerald-500" animate={{ width: `${d.checklist.length ? (done / d.checklist.length) * 100 : 0}%` }} />
         </div>
         <span className="text-sm font-bold tabular-nums text-slate-900 dark:text-white">
@@ -425,14 +425,14 @@ const ChecklistTab: React.FC<{ d: ApplicationDetail; onChange: (c: ApplicationDe
                 setBusy(null);
                 if (next) onChange(next);
               }}
-              className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-slate-800"
+              className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-gray-800"
             >
-              <span className={cx("flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-colors", c.checked ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 dark:border-slate-600")}>
+              <span className={cx("flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-colors", c.checked ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 dark:border-gray-600")}>
                 <AnimatePresence>{c.checked && <motion.span {...m("check")}><Check className="h-4 w-4" aria-hidden /></motion.span>}</AnimatePresence>
               </span>
-              <span className={cx("flex-1 text-sm", c.checked ? "text-slate-600 line-through dark:text-slate-300" : "font-medium text-slate-900 dark:text-white")}>{c.label}</span>
+              <span className={cx("flex-1 text-sm", c.checked ? "text-slate-600 line-through dark:text-gray-300" : "font-medium text-slate-900 dark:text-white")}>{c.label}</span>
               {c.checked && c.checkedBy && (
-                <span className="text-right text-[11px] text-slate-600 dark:text-slate-300">
+                <span className="text-right text-[11px] text-slate-600 dark:text-gray-300">
                   {c.checkedBy}
                   <br />
                   {fmtDateTime(c.checkedAt)}
@@ -483,11 +483,11 @@ const MessagesTab: React.FC<{ d: ApplicationDetail; onSent: (m: ThreadMessage) =
                       : mine
                         ? "bg-brand-600 text-white"
                         : msg.author === "SYSTEM"
-                          ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                          : "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white",
+                          ? "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-200"
+                          : "bg-slate-100 text-slate-900 dark:bg-gray-800 dark:text-white",
                   )}
                 >
-                  <div className={cx("mb-0.5 flex items-center gap-1 text-[11px] font-semibold", mine && !msg.internal ? "text-white/85" : "text-slate-600 dark:text-slate-300")}>
+                  <div className={cx("mb-0.5 flex items-center gap-1 text-[11px] font-semibold", mine && !msg.internal ? "text-white/85" : "text-slate-600 dark:text-gray-300")}>
                     {msg.internal && <Lock className="h-3 w-3" aria-label="Internal" />}
                     {msg.authorName ?? msg.author.toLowerCase()} · {fmtDateTime(msg.at)}
                   </div>
@@ -511,14 +511,14 @@ const MessagesTab: React.FC<{ d: ApplicationDetail; onSent: (m: ThreadMessage) =
           e.preventDefault();
           void send();
         }}
-        className={cx("flex items-end gap-2 rounded-2xl p-2", internal ? "bg-amber-50 ring-1 ring-amber-300 dark:bg-amber-400/10" : "bg-slate-50 dark:bg-slate-800")}
+        className={cx("flex items-end gap-2 rounded-2xl p-2", internal ? "bg-amber-50 ring-1 ring-amber-300 dark:bg-amber-400/10" : "bg-slate-50 dark:bg-gray-800")}
       >
         <button
           type="button"
           aria-pressed={internal}
           onClick={() => setInternal(!internal)}
           title="Internal note"
-          className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", internal ? "bg-amber-500 text-white" : "text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700")}
+          className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", internal ? "bg-amber-500 text-white" : "text-slate-600 hover:bg-slate-200 dark:text-gray-300 dark:hover:bg-gray-700")}
         >
           <Lock className="h-4 w-4" aria-hidden />
           <span className="sr-only">Internal note</span>
@@ -572,7 +572,7 @@ const AssignDialog: React.FC<{ open: boolean; current: number | null; onClose: (
                 type="button"
                 aria-pressed={s.id === current}
                 onClick={() => onPick(s.id)}
-                className={cx("flex w-full items-center gap-3 rounded-xl p-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800", s.id === current && "bg-brand-50 dark:bg-brand-500/10")}
+                className={cx("flex w-full items-center gap-3 rounded-xl p-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-gray-800", s.id === current && "bg-brand-50 dark:bg-brand-500/10")}
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200">{initials(s.name)}</span>
                 <span className="flex-1 font-medium text-slate-900 dark:text-white">{s.name}</span>
@@ -693,7 +693,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
             )}
 
             <div>
-              <label htmlFor="approve-slug" className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <label htmlFor="approve-slug" className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-gray-300">
                 <Link2 className="h-3.5 w-3.5" aria-hidden />
                 Address
               </label>
@@ -710,7 +710,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
                 </span>
               </div>
               {slugState.available === false && slugState.suggestion && (
-                <button type="button" onClick={() => setSlug(slugState.suggestion!)} className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-mono text-xs text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100">
+                <button type="button" onClick={() => setSlug(slugState.suggestion!)} className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-mono text-xs text-slate-800 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-100">
                   <Copy className="h-3 w-3" aria-hidden />
                   {slugState.suggestion}
                 </button>
@@ -719,7 +719,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
 
             {pkgApps.length > 0 && (
               <div>
-                <p className="mb-1 text-xs font-semibold text-slate-600 dark:text-slate-300">Apps</p>
+                <p className="mb-1 text-xs font-semibold text-slate-600 dark:text-gray-300">Apps</p>
                 <div className="flex flex-wrap gap-2">
                   {pkgApps.map((k) => {
                     const on = apps?.includes(k) ?? false;
@@ -733,7 +733,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
                         onClick={() => setApps((cur) => (on ? (cur ?? []).filter((x) => x !== k) : [...(cur ?? []), k]))}
                         className={cx(
                           "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed",
-                          on ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300",
+                          on ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-300",
                         )}
                       >
                         <Icon className="h-3.5 w-3.5" aria-hidden />

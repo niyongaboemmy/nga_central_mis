@@ -37,7 +37,7 @@ const useIsDesktop = () => {
 type Tab = "progress" | "timeline" | "messages";
 
 const Panel: React.FC<{ id: string; icon: React.ComponentType<{ className?: string }>; title: string; badge?: number; children: React.ReactNode }> = ({ id, icon: Icon, title, badge, children }) => (
-  <section aria-labelledby={id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+  <section aria-labelledby={id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
     <h2 id={id} className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
       <Icon className="h-4 w-4 text-brand-600 dark:text-brand-200" />
       {title}
@@ -83,7 +83,7 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
     <header className="mb-5 flex items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-2">
         <AmashuriMark size={36} />
-        <span className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{me.account.fullName}</span>
+        <span className="truncate text-sm font-medium text-slate-700 dark:text-gray-200">{me.account.fullName}</span>
       </div>
       <div className="flex items-center gap-1">
         <button type="button" className={iconBtn} onClick={() => setPwOpen(true)}>
@@ -100,7 +100,7 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
   );
 
   const shell = (children: React.ReactNode) => (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 px-4 py-6 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 px-4 py-6 dark:from-gray-950 dark:via-gray-950 dark:to-gray-900">
       <div className="mx-auto max-w-6xl">
         {header}
         {error && (
@@ -117,7 +117,7 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
 
   if (!app) {
     return shell(
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
         <h1 ref={heading} tabIndex={-1} className="sr-only">
           My application
         </h1>
@@ -142,19 +142,19 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
 
   return shell(
     <>
-      <motion.section {...m("reveal")} className="mb-5 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+      <motion.section {...m("reveal")} className="mb-5 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-6">
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <h1 ref={heading} tabIndex={-1} className="mr-auto min-w-0 break-words text-xl font-extrabold text-slate-900 focus:outline-none dark:text-white sm:text-2xl">
             {app.schoolName}
           </h1>
-          {app.ref && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-mono text-xs font-bold text-slate-800 dark:bg-slate-800 dark:text-slate-100">{app.ref}</span>}
+          {app.ref && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-mono text-xs font-bold text-slate-800 dark:bg-gray-800 dark:text-gray-100">{app.ref}</span>}
           <StatusPill status={app.status} />
         </div>
         <JourneyStepper current={app.step} failed={failed} />
       </motion.section>
 
       {/* mobile tab bar; on desktop every panel is visible */}
-      <div className="mb-4 flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800 lg:hidden" aria-label="Sections">
+      <div className="mb-4 flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800 lg:hidden" aria-label="Sections">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -163,7 +163,7 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
             onClick={() => setTab(t.key)}
             className={cx(
               "relative flex flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-1.5 text-sm font-semibold",
-              tab === t.key ? "bg-white text-slate-900 shadow dark:bg-slate-700 dark:text-white" : "text-slate-600 dark:text-slate-300",
+              tab === t.key ? "bg-white text-slate-900 shadow dark:bg-gray-700 dark:text-white" : "text-slate-600 dark:text-gray-300",
             )}
           >
             <t.icon className="h-4 w-4" aria-hidden />
@@ -181,27 +181,27 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className={cx("space-y-4", show("progress"))}>
           {app.status === "REJECTED" && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
               <div className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                <Ban className="h-5 w-5 text-slate-500 dark:text-slate-300" aria-hidden />
+                <Ban className="h-5 w-5 text-slate-500 dark:text-gray-300" aria-hidden />
                 Not approved
               </div>
-              {app.decisionReason && <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{app.decisionReason}</p>}
+              {app.decisionReason && <p className="mt-2 text-sm text-slate-700 dark:text-gray-200">{app.decisionReason}</p>}
             </section>
           )}
           {app.status === "EXPIRED" && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
               <div className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                <CalendarX2 className="h-5 w-5 text-slate-500 dark:text-slate-300" aria-hidden />
+                <CalendarX2 className="h-5 w-5 text-slate-500 dark:text-gray-300" aria-hidden />
                 Expired
               </div>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">The platform team can reopen it · send a message</p>
+              <p className="mt-2 text-sm text-slate-600 dark:text-gray-300">The platform team can reopen it · send a message</p>
             </section>
           )}
           {app.status === "WITHDRAWN" && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
               <div className="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-                <UndoDot className="h-5 w-5 text-slate-500 dark:text-slate-300" aria-hidden />
+                <UndoDot className="h-5 w-5 text-slate-500 dark:text-gray-300" aria-hidden />
                 Withdrawn
               </div>
               <Link to="/register-school" className={cx(ghostBtn, "mt-2")}>
@@ -215,13 +215,13 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
 
           {me.provisioning && SETTING_UP.has(app.status) && <ProvisioningSteps run={me.provisioning} />}
 
-          <details className="group rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <details className="group rounded-2xl border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900">
             <summary className="flex cursor-pointer list-none items-center gap-2 rounded-2xl p-4 font-semibold text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-white">
               <FileText className="h-4 w-4 text-brand-600 dark:text-brand-200" aria-hidden />
               Application
               <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" aria-hidden />
             </summary>
-            <div className="border-t border-slate-100 p-4 dark:border-slate-800">
+            <div className="border-t border-slate-100 p-4 dark:border-gray-800">
               <ApplicationSummary app={app} packages={packages} />
               {WITHDRAWABLE.has(app.status) && (
                 <div className="mt-4 flex justify-end">
@@ -241,7 +241,7 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
               {me.timeline.length ? (
                 <Timeline events={[...me.timeline].sort((a, b) => b.at.localeCompare(a.at))} iconFor={actorIcon} />
               ) : (
-                <p className="text-sm text-slate-600 dark:text-slate-300">—</p>
+                <p className="text-sm text-slate-600 dark:text-gray-300">—</p>
               )}
             </Panel>
           </div>

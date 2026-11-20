@@ -29,7 +29,7 @@ const ModeChip: React.FC<{ mode: Mode }> = ({ mode }) => (
   <span
     className={cx(
       "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
-      mode === "WRITE" ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" : "bg-sky-100 text-sky-800 dark:bg-sky-400/15 dark:text-sky-200",
+      mode === "WRITE" ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" : "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200",
     )}
   >
     {mode === "WRITE" ? <Pencil className="h-3 w-3" aria-hidden /> : <Eye className="h-3 w-3" aria-hidden />}
@@ -113,7 +113,7 @@ const SupportAccessPage: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6 sm:px-6">
       <header className="flex flex-wrap items-center gap-3">
-        <Link to="/settings/subscription" className="rounded-xl p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+        <Link to="/settings/subscription" className="rounded-xl p-2 text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800">
           <ArrowLeft className="h-5 w-5" aria-hidden />
           <span className="sr-only">Back to subscription</span>
         </Link>
@@ -124,13 +124,13 @@ const SupportAccessPage: React.FC = () => {
       {/* Grant */}
       <motion.section {...m("reveal")} className={cx(card, "space-y-5 p-4")} aria-label="Grant support access">
         <div>
-          <label htmlFor={`${id}-hours`} className="mb-2 flex items-center justify-between text-sm font-semibold text-slate-800 dark:text-slate-100">
+          <label htmlFor={`${id}-hours`} className="mb-2 flex items-center justify-between text-sm font-semibold text-slate-800 dark:text-gray-100">
             <span className="inline-flex items-center gap-1.5">
               <Clock className="h-4 w-4" aria-hidden /> Duration
             </span>
             <span className="tabular-nums" data-testid="hours-label">
               {hours} h · until {timeOf(until)}
-              {until.toDateString() !== new Date(now).toDateString() && <span className="ml-1 text-xs text-slate-600 dark:text-slate-300">tomorrow</span>}
+              {until.toDateString() !== new Date(now).toDateString() && <span className="ml-1 text-xs text-slate-600 dark:text-gray-300">tomorrow</span>}
             </span>
           </label>
           <input
@@ -144,7 +144,7 @@ const SupportAccessPage: React.FC = () => {
             className="w-full accent-brand-600"
             aria-valuetext={`${hours} hours, until ${timeOf(until)}`}
           />
-          <div className="mt-1 flex justify-between text-[11px] text-slate-600 dark:text-slate-300" aria-hidden>
+          <div className="mt-1 flex justify-between text-[11px] text-slate-600 dark:text-gray-300" aria-hidden>
             <span>1 h</span>
             <span>12 h</span>
             <span>24 h</span>
@@ -171,15 +171,15 @@ const SupportAccessPage: React.FC = () => {
         </div>
 
         <label htmlFor={`${id}-reason`} className="block">
-          <span className="mb-1 block text-sm font-semibold text-slate-800 dark:text-slate-100">
-            Reason <span className="text-xs font-medium text-slate-600 dark:text-slate-300">(optional)</span>
+          <span className="mb-1 block text-sm font-semibold text-slate-800 dark:text-gray-100">
+            Reason <span className="text-xs font-medium text-slate-600 dark:text-gray-300">(optional)</span>
           </span>
           <input
             id={`${id}-reason`}
             value={reason}
             maxLength={300}
             onChange={(e) => setReason(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
           />
         </label>
 
@@ -219,26 +219,26 @@ const SupportAccessPage: React.FC = () => {
                   center={
                     <>
                       <span className="text-base font-extrabold tabular-nums">{shown}</span>
-                      <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">{leftH >= 1 ? "h" : "min"}</span>
+                      <span className="text-[10px] font-semibold text-slate-600 dark:text-gray-300">{leftH >= 1 ? "h" : "min"}</span>
                     </>
                   }
                 />
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <ModeChip mode={s.mode} />
-                    <span className="text-xs text-slate-600 dark:text-slate-300">→ {whenOf(s.expiresAt)}</span>
+                    <span className="text-xs text-slate-600 dark:text-gray-300">→ {whenOf(s.expiresAt)}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-sm text-slate-800 dark:text-slate-100">
-                    <UserRound className="h-4 w-4 text-slate-500 dark:text-slate-300" aria-hidden />
+                  <div className="flex items-center gap-1.5 text-sm text-slate-800 dark:text-gray-100">
+                    <UserRound className="h-4 w-4 text-slate-500 dark:text-gray-300" aria-hidden />
                     {s.openedBy ? (
                       <span>
-                        {s.openedBy} <span className="text-xs text-slate-600 dark:text-slate-300">· {whenOf(s.openedAt)}</span>
+                        {s.openedBy} <span className="text-xs text-slate-600 dark:text-gray-300">· {whenOf(s.openedAt)}</span>
                       </span>
                     ) : (
-                      <span className="text-slate-600 dark:text-slate-300">Not opened yet</span>
+                      <span className="text-slate-600 dark:text-gray-300">Not opened yet</span>
                     )}
                   </div>
-                  {s.reason && <div className="truncate text-xs text-slate-600 dark:text-slate-300">{s.reason}</div>}
+                  {s.reason && <div className="truncate text-xs text-slate-600 dark:text-gray-300">{s.reason}</div>}
                 </div>
                 <button type="button" className={btn.danger} onClick={() => setRevoking(s)}>
                   <ShieldOff className="h-4 w-4" aria-hidden /> Revoke
@@ -248,7 +248,7 @@ const SupportAccessPage: React.FC = () => {
           })}
         </AnimatePresence>
         {sessions && active.length === 0 && (
-          <p className="flex items-center justify-center gap-2 py-4 text-sm text-slate-600 dark:text-slate-300">
+          <p className="flex items-center justify-center gap-2 py-4 text-sm text-slate-600 dark:text-gray-300">
             <ShieldOff className="h-4 w-4" aria-hidden /> No open sessions
           </p>
         )}
@@ -261,7 +261,7 @@ const SupportAccessPage: React.FC = () => {
             type="button"
             onClick={() => setShowPast((v) => !v)}
             aria-expanded={showPast}
-            className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
+            className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-800"
           >
             <span>Past ({past.length})</span>
             <motion.span animate={{ rotate: showPast ? 180 : 0 }}>
@@ -270,9 +270,9 @@ const SupportAccessPage: React.FC = () => {
           </button>
           <AnimatePresence initial={false}>
             {showPast && (
-              <motion.ul {...m("reveal")} className="divide-y divide-slate-100 px-2 dark:divide-slate-800">
+              <motion.ul {...m("reveal")} className="divide-y divide-slate-100 px-2 dark:divide-gray-800">
                 {past.map((s) => (
-                  <li key={s.id} className="flex flex-wrap items-center gap-2 py-2 text-xs text-slate-600 dark:text-slate-300">
+                  <li key={s.id} className="flex flex-wrap items-center gap-2 py-2 text-xs text-slate-600 dark:text-gray-300">
                     <ModeChip mode={s.mode} />
                     <span>
                       {whenOf(s.startsAt)} → {whenOf(s.revokedAt ?? s.expiresAt)}

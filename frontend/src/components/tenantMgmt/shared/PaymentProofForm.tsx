@@ -27,8 +27,8 @@ const today = () => {
 
 const inputCls = (bad: boolean) =>
   cx(
-    "w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:bg-slate-900 dark:text-white",
-    bad ? "border-red-400 dark:border-red-500" : "border-slate-300 dark:border-slate-600",
+    "w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-brand-500 dark:bg-gray-900 dark:text-white",
+    bad ? "border-red-400 dark:border-red-500" : "border-slate-300 dark:border-gray-600",
   );
 
 type Field = "method" | "reference" | "amount" | "paidAt";
@@ -109,7 +109,7 @@ const PaymentProofForm: React.FC<PaymentProofFormProps> = ({ invoice, methods, o
       aria-label="Payment proof"
     >
       <fieldset>
-        <legend className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">Method</legend>
+        <legend className="mb-2 text-sm font-semibold text-slate-800 dark:text-gray-100">Method</legend>
         <div role="radiogroup" aria-label="Payment method" aria-invalid={errors.has("method") || undefined} className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {offered.map((x) => {
             const info = METHOD_INFO[x];
@@ -128,7 +128,7 @@ const PaymentProofForm: React.FC<PaymentProofFormProps> = ({ invoice, methods, o
                 }}
                 className={cx(
                   "relative flex flex-col items-center gap-1 rounded-xl border-2 p-2.5 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-                  on ? cx("border-brand-500", info.tone) : "border-slate-200 text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:text-slate-200",
+                  on ? cx("border-brand-500", info.tone) : "border-slate-200 text-slate-700 hover:border-slate-300 dark:border-gray-700 dark:text-gray-200",
                   errors.has("method") && !on && "border-red-300 dark:border-red-500/60",
                 )}
               >
@@ -149,7 +149,7 @@ const PaymentProofForm: React.FC<PaymentProofFormProps> = ({ invoice, methods, o
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block sm:col-span-2" htmlFor={`${id}-ref`}>
-          <span className="mb-1 block text-sm font-semibold text-slate-800 dark:text-slate-100">Reference</span>
+          <span className="mb-1 block text-sm font-semibold text-slate-800 dark:text-gray-100">Reference</span>
           <input
             id={`${id}-ref`}
             className={inputCls(errors.has("reference"))}
@@ -163,8 +163,8 @@ const PaymentProofForm: React.FC<PaymentProofFormProps> = ({ invoice, methods, o
           />
         </label>
         <label className="block" htmlFor={`${id}-amt`}>
-          <span className="mb-1 flex items-center gap-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
-            Amount <span className="text-xs font-medium text-slate-600 dark:text-slate-300">({invoice.currency})</span>
+          <span className="mb-1 flex items-center gap-1 text-sm font-semibold text-slate-800 dark:text-gray-100">
+            Amount <span className="text-xs font-medium text-slate-600 dark:text-gray-300">({invoice.currency})</span>
             <AnimatePresence>
               {mismatch && (
                 <motion.span {...m("check")} className="ml-auto inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300" title={`Invoice: ${formatMoney(invoice.amount, invoice.currency)}`} data-testid="amount-mismatch">
@@ -190,7 +190,7 @@ const PaymentProofForm: React.FC<PaymentProofFormProps> = ({ invoice, methods, o
           />
         </label>
         <label className="block" htmlFor={`${id}-date`}>
-          <span className="mb-1 block text-sm font-semibold text-slate-800 dark:text-slate-100">Paid on</span>
+          <span className="mb-1 block text-sm font-semibold text-slate-800 dark:text-gray-100">Paid on</span>
           <input
             id={`${id}-date`}
             type="date"
@@ -207,12 +207,12 @@ const PaymentProofForm: React.FC<PaymentProofFormProps> = ({ invoice, methods, o
       </div>
 
       <div>
-        <span className="mb-1 block text-sm font-semibold text-slate-800 dark:text-slate-100">Receipt</span>
+        <span className="mb-1 block text-sm font-semibold text-slate-800 dark:text-gray-100">Receipt</span>
         {proof ? (
           <motion.div {...m("reveal")} className="flex items-center gap-3 rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 dark:bg-emerald-400/10">
             <FileCheck2 className="h-5 w-5 text-emerald-600 dark:text-emerald-300" aria-hidden />
-            <span className="min-w-0 flex-1 truncate text-sm text-slate-800 dark:text-slate-100">{proof.name}</span>
-            <button type="button" onClick={() => setProof(null)} className="rounded-lg p-1.5 text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800">
+            <span className="min-w-0 flex-1 truncate text-sm text-slate-800 dark:text-gray-100">{proof.name}</span>
+            <button type="button" onClick={() => setProof(null)} className="rounded-lg p-1.5 text-slate-600 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-800">
               <X className="h-4 w-4" aria-hidden />
               <span className="sr-only">Remove receipt</span>
             </button>

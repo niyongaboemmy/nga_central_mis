@@ -52,7 +52,7 @@ const StepSchool: React.FC<{
         {logo || logoUploaded ? (
           <div className="flex items-center gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 p-3 dark:border-emerald-500/40 dark:bg-emerald-400/10">
             {preview && <img src={preview} alt="" className="h-12 w-12 rounded-xl object-cover" />}
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{logo?.name ?? "Logo"}</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-gray-100">{logo?.name ?? "Logo"}</span>
             {logo && (
               <button type="button" className={iconBtn} onClick={() => onLogo(null)}>
                 <X className="h-4 w-4" aria-hidden />

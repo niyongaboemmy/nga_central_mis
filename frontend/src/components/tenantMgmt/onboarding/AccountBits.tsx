@@ -85,9 +85,9 @@ export const ChangePasswordModal: React.FC<{ isOpen: boolean; onClose: () => voi
 const Row: React.FC<{ icon: LucideIcon; label: string; value: React.ReactNode }> = ({ icon: Icon, label, value }) =>
   value === null || value === undefined || value === "" ? null : (
     <div className="flex items-start gap-2">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500 dark:text-slate-300" aria-hidden />
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500 dark:text-gray-300" aria-hidden />
       <dt className="sr-only">{label}</dt>
-      <dd className="min-w-0 break-words text-sm text-slate-800 dark:text-slate-100">{value}</dd>
+      <dd className="min-w-0 break-words text-sm text-slate-800 dark:text-gray-100">{value}</dd>
     </div>
   );
 

@@ -38,8 +38,8 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({ invoice, instructions, pdfUrl
       <div className="flex flex-wrap items-start gap-4 p-4">
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Receipt className="h-4 w-4 text-slate-500 dark:text-slate-300" aria-hidden />
-            <span className="font-mono text-sm font-semibold text-slate-800 dark:text-slate-100">{invoice.number ?? `#${invoice.id}`}</span>
+            <Receipt className="h-4 w-4 text-slate-500 dark:text-gray-300" aria-hidden />
+            <span className="font-mono text-sm font-semibold text-slate-800 dark:text-gray-100">{invoice.number ?? `#${invoice.id}`}</span>
             <StatusPill status={overdue && invoice.status !== "OVERDUE" ? "OVERDUE" : invoice.status} />
             {pending && (
               <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800 dark:bg-violet-400/15 dark:text-violet-200">
@@ -50,13 +50,13 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({ invoice, instructions, pdfUrl
           <div className="text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">
             <CountUp value={invoice.amount} format={(n) => formatMoney(n, invoice.currency)} />
           </div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-gray-300">
             <span className="inline-flex items-center gap-1">
               <CalendarRange className="h-3.5 w-3.5" aria-hidden />
               <span className="sr-only">Period</span>
               {shortDate(invoice.periodStart)} – {shortDate(invoice.periodEnd)}
             </span>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold capitalize dark:bg-slate-800">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold capitalize dark:bg-gray-800">
               {invoice.packageCode} · {invoice.billingCycle === "YEAR" ? "year" : "term"}
             </span>
           </div>
@@ -78,9 +78,9 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({ invoice, instructions, pdfUrl
       </div>
 
       {invoice.lines?.length > 1 && (
-        <ul className="mx-4 mb-3 divide-y divide-slate-100 rounded-xl bg-slate-50 text-xs dark:divide-slate-800 dark:bg-slate-800/50">
+        <ul className="mx-4 mb-3 divide-y divide-slate-100 rounded-xl bg-slate-50 text-xs dark:divide-gray-800 dark:bg-gray-800/50">
           {invoice.lines.map((l, i) => (
-            <li key={i} className="flex justify-between gap-3 px-3 py-1.5 text-slate-700 dark:text-slate-200">
+            <li key={i} className="flex justify-between gap-3 px-3 py-1.5 text-slate-700 dark:text-gray-200">
               <span className="min-w-0 truncate">{l.label}</span>
               <span className="tabular-nums">{formatMoney(l.amount, invoice.currency)}</span>
             </li>
@@ -113,7 +113,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({ invoice, instructions, pdfUrl
         </ul>
       )}
 
-      <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
+      <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/50">
         <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className={btn.ghost}>
           <FileDown className="h-4 w-4" aria-hidden /> PDF
         </a>

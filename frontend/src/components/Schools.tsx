@@ -65,7 +65,7 @@ import TenantLogo from "./brand/TenantLogo";
 type Status = School["status"];
 const STATUS_STYLE: Record<Status, string> = {
   ACTIVE: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  INACTIVE: "bg-gray-100 text-gray-600 dark:bg-slate-700/60 dark:text-gray-300",
+  INACTIVE: "bg-gray-100 text-gray-600 dark:bg-gray-700/60 dark:text-gray-300",
   SUSPENDED: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
 };
 const STATUS_LABEL: Record<Status, string> = { ACTIVE: "Active", INACTIVE: "Inactive", SUSPENDED: "Suspended" };
@@ -103,11 +103,11 @@ const SchoolCard = ({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}
-      className="flex flex-col bg-white dark:bg-slate-800/50 rounded-2xl border border-gray-200 dark:border-slate-700/40 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+      className="flex flex-col bg-white dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700/40 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
     >
       <div className="p-5 flex-1">
         <div className="flex items-start gap-4 mb-4">
-          <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-700 flex items-center justify-center p-1.5 shrink-0">
+          <div className="w-16 h-16 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 flex items-center justify-center p-1.5 shrink-0">
             <TenantLogo src={logoUrl(school)} name={school.name} isPrimary={false} className="w-full h-full" rounded="rounded-xl" />
           </div>
           <div className="min-w-0">
@@ -138,7 +138,7 @@ const SchoolCard = ({
             .filter((r) => r.value)
             .map(({ icon: Icon, value, label }) => (
               <div key={label} className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                <dt className="p-1.5 rounded-lg bg-gray-50 dark:bg-slate-700/50 text-gray-400">
+                <dt className="p-1.5 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-400">
                   <Icon className="w-4 h-4" aria-hidden="true" />
                   <span className="sr-only">{label}</span>
                 </dt>
@@ -150,7 +150,7 @@ const SchoolCard = ({
         </dl>
       </div>
 
-      <div className="flex items-center justify-end gap-1 px-3 py-2 border-t border-gray-100 dark:border-slate-700/40">
+      <div className="flex items-center justify-end gap-1 px-3 py-2 border-t border-gray-100 dark:border-gray-700/40">
         <button type="button" onClick={() => onConfig(school)} className={iconBtn} title="Apps and role access" aria-label={`Apps and role access for ${school.name}`}>
           <Settings className="w-4 h-4" />
         </button>
@@ -173,17 +173,17 @@ const SchoolCard = ({
 };
 
 const SchoolCardSkeleton = () => (
-  <div className="rounded-2xl border border-gray-200 dark:border-slate-700/40 bg-white dark:bg-slate-800/50 p-5 space-y-4 animate-pulse" aria-hidden="true">
+  <div className="rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/50 p-5 space-y-4 animate-pulse" aria-hidden="true">
     <div className="flex gap-4">
-      <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-slate-700" />
+      <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-700" />
       <div className="flex-1 space-y-2">
-        <div className="h-4 w-3/4 rounded bg-gray-100 dark:bg-slate-700" />
-        <div className="h-3 w-1/3 rounded bg-gray-100 dark:bg-slate-700" />
-        <div className="h-4 w-16 rounded-full bg-gray-100 dark:bg-slate-700" />
+        <div className="h-4 w-3/4 rounded bg-gray-100 dark:bg-gray-700" />
+        <div className="h-3 w-1/3 rounded bg-gray-100 dark:bg-gray-700" />
+        <div className="h-4 w-16 rounded-full bg-gray-100 dark:bg-gray-700" />
       </div>
     </div>
-    <div className="h-3 w-2/3 rounded bg-gray-100 dark:bg-slate-700" />
-    <div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-slate-700" />
+    <div className="h-3 w-2/3 rounded bg-gray-100 dark:bg-gray-700" />
+    <div className="h-3 w-1/2 rounded bg-gray-100 dark:bg-gray-700" />
   </div>
 );
 
@@ -364,7 +364,7 @@ const SchoolConfigurationModal = ({
       }
     >
       {/* Tabs */}
-      <div className="flex gap-4 mb-6 border-b border-gray-200 dark:border-slate-700/30">
+      <div className="flex gap-4 mb-6 border-b border-gray-200 dark:border-gray-700/30">
         <button
           onClick={() => setActiveTab("systems")}
           className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
@@ -408,7 +408,7 @@ const SchoolConfigurationModal = ({
       {loading ? (
         <div className="space-y-3" aria-busy="true" aria-label="Loading configuration">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[72px] rounded-3xl bg-gray-100 dark:bg-slate-700/40 animate-pulse" />
+            <div key={i} className="h-[72px] rounded-3xl bg-gray-100 dark:bg-gray-700/40 animate-pulse" />
           ))}
         </div>
       ) : (
@@ -433,7 +433,7 @@ const SchoolConfigurationModal = ({
                       className={`flex items-center justify-between p-4 rounded-3xl border transition-all ${
                         isAssigned
                           ? "bg-blue-50/50 border-blue-100 dark:bg-blue-900/10 dark:border-blue-800"
-                          : "bg-gray-50 border-gray-100 dark:bg-slate-700/30 dark:border-slate-700/30"
+                          : "bg-gray-50 border-gray-100 dark:bg-gray-700/30 dark:border-gray-700/30"
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -441,7 +441,7 @@ const SchoolConfigurationModal = ({
                           className={`p-2 rounded-full ${
                             isAssigned
                               ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                              : "bg-gray-200 text-gray-500 dark:bg-slate-600 dark:text-gray-400"
+                              : "bg-gray-200 text-gray-500 dark:bg-gray-600 dark:text-gray-400"
                           }`}
                         >
                           <Layers className="w-5 h-5" />
@@ -466,7 +466,7 @@ const SchoolConfigurationModal = ({
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                           isAssigned
                             ? "bg-blue-600"
-                            : "bg-gray-200 dark:bg-slate-600"
+                            : "bg-gray-200 dark:bg-gray-600"
                         }`}
                       >
                         <span
@@ -508,7 +508,7 @@ const SchoolConfigurationModal = ({
                       onChange={(e) =>
                         setSelectedSystemId(Number(e.target.value))
                       }
-                      className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white appearance-none transition-all"
+                      className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/30 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white appearance-none transition-all"
                     >
                       <option value="">Choose a module...</option>
                       {roleSystems.map((sys) => (
@@ -536,7 +536,7 @@ const SchoolConfigurationModal = ({
                       onChange={(e) =>
                         setSelectedRoleId(Number(e.target.value))
                       }
-                      className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white appearance-none transition-all"
+                      className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/30 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white appearance-none transition-all"
                     >
                       <option value="">Choose a role...</option>
                       {roles.map((role) => (
@@ -571,7 +571,7 @@ const SchoolConfigurationModal = ({
 
               {/* Active Assignments List */}
               {roleAssignments.length > 0 && (
-                <div className="pt-6 border-t border-gray-100 dark:border-slate-700/30">
+                <div className="pt-6 border-t border-gray-100 dark:border-gray-700/30">
                   <h4 className="font-semibold text-gray-900 dark:text-white mb-3 text-sm">
                     Active Assignments
                   </h4>
@@ -579,7 +579,7 @@ const SchoolConfigurationModal = ({
                     {roleAssignments.map((assignment) => (
                       <div
                         key={assignment.fragment_id}
-                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700/30 rounded-lg border border-gray-100 dark:border-slate-700/30"
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700/30"
                       >
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-md text-blue-600 dark:text-blue-400">
@@ -621,7 +621,7 @@ const SchoolConfigurationModal = ({
       )}
 
       {!loading && (
-        <div className="mt-6 pt-4 border-t border-gray-100 dark:border-slate-700/30 flex justify-end">
+        <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700/30 flex justify-end">
           <button
             onClick={onClose}
             className="text-sm font-medium text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
@@ -655,8 +655,8 @@ const LOGO_SLOTS: { slot: SchoolLogoSlot; title: string; hint: string }[] = [
 ];
 
 const inputCls = (error?: string) =>
-  `w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400 ${
-    error ? "border-red-400 dark:border-red-500" : "border-gray-200 dark:border-slate-700/30"
+  `w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400 ${
+    error ? "border-red-400 dark:border-red-500" : "border-gray-200 dark:border-gray-700/30"
   }`;
 
 const Field = ({
@@ -866,9 +866,9 @@ const SchoolModal = ({
               const url = current ? logoUrl(current, slot) : null;
               const busy = logoBusy === slot;
               return (
-                <div key={slot} className="p-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl">
+                <div key={slot} className="p-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/30 rounded-xl">
                   <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-lg bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center overflow-hidden shrink-0 p-1">
+                    <div className="w-14 h-14 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 flex items-center justify-center overflow-hidden shrink-0 p-1">
                       {busy ? (
                         <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
                       ) : url ? (
@@ -887,7 +887,7 @@ const SchoolModal = ({
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-colors ${
                         current && !logoBusy
                           ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40"
-                          : "text-gray-400 bg-gray-100 dark:bg-slate-800 cursor-not-allowed"
+                          : "text-gray-400 bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
                       }`}
                     >
                       <Upload className="w-3.5 h-3.5" aria-hidden="true" />
@@ -968,7 +968,7 @@ const SchoolModal = ({
                       onChange={(e) => set("status", e.target.value)}
                       className="sr-only peer"
                     />
-                    <span className="px-4 py-2 rounded-full border border-gray-200 dark:border-slate-700/30 text-sm font-medium text-gray-500 peer-checked:bg-blue-50 peer-checked:border-blue-500 peer-checked:text-blue-600 dark:peer-checked:bg-blue-900/40 dark:peer-checked:text-blue-400 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 transition-all">
+                    <span className="px-4 py-2 rounded-full border border-gray-200 dark:border-gray-700/30 text-sm font-medium text-gray-500 peer-checked:bg-blue-50 peer-checked:border-blue-500 peer-checked:text-blue-600 dark:peer-checked:bg-blue-900/40 dark:peer-checked:text-blue-400 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 transition-all">
                       {STATUS_LABEL[status]}
                     </span>
                   </label>
@@ -988,7 +988,7 @@ const SchoolModal = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+            className="px-6 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
           >
             {current && !school ? "Done" : "Cancel"}
           </button>
@@ -1153,7 +1153,7 @@ const Schools = () => {
             <input
               type="search"
               aria-label="Search schools"
-              className="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-slate-700/30 rounded-xl bg-white dark:bg-slate-800/50 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm transition-all"
+              className="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-700/30 rounded-xl bg-white dark:bg-gray-800/50 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm transition-all"
               placeholder="Search by name, code, email or address..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -1170,7 +1170,7 @@ const Schools = () => {
                 className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${
                   filter === f.key
                     ? "bg-blue-600 border-blue-600 text-white"
-                    : "border-gray-200 dark:border-slate-700/40 text-gray-600 dark:text-gray-300 hover:border-blue-300"
+                    : "border-gray-200 dark:border-gray-700/40 text-gray-600 dark:text-gray-300 hover:border-blue-300"
                 }`}
               >
                 {f.label} <span className="opacity-70">{countOf(f.key)}</span>
@@ -1217,7 +1217,7 @@ const Schools = () => {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-20 h-20 bg-gray-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-5">
+            <div className="w-20 h-20 bg-gray-50 dark:bg-gray-800/50 rounded-full flex items-center justify-center mb-5">
               <Search className="w-9 h-9 text-gray-300 dark:text-gray-600" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{schools.length ? "No schools match" : "No schools yet"}</h3>

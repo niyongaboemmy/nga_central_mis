@@ -32,9 +32,9 @@ import { Btn, Card, IconBtn, Lightbox, ReasonDialog, Spinner, TabBar, act, cx, f
 export const METHOD_META: Record<PaymentMethod, { label: string; icon: LucideIcon; tone: string }> = {
   MOMO: { label: "MoMo", icon: Smartphone, tone: "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" },
   AIRTEL_MONEY: { label: "Airtel", icon: Smartphone, tone: "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-200" },
-  BANK_TRANSFER: { label: "Bank", icon: Landmark, tone: "bg-sky-100 text-sky-800 dark:bg-sky-400/15 dark:text-sky-200" },
+  BANK_TRANSFER: { label: "Bank", icon: Landmark, tone: "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200" },
   CASH: { label: "Cash", icon: Banknote, tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200" },
-  OTHER: { label: "Other", icon: CircleDollarSign, tone: "bg-slate-100 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200" },
+  OTHER: { label: "Other", icon: CircleDollarSign, tone: "bg-slate-100 text-slate-700 dark:bg-gray-700/60 dark:text-gray-200" },
 };
 
 export const MethodChip: React.FC<{ method: PaymentMethod }> = ({ method }) => {
@@ -113,12 +113,12 @@ export const PaymentsQueue: React.FC = () => {
           {rows.map((p) => {
             const match = p.amount === p.invoice.amount;
             return (
-              <motion.li key={p.id} layout {...m("reveal")} className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <motion.li key={p.id} layout {...m("reveal")} className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 <button
                   type="button"
                   onClick={() => p.proofUrl && setPreview(p)}
                   disabled={!p.proofUrl}
-                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default dark:bg-slate-800"
+                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default dark:bg-gray-800"
                 >
                   {p.proofUrl && !isPdf(p.proofUrl) ? <img src={p.proofUrl} alt="" className="h-full w-full object-cover" /> : <FileText className="h-8 w-8 text-slate-400" aria-hidden />}
                   <span className="sr-only">{p.proofUrl ? "View proof" : "No proof"}</span>
@@ -140,7 +140,7 @@ export const PaymentsQueue: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
+                  <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-gray-300">
                     <span className="truncate font-mono">{p.reference ?? "—"}</span>
                     {p.reference && <CopyBtn text={p.reference} />}
                     <span className="ml-auto">{fmtDate(p.paidAt ?? p.submittedAt)}</span>
@@ -223,17 +223,17 @@ export const InvoiceList: React.FC<{ invoices: Invoice[]; onChange: (inv: Invoic
                 key={inv.id}
                 layout
                 {...m("reveal")}
-                className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:flex-row md:items-center md:gap-4"
+                className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900 md:flex-row md:items-center md:gap-4"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-sm font-semibold text-slate-900 dark:text-white">{inv.number ?? `#${inv.id}`}</span>
                     <StatusPill status={inv.status} />
-                    <span className="text-xs text-slate-600 dark:text-slate-300">
+                    <span className="text-xs text-slate-600 dark:text-gray-300">
                       {inv.packageCode} · {inv.billingCycle === "YEAR" ? "Year" : "Term"} · {inv.kind.toLowerCase()}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-600 dark:text-slate-300">
+                  <div className="text-xs text-slate-600 dark:text-gray-300">
                     {inv.dueAt ? `Due ${fmtDate(inv.dueAt)}` : inv.issuedAt ? fmtDate(inv.issuedAt) : "Draft"}
                     {inv.paidAt && ` · Paid ${fmtDate(inv.paidAt)}`}
                   </div>
@@ -342,7 +342,7 @@ const EditInvoiceDialog: React.FC<{ inv: Invoice; onClose: () => void; onSaved: 
         </Btn>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="inv-amount" className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <label htmlFor="inv-amount" className="mb-1 block text-xs font-semibold text-slate-600 dark:text-gray-300">
               Total
             </label>
             <input
@@ -358,7 +358,7 @@ const EditInvoiceDialog: React.FC<{ inv: Invoice; onClose: () => void; onSaved: 
             />
           </div>
           <div>
-            <label htmlFor="inv-due" className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <label htmlFor="inv-due" className="mb-1 block text-xs font-semibold text-slate-600 dark:text-gray-300">
               Due
             </label>
             <input id="inv-due" type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className={inputCls} />

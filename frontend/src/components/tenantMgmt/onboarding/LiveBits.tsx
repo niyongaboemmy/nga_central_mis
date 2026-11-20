@@ -33,14 +33,14 @@ export const WaitIllustration: React.FC<{ status: ApplicationStatus }> = ({ stat
             </motion.span>
           </>
         )}
-        <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-sky-500 text-white shadow">
+        <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-blue-500 text-white shadow">
           <Icon className="h-5 w-5" aria-hidden />
         </span>
       </div>
       <div>
         <p className="font-semibold text-slate-900 dark:text-white">{c.line}</p>
         {c.eta && (
-          <p className="flex items-center gap-1 text-sm text-slate-600 dark:text-slate-300">
+          <p className="flex items-center gap-1 text-sm text-slate-600 dark:text-gray-300">
             <Clock className="h-3.5 w-3.5" aria-hidden />
             {c.eta}
           </p>
@@ -51,12 +51,12 @@ export const WaitIllustration: React.FC<{ status: ApplicationStatus }> = ({ stat
 };
 
 const STEP_VIEW: Record<StepStatus, { icon: LucideIcon; cls: string; sr: string; spin?: boolean }> = {
-  PENDING: { icon: Circle, cls: "text-slate-400 dark:text-slate-500", sr: "waiting" },
+  PENDING: { icon: Circle, cls: "text-slate-400 dark:text-gray-500", sr: "waiting" },
   RUNNING: { icon: Loader2, cls: "text-brand-600 dark:text-brand-200", sr: "in progress", spin: true },
   DONE: { icon: Check, cls: "bg-emerald-500 text-white rounded-full p-0.5", sr: "done" },
   // an applicant never sees a raw failure: the platform retries
   FAILED: { icon: Clock, cls: "text-amber-600 dark:text-amber-300", sr: "retrying" },
-  SKIPPED: { icon: Minus, cls: "text-slate-400 dark:text-slate-500", sr: "skipped" },
+  SKIPPED: { icon: Minus, cls: "text-slate-400 dark:text-gray-500", sr: "skipped" },
 };
 
 /** The provisioning run, live: spinner -> tick per step. */
@@ -65,15 +65,15 @@ export const ProvisioningSteps: React.FC<{ run: ProvisioningRun }> = ({ run }) =
   const done = run.steps.filter((s) => s.status === "DONE" || s.status === "SKIPPED").length;
   const pct = run.steps.length ? Math.round((done / run.steps.length) * 100) : 0;
   return (
-    <section aria-labelledby="prov-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <section aria-labelledby="prov-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
       <div className="mb-3 flex items-center gap-2">
         <Rocket className="h-5 w-5 text-brand-600 dark:text-brand-200" aria-hidden />
         <h3 id="prov-title" className="flex-1 font-semibold text-slate-900 dark:text-white">
           Setting up
         </h3>
-        <span className="text-sm font-bold tabular-nums text-slate-700 dark:text-slate-200">{pct}%</span>
+        <span className="text-sm font-bold tabular-nums text-slate-700 dark:text-gray-200">{pct}%</span>
       </div>
-      <div className="mb-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" aria-hidden>
+      <div className="mb-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-800" aria-hidden>
         <motion.div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-emerald-500" initial={false} animate={{ width: `${pct}%` }} {...m("fill")} />
       </div>
       <ol className="space-y-2" aria-label="Setup steps">
@@ -86,7 +86,7 @@ export const ProvisioningSteps: React.FC<{ run: ProvisioningRun }> = ({ run }) =
                   <v.icon className={cx("h-4 w-4", v.cls, v.spin && "animate-spin")} aria-hidden />
                 </motion.span>
               </AnimatePresence>
-              <span className={cx(s.status === "DONE" ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-slate-300", s.status === "RUNNING" && "font-semibold")}>{s.label}</span>
+              <span className={cx(s.status === "DONE" ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-gray-300", s.status === "RUNNING" && "font-semibold")}>{s.label}</span>
               <span className="sr-only">({v.sr})</span>
             </li>
           );

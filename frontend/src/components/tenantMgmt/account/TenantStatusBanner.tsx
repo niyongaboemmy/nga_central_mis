@@ -105,7 +105,7 @@ const TenantStatusBanner: React.FC = () => {
             <span className="min-w-0 flex-1 text-sm font-semibold">{grace ? "Subscription expired" : "School suspended"}</span>
             <Link
               to="/settings/subscription"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-white dark:text-slate-900"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-white dark:text-gray-900"
             >
               <CreditCard className="h-4 w-4" aria-hidden /> Pay
             </Link>
@@ -118,7 +118,7 @@ const TenantStatusBanner: React.FC = () => {
                 key={w.key}
                 layout
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="flex w-full items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-1.5 shadow-sm dark:border-red-500/40 dark:bg-slate-900 sm:w-72"
+                className="flex w-full items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-1.5 shadow-sm dark:border-red-500/40 dark:bg-gray-900 sm:w-72"
               >
                 <span className="sr-only">{w.label} almost at its limit</span>
                 <div className="min-w-0 flex-1">
@@ -130,7 +130,7 @@ const TenantStatusBanner: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => dismiss(w.key)}
-                  className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="rounded-lg p-1 text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   <X className="h-4 w-4" aria-hidden />
                   <span className="sr-only">Hide {w.label} warning for today</span>
