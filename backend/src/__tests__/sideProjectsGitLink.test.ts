@@ -22,6 +22,9 @@ import { setGitHubFetch } from "../services/sideProjects/git/github";
 import { syncDue } from "../services/sideProjects/git/linkMode";
 import { suggestAuthor } from "../routes/sideProjectsGit";
 import { findRefs } from "../services/sideProjects/git/refs";
+import { roleOrder, setTestProviders } from "../services/aiProviders/registry";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+import * as drafts from "../services/sideProjects/git/drafts";
 
 const rows = (r: unknown): any[] => (Array.isArray(r) && Array.isArray(r[0]) ? r[0] : (r as any[]));
 const q = async (s: any) => rows(await db.execute(s));
@@ -487,6 +490,42 @@ describe("confirming and precedence", () => {
     const ok = await api().put(`/side-projects/git/projects/${pubProject}/team/${freelancer}/github`).set(as(lead)).send({ login: "kezo-dev" });
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
     expect(Number(await author("Second account work"))).toBe(freelancer);
+  });
+
+  it("an unknown AI role falls back to the default order instead of crashing (Word it with AI)", () => {
+    expect(roleOrder("assist" as any)).toBeUndefined();
+    expect(roleOrder("draft")?.length).toBeGreaterThan(0);
+  });
+
+  it("Word it with AI writes the draft with the draft role, and survives a provider failure", async () => {
+    setAiPolicyForTests(AI_POLICY_ALL_ON);
+    const seen: string[] = [];
+    const provider = (name: string, fail = false) => ({
+      name,
+      isConfigured: () => true,
+      supportsStrictSchema: true,
+      generateJSON: async () => {
+        seen.push(name);
+        if (fail) throw Object.assign(new Error("503 overloaded"), { status: 503 });
+        return { data: { did: "I added delivery slots and tidied the footer.", nextSteps: "Finish payments." }, model: `${name}-m` };
+      },
+    });
+    try {
+      const got = await api().get(`/side-projects/git/projects/${pubProject}/draft?polish=0`).set(as(freelancer));
+      expect(got.status, JSON.stringify(got.body)).toBe(200);
+      const id = got.body.data.draft.id;
+      setTestProviders({ glm: provider("glm", true), gemini: provider("gemini") } as any);
+      const d = await drafts.polishDraft(id, freelancer);
+      expect(d.did).toBe("I added delivery slots and tidied the footer.");
+      expect(d.aiPolished).toBe(true);
+      expect(seen).toEqual(["glm", "gemini"]); // the draft role's order, glm first
+      setTestProviders({ glm: provider("glm", true) } as any);
+      await db.execute(sql`UPDATE SideProjectReportDraft SET ai_polished = 0 WHERE draft_id = ${id}`);
+      await expect(drafts.polishDraft(id, freelancer)).rejects.toBeTruthy();
+    } finally {
+      setTestProviders(null);
+      setAiPolicyForTests(null);
+    }
   });
 
   it("GitHub's pull request numbers are not task references", () => {

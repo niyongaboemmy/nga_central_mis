@@ -1,3 +1,4 @@
+import logger from "../utils/logger";
 import express from "express";
 import { sql } from "drizzle-orm";
 import { authenticate } from "../middleware/auth";
@@ -477,7 +478,15 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
     handle(async (req) => {
       const d = await ownDraft(req);
       if (!(await mayPolish(req, d.projectId))) fail(403, "AI_DISABLED", "AI wording isn't available for you here");
-      return drafts.polishDraft(d.id, uid(req));
+      try {
+        return await drafts.polishDraft(d.id, uid(req));
+      } catch (e: any) {
+        // A known refusal (403 AI off, 404) keeps its status; a provider failure is not a 500.
+        if (e?.status && e.status < 500) throw e;
+        if (e?.code === "AI_DISABLED" || e?.name === "AiDisabledError") throw e;
+        logger.warn(`[git] AI wording failed for draft ${d.id}: ${e?.message ?? e}`);
+        fail(503, "AI_UNAVAILABLE", "The AI couldn't word your report right now. Your draft is unchanged; try again in a minute.");
+      }
     }),
   );
 
