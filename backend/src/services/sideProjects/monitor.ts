@@ -374,45 +374,13 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
   };
 }
 
-export async function exportRows(scope: ScopeEntry | null, f: MonitorFilters, format: "csv" | "xlsx") {
+/** The report behind Excel / CSV / PDF: the table's filtered rows, in words (report.ts). */
+export async function exportRows(scope: ScopeEntry | null, f: MonitorFilters, format: "csv" | "xlsx" | "pdf", opts: { generatedBy?: string } = {}) {
   const rows = await loadRows(scope, f);
-  const data = rows.map((p) => ({
-    "Reg. number": p.student.regNumber ?? "",
-    Owner: p.student.name ?? "",
-    "Owner type": p.student.type,
-    Class: p.class?.name ?? "",
-    Grade: p.class?.grade ?? "",
-    Programme: p.class?.program ?? "",
-    "Academic year": p.year?.name ?? "",
-    Title: p.title,
-    Customer: (p as any).customer?.name ?? "Own initiative",
-    Type: p.kind === "DELIVERY_STUDIO" ? "NGA Delivery Studio" : p.kind === "STUDENT" ? "Student project" : "Individual project",
-    Category: p.category?.name ?? "",
-    Technologies: (p.techTags as string[]).join(", "),
-    Status: p.status,
-    Review: p.reviewState,
-    "Progress %": p.progress,
-    Health: p.health,
-    "Days in stage": p.stage.daysIn ?? "",
-    "Stage due": p.stage.plannedEnd ?? "",
-    "Stage overrun (days)": p.stage.overrunDays || "",
-    "Last report": p.lastReport ?? "",
-    Concept: p.docs.CONCEPT ? "yes" : p.conceptPending ? "pending" : "no",
-    SRS: p.docs.SRS ? "yes" : "no",
-    "Implementation plan": p.docs.IMPLEMENTATION_PLAN ? "yes" : "no",
-    GitHub: p.githubUrl ?? "",
-    "Live link": p.accessUrl ?? "",
-    Supervisor: p.supervisor?.name ?? "",
-    "Last activity": p.lastActivityAt,
-    Created: p.createdAt,
-    Completed: p.completedAt ?? "",
-    Verified: p.verifiedAt ?? "",
-  }));
-  const ws = XLSX.utils.json_to_sheet(data.length ? data : [{ "Reg. number": "" }]);
-  if (format === "csv") return { body: Buffer.from("﻿" + XLSX.utils.sheet_to_csv(ws), "utf8"), count: rows.length };
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Side projects");
-  return { body: XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer, count: rows.length };
+  const report = await import("./report");
+  if (format === "csv") return { body: report.buildCsv(rows), count: rows.length };
+  if (format === "pdf") return { body: await report.buildPdf(rows, f, opts.generatedBy ?? "MIS"), count: Math.min(rows.length, report.PDF_MAX_ROWS) };
+  return { body: await report.buildWorkbook(rows, f), count: rows.length };
 }
 
 /** Filter options for the bar (only what the viewer can see). */
