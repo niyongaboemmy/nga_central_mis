@@ -21,7 +21,7 @@ import type { Viewer } from "../services/sideProjects/access";
 import { setGitHubFetch } from "../services/sideProjects/git/github";
 import { syncDue } from "../services/sideProjects/git/linkMode";
 import { suggestAuthor } from "../routes/sideProjectsGit";
-import { findRefs } from "../services/sideProjects/git/refs";
+import { closingRefs, findRefs } from "../services/sideProjects/git/refs";
 import { roleOrder, setTestProviders } from "../services/aiProviders/registry";
 import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
 import * as drafts from "../services/sideProjects/git/drafts";
@@ -531,7 +531,10 @@ describe("confirming and precedence", () => {
   it("GitHub's pull request numbers are not task references", () => {
     expect(findRefs("Merge pull request #56 from niyongaboemmy/feat/multi-tenancy", "ANCM", { allowBare: true })).toEqual([]);
     expect(findRefs("feat(side-projects): several repositories (#141)", "ANCM", { allowBare: true })).toEqual([]);
-    expect(findRefs("Fix the form for #27 (#141)", "ANCM", { allowBare: true })).toEqual([27]);
+    expect(findRefs("Fix the form for #27 (#141)", "ANCM", { allowBare: true })).toEqual([]);
+    expect(findRefs("Fix the form for task #27 (#141)", "ANCM", { allowBare: true })).toEqual([27]);
+    expect(findRefs("Body: what PR #50 showed, see #52 and Merge pull request #56 in a sentence", "ANCM", { allowBare: true })).toEqual([]);
+    expect(closingRefs("Fixes #56 and closes ANCM-27", "ANCM")).toEqual([27]);
     expect(findRefs("Merge pull request #12 from x/feat/ANCM-27-form", "ANCM", { allowBare: true })).toEqual([27]);
   });
 });
