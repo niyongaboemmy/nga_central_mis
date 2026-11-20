@@ -205,12 +205,14 @@ export function sideProjectsRouter(
     handle(async (req, res) => {
       const v = await viewer(req);
       if (isEmptyScope(v.detail)) fail(403, "FORBIDDEN", "You can't export projects");
-      const format = req.query.format === "csv" ? "csv" : "xlsx";
-      const out = await monitor.exportRows(v.detail, monitor.parseFilters(req.query), format);
+      const format = req.query.format === "csv" ? "csv" : req.query.format === "pdf" ? "pdf" : "xlsx";
+      const me = await one(sql`SELECT TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) AS name FROM UserProfile WHERE user_id = ${uid(req)}`);
+      const out = await monitor.exportRows(v.detail, monitor.parseFilters(req.query), format, { generatedBy: me?.name || "MIS" });
       await recordActivity(uid(req), "SIDE_PROJECT_EXPORT", `Exported ${out.count} side projects (${format})`, "side_project", undefined, { filters: req.query });
       const stamp = new Date().toISOString().slice(0, 10);
-      res.set("Content-Type", format === "csv" ? "text/csv; charset=utf-8" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.set("Content-Disposition", `attachment; filename="side-projects-${stamp}.${format}"`);
+      const types = { csv: "text/csv; charset=utf-8", pdf: "application/pdf", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" } as const;
+      res.set("Content-Type", types[format]);
+      res.set("Content-Disposition", `attachment; filename="projects-report-${stamp}.${format}"`);
       res.send(out.body);
       return undefined;
     }),

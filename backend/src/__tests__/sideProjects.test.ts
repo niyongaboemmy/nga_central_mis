@@ -446,9 +446,34 @@ describe("monitor, review and supervision", () => {
     expect(csv.status).toBe(200);
     expect(csv.text).toContain("Reg. number");
     expect(csv.text).toContain(`SPA${alice}`);
+    // Words, not codes: statuses, health and the one-line time in stage.
+    expect(csv.text).toContain("Time in stage");
+    expect(csv.text).not.toMatch(/,IN_PROGRESS,/);
     expect((await api().get("/side-projects/monitor/export").set(as(insights))).status).toBe(403);
-    const audit = rows(await db.execute(sql`SELECT 1 FROM ActivityLog WHERE user_id = ${lead} AND action_type = 'SIDE_PROJECT_EXPORT'`));
-    expect(audit.length).toBe(1);
+    // Excel: a Summary sheet and a Projects sheet.
+    const xlsx = await api().get("/side-projects/monitor/export?format=xlsx").set(as(lead)).buffer(true).parse((res, cb) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(xlsx.status).toBe(200);
+    const XLSX = await import("xlsx");
+    const wb = XLSX.read(xlsx.body as Buffer, { type: "buffer" });
+    expect(wb.SheetNames).toEqual(["Summary", "Projects"]);
+    expect(String(XLSX.utils.sheet_to_csv(wb.Sheets.Summary))).toContain("Projects report");
+    expect(XLSX.utils.sheet_to_json<any>(wb.Sheets.Projects).some((r) => r["Reg. number"] === `SPA${alice}`)).toBe(true);
+    // PDF report.
+    const pdf = await api().get("/side-projects/monitor/export?format=pdf").set(as(lead)).buffer(true).parse((res, cb) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers["content-type"]).toBe("application/pdf");
+    expect(pdf.headers["content-disposition"]).toMatch(/projects-report-\d{4}-\d{2}-\d{2}\.pdf/);
+    expect((pdf.body as Buffer).subarray(0, 5).toString()).toBe("%PDF-");
+    const audit = rows(await db.execute(sql`SELECT description FROM ActivityLog WHERE user_id = ${lead} AND action_type = 'SIDE_PROJECT_EXPORT'`));
+    expect(audit.length).toBe(3);
   });
 
   it("lets the lead correct a status with a reason, archive and delete; others can't", async () => {

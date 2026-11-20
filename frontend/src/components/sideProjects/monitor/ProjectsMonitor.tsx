@@ -2,9 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, Github, Globe, Kanban, LayoutDashboard, List, RefreshCw, Search, Upload, UserCheck, X, ShieldAlert, GraduationCap, Briefcase, FolderKanban } from "lucide-react";
+  ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, FileSpreadsheet, FileText, FileX2, Filter, Github, Globe, Kanban, LayoutDashboard, List, RefreshCw, Search, Upload, UserCheck, X, ShieldAlert, GraduationCap, Briefcase, FolderKanban } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type FilterOptions, type Me, type MonitorRow, type Summary } from "../../../api/sideProjects";
 import { useUser } from "../../../contexts/UserContext";
+import { useToast } from "../../../contexts/ToastContext";
 import UserAvatar from "../../ui/UserAvatar";
 import SelectField from "../../ui/SelectField";
 import { TYPE_LABEL } from "../fields";
@@ -27,6 +28,89 @@ const selectCls = "min-w-0 max-w-full rounded-full border border-slate-900/[0.07
  * dashboard (tiles and charts drill into the list), the list, a school-wide board and the
  * shared drawer with review. Filters live in the URL so a view can be shared.
  */
+const PAGE_SIZES = [10, 25, 50, 100];
+
+/** Time in stage, on one line: the stage chip and how fresh the last report is (details in tooltips). */
+export const StageCell: React.FC<{ r: MonitorRow }> = ({ r }) => {
+  const report = r.lastReport === undefined ? null : r.lastReport ? timeAgo(`${r.lastReport}T12:00:00Z`) : null;
+  const done = r.status === "COMPLETED";
+  return (
+    <div className="flex items-center gap-1.5">
+      {done ? <span className="whitespace-nowrap text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">Completed</span> : <StageChip card={r} compact />}
+      {r.lastReport !== undefined && !done && (
+        <span
+          className={`inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-[10px] font-medium ${report ? "text-slate-500 dark:text-gray-400" : "text-amber-700 dark:text-amber-300"}`}
+          title={report ? `Last progress report ${report}` : "No progress report yet"}
+        >
+          {report ? <FileText className="h-3 w-3" aria-hidden /> : <FileX2 className="h-3 w-3" aria-hidden />}
+          {report ? report.replace(/ ago$/, "") : "No report"}
+        </span>
+      )}
+    </div>
+  );
+};
+
+/** Page numbers with gaps: 1 … 4 5 6 … 12. */
+export function pageList(page: number, pages: number): Array<number | "gap"> {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const set = new Set([1, pages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= pages));
+  const sorted = [...set].sort((a, b) => a - b);
+  const out: Array<number | "gap"> = [];
+  sorted.forEach((n, i) => {
+    if (i && n - sorted[i - 1] > 1) out.push("gap");
+    out.push(n);
+  });
+  return out;
+}
+
+export const Pager: React.FC<{ page: number; size: number; total: number; onPage: (n: number) => void; onSize: (n: number) => void }> = ({ page, size, total, onPage, onSize }) => {
+  const pages = Math.max(1, Math.ceil(total / size));
+  const from = total ? (page - 1) * size + 1 : 0;
+  const to = Math.min(page * size, total);
+  const btn = "inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full px-2 text-xs font-semibold tabular-nums transition disabled:opacity-40";
+  return (
+    <nav aria-label="Pages" className="flex flex-col gap-2 border-t border-slate-900/[0.05] px-4 py-2.5 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.06] dark:text-gray-300">
+      <div className="flex items-center gap-3">
+        <span className="tabular-nums">
+          {from}–{to} of {total} {total === 1 ? "project" : "projects"}
+        </span>
+        <label className="inline-flex items-center gap-1.5">
+          <span className="text-slate-500 dark:text-gray-400">Rows</span>
+          <SelectField aria-label="Rows per page" value={size} onChange={(e) => onSize(Number(e.target.value))} className="rounded-full border border-slate-900/[0.07] bg-white px-2 py-0.5 text-xs dark:border-white/10 dark:bg-gray-900">
+            {PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </SelectField>
+        </label>
+      </div>
+      <div className="flex items-center gap-1">
+        <button type="button" className={`${btn} hover:bg-slate-100 dark:hover:bg-gray-700/50`} disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Previous page">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        {pageList(Math.min(page, pages), pages).map((n, i) =>
+          n === "gap" ? (
+            <span key={`g${i}`} className="px-1 text-slate-400" aria-hidden>…</span>
+          ) : (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onPage(n)}
+              aria-label={`Page ${n}`}
+              aria-current={n === page ? "page" : undefined}
+              className={`${btn} ${n === page ? "bg-blue-600 text-white" : "hover:bg-slate-100 dark:hover:bg-gray-700/50"}`}
+            >
+              {n}
+            </button>
+          ),
+        )}
+        <button type="button" className={`${btn} hover:bg-slate-100 dark:hover:bg-gray-700/50`} disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Next page">
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </nav>
+  );
+};
+
 const ProjectsMonitor: React.FC = () => {
   const dark = useIsDark();
   const { user } = useUser();
@@ -40,11 +124,14 @@ const ProjectsMonitor: React.FC = () => {
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const { showToast } = useToast();
+  const [exporting, setExporting] = useState<"xlsx" | "pdf" | "csv" | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
 
   const tab = (params.get("tab") as Tab) || "dashboard";
-  const page = Number(params.get("page") || 1);
+  const page = Math.max(1, Number(params.get("page") || 1));
+  const size = PAGE_SIZES.includes(Number(params.get("size"))) ? Number(params.get("size")) : 25;
   const sort = params.get("sort") || "activity";
   const dir = params.get("dir") || "desc";
   const openId = Number(params.get("project")) || null;
@@ -90,7 +177,7 @@ const ProjectsMonitor: React.FC = () => {
     try {
       const q = { ...filters, ...scopeParam };
       if (effectiveTab === "dashboard") setSummary(await sideProjectsApi.summary(q));
-      else if (effectiveTab === "list" || effectiveTab === "supervising") setRows(await sideProjectsApi.list({ ...q, page, sort, dir, pageSize: 25 }));
+      else if (effectiveTab === "list" || effectiveTab === "supervising") setRows(await sideProjectsApi.list({ ...q, page, sort, dir, pageSize: size }));
       else if (effectiveTab === "board") setBoard(await sideProjectsApi.board(q));
       setRefreshedAt(new Date());
     } catch (e) {
@@ -99,7 +186,7 @@ const ProjectsMonitor: React.FC = () => {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, effectiveTab, JSON.stringify(filters), page, sort, dir]);
+  }, [me, effectiveTab, JSON.stringify(filters), page, size, sort, dir]);
 
   useEffect(() => {
     load();
@@ -149,6 +236,26 @@ const ProjectsMonitor: React.FC = () => {
     </th>
   );
 
+  const download = async (format: "xlsx" | "pdf" | "csv") => {
+    setExporting(format);
+    try {
+      const { blob, name } = await sideProjectsApi.exportFile({ ...filters }, format);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      showToast(format === "pdf" ? "PDF report downloaded" : format === "xlsx" ? "Excel report downloaded" : "CSV downloaded", "success");
+    } catch (e) {
+      showToast(failure(e, "Couldn't create the report. Try again").message, "error");
+    } finally {
+      setExporting(null);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-[96rem] space-y-4 px-4 py-6">
       <PageHeader
@@ -164,12 +271,15 @@ const ProjectsMonitor: React.FC = () => {
           <>
             {detail && (
               <>
-                <a href={sideProjectsApi.exportUrl({ ...filters }, "xlsx")} className={`${secondaryBtn} !min-h-[36px] !px-3.5 !py-1.5`}>
-                  <FileSpreadsheet className="h-4 w-4" /> Excel
-                </a>
-                <a href={sideProjectsApi.exportUrl({ ...filters }, "csv")} className={`${secondaryBtn} !min-h-[36px] !px-3.5 !py-1.5`}>
-                  <Download className="h-4 w-4" /> CSV
-                </a>
+                <button type="button" onClick={() => download("xlsx")} disabled={exporting !== null} className={`${secondaryBtn} !min-h-[36px] !px-3.5 !py-1.5`} title="Summary and every project, with the filters you chose">
+                  {exporting === "xlsx" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} Excel
+                </button>
+                <button type="button" onClick={() => download("pdf")} disabled={exporting !== null} className={`${secondaryBtn} !min-h-[36px] !px-3.5 !py-1.5`} title="A printable report of the filtered projects">
+                  {exporting === "pdf" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} PDF
+                </button>
+                <button type="button" onClick={() => download("csv")} disabled={exporting !== null} aria-label="Download CSV" title="CSV" className={iconBtn}>
+                  {exporting === "csv" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                </button>
               </>
             )}
             {me?.manageAny && (
@@ -340,10 +450,7 @@ const ProjectsMonitor: React.FC = () => {
                           </div>
                           <HealthDot health={r.health} withLabel />
                         </td>
-                        <td className="px-3 py-2.5">
-                          <StageChip card={r} />
-                          {r.lastReport !== undefined && <p className="mt-1 text-[10px] text-slate-500 dark:text-gray-400">{r.lastReport ? `Report ${timeAgo(`${r.lastReport}T12:00:00Z`)}` : "No report yet"}</p>}
-                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5"><StageCell r={r} /></td>
                         <td className="px-3 py-2.5"><DocChips docs={r.docs} pending={r.conceptPending} /></td>
                         <td className="px-3 py-2.5">
                           <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -357,13 +464,7 @@ const ProjectsMonitor: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              <div className="flex items-center justify-between border-t border-slate-900/[0.05] px-4 py-2 text-xs text-slate-600 dark:border-white/[0.06] dark:text-gray-300">
-                <span className="tabular-nums">{(page - 1) * 25 + 1}–{Math.min(page * 25, rows.total)} / {rows.total}</span>
-                <div className="flex gap-1">
-                  <button type="button" className={`${secondaryBtn} !px-2 !py-1`} disabled={page <= 1} onClick={() => patch({ page: page - 1 }, { resetPage: false })} aria-label="Previous page"><ChevronLeft className="h-4 w-4" /></button>
-                  <button type="button" className={`${secondaryBtn} !px-2 !py-1`} disabled={page * 25 >= rows.total} onClick={() => patch({ page: page + 1 }, { resetPage: false })} aria-label="Next page"><ChevronRight className="h-4 w-4" /></button>
-                </div>
-              </div>
+              <Pager page={page} size={size} total={rows.total} onPage={(n) => patch({ page: n }, { resetPage: false })} onSize={(n) => patch({ size: n === 25 ? null : n })} />
             </>
           )}
         </div>

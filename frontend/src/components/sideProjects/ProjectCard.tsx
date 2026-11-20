@@ -14,28 +14,36 @@ export interface ProjectCardProps {
 }
 
 /** Days in the current stage and what is left of its window, as one small chip. */
-export const StageChip: React.FC<{ card: Pick<Card, "status" | "stage" | "pausedFrom"> }> = ({ card }) => {
+/**
+ * How long the project has been in its stage. `compact` is the one-line table form
+ * ("Day 2 · 10d left"): never wraps, the full sentence is in the tooltip.
+ */
+export const StageChip: React.FC<{ card: Pick<Card, "status" | "stage" | "pausedFrom">; compact?: boolean }> = ({ card, compact }) => {
   const t = card.stage;
   if (!t || card.status === "COMPLETED") return null;
+  const d = (n: number) => (compact ? `${n}d` : dayWord(n));
+  const base = `inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums`;
   if (card.status === "ON_HOLD") {
     const from = STATUS_META[pathStage(card.status, card.pausedFrom)];
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-gray-700/50 dark:text-gray-200" title={`Paused during ${from.label}`}>
+      <span className={`${base} bg-slate-100 text-slate-700 dark:bg-gray-700/50 dark:text-gray-200`} title={`${t.daysIn !== null ? `${dayWord(t.daysIn)} paused` : "Paused"} during ${from.label}`}>
         <PauseCircle className="h-3 w-3" aria-hidden />
-        {t.daysIn !== null ? `${dayWord(t.daysIn)} paused` : "Paused"} · {from.label}
+        {t.daysIn !== null ? `${d(t.daysIn)} paused` : "Paused"} · {from.label}
       </span>
     );
   }
-  const over = t.overrunDays > 0;
+  const overBy = t.overrunDays > 0 ? t.overrunDays : t.daysLeft !== null && t.daysLeft < 0 ? -t.daysLeft : 0;
+  const over = overBy > 0;
   const soon = !over && t.daysLeft !== null && t.daysLeft <= 2;
   const cls = over
     ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
     : soon
       ? "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-200"
       : "bg-slate-100 text-slate-600 dark:bg-gray-700/50 dark:text-gray-300";
-  const left = over ? `${dayWord(t.overrunDays)} over` : t.daysLeft !== null ? (t.daysLeft === 0 ? "due today" : `${dayWord(t.daysLeft)} left`) : null;
+  const left = over ? `${d(overBy)} over` : t.daysLeft !== null ? (t.daysLeft === 0 ? "due today" : `${d(t.daysLeft)} left`) : null;
+  const full = `Day ${(t.daysIn ?? 0) + 1} in ${STATUS_META[card.status].label}${over ? `, ${dayWord(overBy)} past the plan` : t.daysLeft !== null ? `, ${t.daysLeft === 0 ? "due today" : `${dayWord(t.daysLeft)} left`}` : ""}${t.plannedEnd ? ` (planned to end ${t.plannedEnd})` : ""}`;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums ${cls}`} title={`${dayWord(t.daysIn ?? 0)} in ${STATUS_META[card.status].label}${t.plannedEnd ? `, planned to end ${t.plannedEnd}` : ""}`}>
+    <span className={`${base} ${cls}`} title={full}>
       <Timer className="h-3 w-3" aria-hidden />
       {t.daysIn !== null ? `Day ${t.daysIn + 1}` : STATUS_META[card.status].label}
       {left && <span className="font-medium">· {left}</span>}

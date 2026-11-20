@@ -651,7 +651,28 @@ export const sideProjectsApi = {
     api.get<Data<{ total: number; page: number; pageSize: number; rows: MonitorRow[] }>>(`${B}/monitor/projects`, { params }).then((r) => r.data.data),
   board: (params: Record<string, unknown>) => api.get<Data<MonitorRow[]>>(`${B}/monitor/board`, { params }).then((r) => r.data.data),
   staffGet: (id: number) => api.get<Data<ProjectDetail>>(`${B}/monitor/projects/${id}`).then((r) => r.data.data),
-  exportUrl: (params: Record<string, unknown>, format: "csv" | "xlsx") => {
+  /** The All projects report as a file (Excel / PDF / CSV), with the server's file name. */
+  exportFile: async (params: Record<string, unknown>, format: "csv" | "xlsx" | "pdf") => {
+    const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ""));
+    let r;
+    try {
+      r = await api.get(`${B}/monitor/export`, { params: { ...clean, format }, responseType: "blob", timeout: 180_000 });
+    } catch (e: any) {
+      // A refusal comes back as a Blob too: read it so the message reaches the toast.
+      const data = e?.response?.data;
+      if (data && typeof data.text === "function") {
+        try {
+          e.response.data = JSON.parse(await data.text());
+        } catch {
+          /* not JSON */
+        }
+      }
+      throw e;
+    }
+    const name = /filename="([^"]+)"/.exec(String(r.headers?.["content-disposition"] ?? ""))?.[1] ?? `projects-report.${format}`;
+    return { blob: r.data as Blob, name };
+  },
+  exportUrl: (params: Record<string, unknown>, format: "csv" | "xlsx" | "pdf") => {
     const q = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
     q.set("format", format);
