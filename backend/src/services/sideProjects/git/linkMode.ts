@@ -20,18 +20,24 @@ import { ensureTaskKey } from "./store";
  */
 
 export const SYNC_EVERY_MIN = 9;
-/** Commits whose changed files we look up per sync (each is one API request). */
+/** Commits whose changed files we look up per sync (each is one API request): fewer without a
+ *  token, where every repository shares the server's 60 requests an hour. */
 const FILE_LOOKUPS_PER_SYNC = 20;
+const FILE_LOOKUPS_SHARED = 3;
 const FIRST_SYNC_DAYS = 14;
 
 export interface SyncState {
   v: 1;
   branches: Record<string, string>;
   pulls: Record<string, string>;
-  etags: { branches?: string; pulls?: string };
+  etags: { branches?: string; pulls?: string; [page: string]: string | undefined };
 }
 
-export class SyncError extends Error {}
+export class SyncError extends Error {
+  constructor(message: string, readonly limited = false) {
+    super(message);
+  }
+}
 
 /** owner/repo from anything people paste: the page, the clone URL, SSH, or owner/repo. */
 export function parseRepo(raw: unknown): { owner: string; repo: string } | null {
@@ -77,7 +83,7 @@ function why(r: ApiReply, hasToken: boolean): string {
 
 async function get<T = any>(path: string, token: string | null, etag?: string | null): Promise<ApiReply<T>> {
   const r = await restGet<T>(path, { token, etag });
-  if (r.status !== 200 && r.status !== 304) throw new SyncError(why(r, !!token));
+  if (r.status !== 200 && r.status !== 304) throw new SyncError(why(r, !!token), (r.status === 403 || r.status === 429) && r.remaining === 0);
   return r;
 }
 
@@ -111,17 +117,19 @@ export async function connectByUrl(projectId: number, by: number, input: Connect
     fail(409, "REPO_IN_USE", "This repository is already connected to another project. Give each project a folder to share it", "pathPrefix");
   }
   const sealed = token ? packSealed(seal(token, aad(projectId))) : null;
+  // Another repository of the same project takes the project's settings (automations, auto-submit).
+  const settings = (await one(sql`SELECT settings FROM GitRepoLink WHERE project_id = ${projectId} AND status = 'ACTIVE' AND repo_id <> ${repo.id} ORDER BY link_id LIMIT 1`))?.settings ?? null;
   await db.execute(sql`
     INSERT INTO GitRepoLink (project_id, provider, repo_id, full_name, html_url, installation_id, access_mode, token_sealed, token_hint, default_branch, path_prefix, settings, status, connected_by, sync_state, synced_at, sync_error, created_at, updated_at)
-    VALUES (${projectId}, 'github', ${repo.id}, ${repo.full_name}, ${repo.html_url}, NULL, 'LINK', ${sealed}, ${token ? keyHint(token) : null}, ${repo.default_branch || "main"}, ${prefix}, NULL, 'ACTIVE', ${by}, NULL, NULL, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+    VALUES (${projectId}, 'github', ${repo.id}, ${repo.full_name}, ${repo.html_url}, NULL, 'LINK', ${sealed}, ${token ? keyHint(token) : null}, ${repo.default_branch || "main"}, ${prefix}, ${settings}, 'ACTIVE', ${by}, NULL, NULL, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP())
     ON DUPLICATE KEY UPDATE repo_id = VALUES(repo_id), full_name = VALUES(full_name), html_url = VALUES(html_url), installation_id = NULL, access_mode = 'LINK',
       token_sealed = VALUES(token_sealed), token_hint = VALUES(token_hint), default_branch = VALUES(default_branch), path_prefix = VALUES(path_prefix),
       status = 'ACTIVE', connected_by = VALUES(connected_by), sync_state = NULL, synced_at = NULL, sync_error = NULL, updated_at = UTC_TIMESTAMP()`);
   await db.execute(sql`UPDATE SideProject SET github_url = ${repo.html_url} WHERE project_id = ${projectId} AND (github_url IS NULL OR github_url = '')`);
   await ensureTaskKey(projectId);
-  const link = await one(sql`SELECT link_id FROM GitRepoLink WHERE project_id = ${projectId}`);
+  const link = await one(sql`SELECT link_id FROM GitRepoLink WHERE project_id = ${projectId} AND repo_id = ${repo.id}`);
   const sync = await syncLink(Number(link!.link_id)).catch((e) => ({ error: String(e?.message ?? e) }));
-  return { fullName: repo.full_name as string, private: !!repo.private, sync };
+  return { linkId: Number(link!.link_id), fullName: repo.full_name as string, private: !!repo.private, sync };
 }
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
@@ -187,11 +195,12 @@ export async function syncLink(linkId: number, now = new Date()) {
       for (let page = 2; page <= 5 && list.length === (page - 1) * 100; page++) {
         const more = await get<any[]>(`/repos/${full}/branches?per_page=100&page=${page}`, token);
         if (Array.isArray(more.data)) list.push(...more.data);
+        state.etags[`branches${page}`] = more.etag ?? undefined;
       }
       const heads = new Map<string, string>(list.map((x: any) => [String(x.name), String(x.commit?.sha ?? "")]));
       if (first) for (const [name, sha] of heads) if (name !== defaultBranch && !active.has(name)) state.branches[name] = sha;
       const changed = [...heads.entries()].filter(([name, sha]) => state.branches[name] !== sha).sort(([a], [z]) => (a === defaultBranch ? 1 : z === defaultBranch ? -1 : 0));
-      let lookups = FILE_LOOKUPS_PER_SYNC;
+      let lookups = token || process.env.GITHUB_TOKEN ? FILE_LOOKUPS_PER_SYNC : FILE_LOOKUPS_SHARED;
       for (const [name, sha] of changed) {
         if (name !== defaultBranch && !(name in state.branches)) {
           touched.push(...(await applyEvent("create", { ref_type: "branch", ref: name, repository: { id: repo }, sender: {} })));
@@ -289,8 +298,10 @@ export async function syncDue(limit = 30): Promise<number> {
     try {
       await syncLink(Number(r.link_id));
       n++;
-    } catch {
-      /* stored as sync_error */
+    } catch (e) {
+      // Stored as sync_error. GitHub's hourly limit is shared by every repository: stop here and
+      // let the next run go on, instead of spending the rest of the hour on refusals.
+      if (e instanceof SyncError && e.limited) break;
     }
   }
   return n;
@@ -298,12 +309,35 @@ export async function syncDue(limit = 30): Promise<number> {
 
 /** Sync a project's repository when it is a link and the last sync is older than `minutes`. */
 export async function syncIfStale(projectId: number, minutes = 3): Promise<boolean> {
-  const l = await one(sql`
+  const rows = await many(sql`
     SELECT link_id FROM GitRepoLink WHERE project_id = ${projectId} AND status = 'ACTIVE' AND access_mode = 'LINK'
-      AND (synced_at IS NULL OR synced_at < UTC_TIMESTAMP() - INTERVAL ${minutes} MINUTE)`);
-  if (!l) return false;
-  await syncLink(Number(l.link_id)).catch(() => undefined);
-  return true;
+      AND (synced_at IS NULL OR synced_at < UTC_TIMESTAMP() - INTERVAL ${minutes} MINUTE) ORDER BY link_id`);
+  for (const r of rows) {
+    try {
+      await syncLink(Number(r.link_id));
+    } catch (e) {
+      if (e instanceof SyncError && e.limited) break;
+    }
+  }
+  return rows.length > 0;
+}
+
+/** Sync every link-mode repository of a project now ("Sync now"); totals across them. */
+export async function syncProject(projectId: number) {
+  const rows = await many(sql`SELECT link_id, full_name FROM GitRepoLink WHERE project_id = ${projectId} AND status = 'ACTIVE' AND access_mode = 'LINK' ORDER BY link_id`);
+  const out = { branches: 0, commits: 0, prs: 0, repos: rows.length, errors: [] as string[] };
+  for (const r of rows) {
+    try {
+      const x = await syncLink(Number(r.link_id));
+      out.branches += x.branches;
+      out.commits += x.commits;
+      out.prs += x.prs;
+    } catch (e: any) {
+      out.errors.push(`${r.full_name}: ${e?.message ?? e}`);
+      if (e instanceof SyncError && e.limited) break;
+    }
+  }
+  return out;
 }
 
 // ─── Who is who ───────────────────────────────────────────────────────────────
@@ -367,12 +401,25 @@ export async function claimAuthor(projectId: number, userId: number, body: { log
   return { ok: true };
 }
 
-/** Link-mode details for the panel (never the token). */
-export async function linkModeInfo(projectId: number) {
-  const r = await one(sql`
-    SELECT access_mode, token_hint, sync_error,
-           DATE_FORMAT(synced_at, '%Y-%m-%dT%H:%i:%sZ') AS synced_at
-    FROM GitRepoLink WHERE project_id = ${projectId} AND status = 'ACTIVE'`);
-  if (!r) return null;
-  return { mode: String(r.access_mode) as "APP" | "LINK", tokenHint: r.token_hint ?? null, syncedAt: r.synced_at ?? null, syncError: r.sync_error ?? null };
+/** Every connected repository for the panel (never the token). */
+export async function linksInfo(projectId: number) {
+  const rows = await many(sql`
+    SELECT link_id, full_name, html_url, default_branch, path_prefix, installation_id, access_mode, token_hint, sync_error,
+           DATE_FORMAT(synced_at, '%Y-%m-%dT%H:%i:%sZ') AS synced_at, DATE_FORMAT(last_event_at, '%Y-%m-%dT%H:%i:%sZ') AS last_event_at,
+           (SELECT COUNT(*) FROM GitCommit c WHERE c.project_id = l.project_id AND c.repo_id = l.repo_id AND c.counted = 1) AS commits
+    FROM GitRepoLink l WHERE project_id = ${projectId} AND status = 'ACTIVE' ORDER BY link_id`);
+  return rows.map((r) => ({
+    linkId: Number(r.link_id),
+    fullName: String(r.full_name),
+    htmlUrl: String(r.html_url),
+    defaultBranch: String(r.default_branch),
+    pathPrefix: r.path_prefix ?? null,
+    installationId: r.installation_id ? Number(r.installation_id) : null,
+    mode: String(r.access_mode) as "APP" | "LINK",
+    tokenHint: r.token_hint ?? null,
+    syncedAt: r.synced_at ?? null,
+    syncError: r.sync_error ?? null,
+    lastEventAt: r.last_event_at ?? null,
+    commits: Number(r.commits || 0),
+  }));
 }

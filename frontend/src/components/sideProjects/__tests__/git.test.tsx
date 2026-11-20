@@ -202,6 +202,31 @@ describe("GitHub tab", () => {
     await waitFor(() => expect(git.sync).toHaveBeenCalledWith(9));
     expect(toast).toHaveBeenCalledWith("Synced: 2 new commits, 0 pull request updates", "success");
   });
+  it("an ecosystem: several repositories, disconnect one, add another, sync all", async () => {
+    const settings = { automations: true, autoSubmitDays: 2, ignoredPaths: [], aiPolish: true, checks: false };
+    const link = (linkId: number, name: string, commits: number) => ({ linkId, fullName: `niyongaboemmy/${name}`, htmlUrl: `https://github.com/niyongaboemmy/${name}`, defaultBranch: "main", pathPrefix: null, installationId: null, mode: "LINK" as const, tokenHint: null, syncedAt: new Date().toISOString(), syncError: null, lastEventAt: null, commits });
+    git.project.mockResolvedValue(
+      panel({
+        link: { fullName: "niyongaboemmy/nga_central_mis", htmlUrl: "https://github.com/niyongaboemmy/nga_central_mis", defaultBranch: "main", pathPrefix: null, installationId: null, settings, lastEventAt: null, mode: "LINK" },
+        links: [link(1, "nga_central_mis", 40), link(2, "nga-task-mentor", 12)],
+      }),
+    );
+    git.status.mockResolvedValue({ enabled: true, oauth: false, identity: null, prefs: { aiPolish: true } });
+    git.unlink.mockResolvedValue({});
+    git.connectLink.mockResolvedValue({ fullName: "niyongaboemmy/nga-tmcode", private: false, sync: { commits: 3 } });
+    git.sync.mockResolvedValue({ ok: true, commits: 5, prs: 1, repos: 2, errors: [] });
+    render(<GitPanel p={project} meId={1} />);
+    expect(await screen.findByText("2 repositories connected")).toBeTruthy();
+    expect(screen.getByText("40 commits")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect niyongaboemmy/nga-task-mentor" }));
+    await waitFor(() => expect(git.unlink).toHaveBeenCalledWith(9, 2));
+    fireEvent.click(screen.getByRole("button", { name: /Add another repository/ }));
+    fireEvent.change(screen.getByLabelText("Repository address"), { target: { value: "https://github.com/niyongaboemmy/nga-tmcode" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Connect$/ }));
+    await waitFor(() => expect(git.connectLink).toHaveBeenCalledWith(9, { url: "https://github.com/niyongaboemmy/nga-tmcode", token: undefined, pathPrefix: null }));
+    fireEvent.click(await screen.findByRole("button", { name: /Sync all/ }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Synced 2 repositories: 5 new commits, 1 pull request updates", "success"));
+  });
   it("with the app configured, it is offered as the instant option", async () => {
     git.project.mockResolvedValue(panel({ appEnabled: true }));
     git.status.mockResolvedValue({ enabled: true, oauth: true, identity: null, prefs: { aiPolish: true } });

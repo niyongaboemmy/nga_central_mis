@@ -74,7 +74,7 @@ export async function autoSubmitDrafts(now = new Date()): Promise<number> {
   const rows = await many(sql`
     SELECT d.draft_id, d.user_id, d.notified_at, l.settings, sp.kind FROM SideProjectReportDraft d
     JOIN SideProject sp ON sp.project_id = d.project_id AND sp.deleted_at IS NULL
-    LEFT JOIN GitRepoLink l ON l.project_id = d.project_id AND l.status = 'ACTIVE'
+    LEFT JOIN GitRepoLink l ON l.link_id = (SELECT MIN(x.link_id) FROM GitRepoLink x WHERE x.project_id = d.project_id AND x.status = 'ACTIVE')
     WHERE d.status = 'OPEN' AND d.notified_at IS NOT NULL`);
   let n = 0;
   for (const r of rows) {

@@ -152,7 +152,8 @@ const GitPanel: React.FC<{ p: ProjectDetail; meId: number }> = ({ p, meId }) => 
   const [urlErr, setUrlErr] = useState<string | null>(null);
   const [token, setToken] = useState("");
   const [needToken, setNeedToken] = useState(false);
-  const [showToken, setShowToken] = useState(false);
+  const [tokenFor, setTokenFor] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
   const [login, setLogin] = useState("");
 
   const load = useCallback(async () => {
@@ -221,6 +222,8 @@ const GitPanel: React.FC<{ p: ProjectDetail; meId: number }> = ({ p, meId }) => 
       const r = await gitApi.connectLink(p.id, { url: url.trim(), token: token.trim() || undefined, pathPrefix: prefix.trim() || null });
       setNeedToken(false);
       setToken("");
+      setAdding(false);
+      setUrl("");
       showToast(r.sync?.error ? `Connected ${r.fullName}. ${r.sync.error}` : `Connected ${r.fullName}${r.sync?.commits ? `: ${r.sync.commits} commits read` : ""}`, r.sync?.error ? "warning" : "success");
       await load();
     } catch (e) {
@@ -263,77 +266,8 @@ const GitPanel: React.FC<{ p: ProjectDetail; meId: number }> = ({ p, meId }) => 
   const step1 = !!panel.link;
   const step2 = !!me.identity;
   const step3 = panel.stats.tasks > 0;
-  const isLink = panel.link?.mode === "LINK";
-  const mine = panel.unclaimed;
-
-  return (
-    <div className="space-y-5">
-      {/* Three steps to reports written from GitHub */}
-      <section className={`${cardCls} p-4 sm:p-5`} aria-label="Get your reports from GitHub">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900">
-            <Github className="h-5 w-5" aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-bold text-slate-900 dark:text-white">Reports written from your GitHub work</p>
-            <p className="text-xs text-slate-500 dark:text-gray-400">Three steps, once. Then branches move your tasks and your report fills itself.</p>
-          </div>
-          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold tabular-nums text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">{[step1, step2, step3].filter(Boolean).length}/3 done</span>
-        </div>
-
-        <ol className="mt-4 space-y-3">
-          <Step n={1} done={step1} title={step1 ? "Repository connected" : "Connect the repository"}>
-            {panel.link ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-600 dark:text-gray-300">
-                <a href={panel.link.htmlUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300">
-                  {panel.link.fullName} <ExternalLink className="h-3 w-3" aria-hidden />
-                </a>
-                {isLink ? (
-                  <span>{panel.link.syncedAt ? `synced ${timeAgo(panel.link.syncedAt)}` : "first sync pending"} · every 10 minutes{panel.link.tokenHint ? ` · token …${panel.link.tokenHint}` : ""}</span>
-                ) : (
-                  <span>live updates · {panel.link.lastEventAt ? `last activity ${timeAgo(panel.link.lastEventAt)}` : "waiting for the first push"}</span>
-                )}
-                {isLink && panel.canEdit && (
-                  <button type="button" className={`${ghostBtn} !py-1`} disabled={busy !== null} onClick={() => run("sync", async () => {
-                    const r = await gitApi.sync(p.id);
-                    if (r.commits || r.prs) showToast(`Synced: ${r.commits ?? 0} new commits, ${r.prs ?? 0} pull request updates`, "success");
-                  }, "Up to date")}>
-                    {busy === "sync" ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />} Sync now
-                  </button>
-                )}
-                {panel.canManage && (
-                  <button
-                    type="button"
-                    className={`${ghostBtn} !py-1`}
-                    disabled={busy !== null}
-                    onClick={async () => {
-                      if (await confirm({ title: "Disconnect the repository?", message: "New GitHub activity stops linking to this project. Reports already written stay.", confirmText: "Disconnect", tone: "danger" }))
-                        void run("unlink", () => gitApi.unlink(p.id), "Repository disconnected");
-                    }}
-                  >
-                    <Link2Off className="h-3.5 w-3.5" /> Disconnect
-                  </button>
-                )}
-                {panel.link.syncError && (
-                  <p role="alert" className="basis-full rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
-                    {panel.link.syncError}
-                    {panel.canManage && /token/i.test(panel.link.syncError) && (
-                      <button type="button" className="ml-2 font-semibold underline" onClick={() => setShowToken(true)}>
-                        Add a token
-                      </button>
-                    )}
-                  </p>
-                )}
-                {panel.canManage && showToken && isLink && (
-                  <div className="basis-full">
-                    <TokenBox fullName={panel.link.fullName} value={token} onChange={setToken} vault={panel.vault !== false} />
-                    <button type="button" className={`${primaryBtn} mt-2`} disabled={busy !== null || !token.trim()} onClick={() => run("token", () => gitApi.connectLink(p.id, { url: panel.link!.htmlUrl, token: token.trim(), pathPrefix: panel.link!.pathPrefix }), "Token saved").then(() => (setShowToken(false), setToken("")))}>
-                      <KeyRound className="h-4 w-4" /> Save token
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : panel.canManage ? (
+  const links = panel.links ?? (panel.link ? [{ linkId: 0, fullName: panel.link.fullName, htmlUrl: panel.link.htmlUrl, defaultBranch: panel.link.defaultBranch, pathPrefix: panel.link.pathPrefix, installationId: panel.link.installationId, mode: panel.link.mode ?? "APP", tokenHint: panel.link.tokenHint ?? null, syncedAt: panel.link.syncedAt ?? null, syncError: panel.link.syncError ?? null, lastEventAt: panel.link.lastEventAt, commits: panel.stats.commits }] : []);
+  const connectForm = (
               <div className="space-y-2">
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input value={url} onChange={(e) => (setUrl(e.target.value), setUrlErr(null))} placeholder="https://github.com/you/project" aria-label="Repository address" className={`${inputCls} flex-1 ${urlErr ? "!border-red-400" : ""}`} />
@@ -358,9 +292,107 @@ const GitPanel: React.FC<{ p: ProjectDetail; meId: number }> = ({ p, meId }) => 
                   </div>
                 </details>
               </div>
-            ) : (
-              <p className="text-xs text-slate-500 dark:text-gray-400">The project lead connects it: they paste the repository's address here. You can do step 2 already.</p>
+  );
+  const mine = panel.unclaimed;
+
+  return (
+    <div className="space-y-5">
+      {/* Three steps to reports written from GitHub */}
+      <section className={`${cardCls} p-4 sm:p-5`} aria-label="Get your reports from GitHub">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900">
+            <Github className="h-5 w-5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold text-slate-900 dark:text-white">Reports written from your GitHub work</p>
+            <p className="text-xs text-slate-500 dark:text-gray-400">Three steps, once. Then branches move your tasks and your report fills itself.</p>
+          </div>
+          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold tabular-nums text-blue-700 dark:bg-blue-500/10 dark:text-blue-300">{[step1, step2, step3].filter(Boolean).length}/3 done</span>
+        </div>
+
+        <ol className="mt-4 space-y-3">
+          <Step n={1} done={step1} title={links.length > 1 ? `${links.length} repositories connected` : step1 ? "Repository connected" : "Connect the repository"}>
+            {links.length > 0 && (
+              <div className="space-y-2">
+                <ul className="space-y-1.5" aria-label="Connected repositories">
+                  {links.map((l) => (
+                    <li key={l.linkId} className="rounded-xl border border-slate-900/[0.06] px-3 py-2 dark:border-white/[0.06]">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-gray-300">
+                        <a href={l.htmlUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-slate-900 hover:text-blue-700 dark:text-white dark:hover:text-blue-300">
+                          <Github className="h-3.5 w-3.5" aria-hidden /> {l.fullName} <ExternalLink className="h-3 w-3" aria-hidden />
+                        </a>
+                        <span className="tabular-nums">{l.commits} {l.commits === 1 ? "commit" : "commits"}</span>
+                        {l.mode === "LINK" ? (
+                          <span>{l.syncedAt ? `synced ${timeAgo(l.syncedAt)}` : "first sync pending"}{l.tokenHint ? ` · token …${l.tokenHint}` : ""}</span>
+                        ) : (
+                          <span>live updates{l.lastEventAt ? ` · last activity ${timeAgo(l.lastEventAt)}` : ""}</span>
+                        )}
+                        {panel.canManage && (
+                          <button
+                            type="button"
+                            className={`${ghostBtn} !ml-auto !py-0.5`}
+                            disabled={busy !== null}
+                            aria-label={`Disconnect ${l.fullName}`}
+                            onClick={async () => {
+                              if (await confirm({ title: `Disconnect ${l.fullName}?`, message: "New activity from this repository stops linking to the project. Reports already written stay.", confirmText: "Disconnect", tone: "danger" }))
+                                void run(`unlink:${l.linkId}`, () => gitApi.unlink(p.id, l.linkId), `${l.fullName} disconnected`);
+                            }}
+                          >
+                            <Link2Off className="h-3.5 w-3.5" /> Disconnect
+                          </button>
+                        )}
+                      </div>
+                      {l.syncError && (
+                        <p role="alert" className="mt-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
+                          {l.syncError}
+                          {panel.canManage && l.mode === "LINK" && /token/i.test(l.syncError) && (
+                            <button type="button" className="ml-2 font-semibold underline" onClick={() => setTokenFor(l.linkId)}>
+                              Add a token
+                            </button>
+                          )}
+                        </p>
+                      )}
+                      {panel.canManage && tokenFor === l.linkId && (
+                        <div className="mt-2">
+                          <TokenBox fullName={l.fullName} value={token} onChange={setToken} vault={panel.vault !== false} />
+                          <button type="button" className={`${primaryBtn} mt-2`} disabled={busy !== null || !token.trim()} onClick={() => run("token", () => gitApi.connectLink(p.id, { url: l.htmlUrl, token: token.trim(), pathPrefix: l.pathPrefix }), "Token saved").then((ok) => ok && (setTokenFor(null), setToken("")))}>
+                            <KeyRound className="h-4 w-4" /> Save token
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-wrap items-center gap-2">
+                  {links.some((l) => l.mode === "LINK") && panel.canEdit && (
+                    <button type="button" className={`${secondaryBtn} !py-1`} disabled={busy !== null} onClick={() => run("sync", async () => {
+                      const r = await gitApi.sync(p.id);
+                      if (r.commits || r.prs) showToast(`Synced${r.repos && r.repos > 1 ? ` ${r.repos} repositories` : ""}: ${r.commits ?? 0} new commits, ${r.prs ?? 0} pull request updates`, "success");
+                      if (r.errors?.length) showToast(r.errors[0], "warning");
+                    }, "Up to date")}>
+                      {busy === "sync" ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />} Sync {links.length > 1 ? "all" : "now"}
+                    </button>
+                  )}
+                  {panel.canManage && !adding && (
+                    <button type="button" className={`${ghostBtn} !py-1`} onClick={() => (setAdding(true), setUrl(""), setUrlErr(null))}>
+                      <Link2 className="h-3.5 w-3.5" /> Add another repository
+                    </button>
+                  )}
+                </div>
+                {panel.canManage && adding && (
+                  <div className="rounded-xl bg-slate-50 p-3 dark:bg-gray-800/40">
+                    <p className="mb-2 text-xs font-semibold text-slate-700 dark:text-gray-200">Another repository of this project (an app, a library, the mobile client…)</p>
+                    {connectForm}
+                  </div>
+                )}
+              </div>
             )}
+            {links.length === 0 &&
+              (panel.canManage ? (
+                connectForm
+              ) : (
+                <p className="text-xs text-slate-500 dark:text-gray-400">The project lead connects it: they paste the repository's address here. You can do step 2 already.</p>
+              ))}
           </Step>
 
           <Step n={2} done={step2} title={step2 ? `You are @${me.identity!.login} on GitHub` : "Tell us who you are on GitHub"}>

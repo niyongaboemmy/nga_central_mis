@@ -78,9 +78,18 @@ export async function linksForRepo(repoId: number): Promise<RepoLink[]> {
   return (await many(sql`${linkSelect} WHERE l.repo_id = ${repoId} AND l.status = 'ACTIVE'`)).map(toLink);
 }
 
+/**
+ * The project's first repository (migration 142: a project may connect several). It holds the
+ * automation settings shown on the GitHub tab; the tab saves them to every link of the project.
+ */
 export async function linkForProject(projectId: number): Promise<RepoLink | null> {
-  const r = await one(sql`${linkSelect} WHERE l.project_id = ${projectId} AND l.status = 'ACTIVE'`);
+  const r = await one(sql`${linkSelect} WHERE l.project_id = ${projectId} AND l.status = 'ACTIVE' ORDER BY l.link_id LIMIT 1`);
   return r ? toLink(r) : null;
+}
+
+/** Every repository connected to the project, first connected first. */
+export async function linksForProject(projectId: number): Promise<RepoLink[]> {
+  return (await many(sql`${linkSelect} WHERE l.project_id = ${projectId} AND l.status = 'ACTIVE' ORDER BY l.link_id`)).map(toLink);
 }
 
 /**
