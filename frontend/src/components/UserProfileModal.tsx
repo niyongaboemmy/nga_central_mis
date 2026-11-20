@@ -141,6 +141,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     address?: string;
     external_id?: string;
     phone_number?: string;
+      registration_number?: string;
   };
 
   const [editedInfo, setEditedInfo] = React.useState<EditedInfo>({});
@@ -162,6 +163,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       address: u.profile?.address || "",
       external_id: u.profile?.external_id || "",
       phone_number: u.user.phone_number || "",
+      registration_number: u.profile?.registration_number || "",
     }),
     [],
   );
@@ -222,6 +224,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const validateInfo = (): Record<string, string> => {
     const errors: Record<string, string> = {};
+    if (canManageUsers && user?.profile?.user_type === "STUDENT") {
+      const reg = (editedInfo.registration_number ?? "").trim();
+      if (reg !== (user.profile?.registration_number ?? "")) {
+        if (!reg) errors.registration_number = "A student's registration number can't be empty";
+        else if (!/^[A-Za-z0-9][A-Za-z0-9\-/_.]{0,19}$/.test(reg))
+          errors.registration_number = "Up to 20 letters, digits, and - / _ . characters";
+      }
+    }
     if (canManageUsers) {
       if (!editedInfo.username?.trim()) errors.username = "Username is required";
       if (!editedInfo.email?.trim()) errors.email = "Email is required";
@@ -245,9 +255,12 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
     setIsSavingInfo(true);
     try {
-      const { username, email, status, ...profileFields } = editedInfo;
+      const { username, email, status, registration_number, ...profileFields } = editedInfo;
+      // The registration number goes only when it changed (MANAGE_USERS, students).
+      const reg = (registration_number ?? "").trim();
+      const regChanged = canManageUsers && user.profile?.user_type === "STUDENT" && reg !== (user.profile?.registration_number ?? "");
 
-      await updateUserProfile(user.user.user_id, profileFields);
+      await updateUserProfile(user.user.user_id, regChanged ? { ...profileFields, registration_number: reg } : profileFields);
 
       // Username/email/status live on the User row and require the broader
       // MANAGE_USERS permission -- someone who can only edit profile info

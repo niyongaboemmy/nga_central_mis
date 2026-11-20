@@ -22,6 +22,8 @@ interface GradeFormData {
   name: string;
   program_id: number;
   level_order: number;
+  /** RQF level of the grade's learners (TVET report cards: "QUALIFICATION TITLE: Level <n>"). */
+  rqf_level: number | null;
 }
 
 const GradesTab: React.FC<GradesTabProps> = ({
@@ -41,6 +43,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
     name: "",
     program_id: 0,
     level_order: 1,
+    rqf_level: null,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -74,6 +77,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
       name: "",
       program_id: 0,
       level_order: 1,
+      rqf_level: null,
     });
     setFormErrors({});
   };
@@ -91,6 +95,10 @@ const GradesTab: React.FC<GradesTabProps> = ({
 
     if (formData.level_order < 1) {
       errors.level_order = "Level order must be at least 1";
+    }
+
+    if (formData.rqf_level != null && (!Number.isInteger(formData.rqf_level) || formData.rqf_level < 1 || formData.rqf_level > 8)) {
+      errors.rqf_level = "The RQF level is a whole number from 1 to 8";
     }
 
     setFormErrors(errors);
@@ -119,6 +127,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
       name: grade.name,
       program_id: grade.program_id,
       level_order: grade.level_order,
+      rqf_level: grade.rqf_level ?? null,
     });
     setShowEditModal(true);
   };
@@ -308,6 +317,11 @@ const GradesTab: React.FC<GradesTabProps> = ({
                       <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                         <div className="flex items-center gap-2">
                           Level {item.level_order}
+                          {item.rqf_level != null && (
+                            <span className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" title="RQF level printed on TVET report cards">
+                              RQF {item.rqf_level}
+                            </span>
+                          )}
                           {isDuplicate && (
                             <span
                               title={`Same level order as: ${conflictingGradeNames(item.level_order, item.grade_id).join(", ")}. Promotion resolves "next grade" by this order school-wide, so a collision can make either grade report no next grade.`}
@@ -433,6 +447,26 @@ const GradesTab: React.FC<GradesTabProps> = ({
                   unable to tell which grade comes next.
                 </p>
               )}
+
+            <Input
+              label="RQF level (TVET report cards)"
+              type="number"
+              value={formData.rqf_level ?? ""}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  rqf_level: e.target.value ? parseInt(e.target.value) : null,
+                }))
+              }
+              error={formErrors.rqf_level}
+              placeholder="e.g. 3"
+              min="1"
+              max="8"
+              className="text-lg"
+            />
+            <p className="-mt-3 text-xs text-gray-500 dark:text-gray-400">
+              Report cards print "QUALIFICATION TITLE: Level {formData.rqf_level ?? "n"}" for learners of this grade (e.g. Year 1 = 3, Year 2 = 4, Year 3 = 5).
+            </p>
           </div>
 
           <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
@@ -563,6 +597,26 @@ const GradesTab: React.FC<GradesTabProps> = ({
                   unable to tell which grade comes next.
                 </p>
               )}
+
+            <Input
+              label="RQF level (TVET report cards)"
+              type="number"
+              value={formData.rqf_level ?? ""}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  rqf_level: e.target.value ? parseInt(e.target.value) : null,
+                }))
+              }
+              error={formErrors.rqf_level}
+              placeholder="e.g. 3"
+              min="1"
+              max="8"
+              className="text-lg"
+            />
+            <p className="-mt-3 text-xs text-gray-500 dark:text-gray-400">
+              Report cards print "QUALIFICATION TITLE: Level {formData.rqf_level ?? "n"}" for learners of this grade (e.g. Year 1 = 3, Year 2 = 4, Year 3 = 5).
+            </p>
           </div>
 
           <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">

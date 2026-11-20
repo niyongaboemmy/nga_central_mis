@@ -51,6 +51,7 @@ import {
   ValidationError,
   NotFoundError,
   ConflictError,
+  AuthorizationError,
 } from "../errors/CustomError";
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
@@ -253,6 +254,49 @@ export const updateThemePreference = asyncHandler(
   },
 );
 
+/** A registration number as typed: 1-20 letters, digits and - / _ . (starting with a letter or digit). */
+export const REGISTRATION_NUMBER_FORMAT = /^[A-Za-z0-9][A-Za-z0-9\-\/_.]{0,19}$/;
+
+async function changeRegistrationNumber(req: any, userId: number, raw: unknown) {
+  if (!req.user?.permissions?.includes("MANAGE_USERS")) {
+    throw new AuthorizationError("Only someone who can manage users can change a registration number");
+  }
+  const next = typeof raw === "string" ? raw.trim() : "";
+  if (!next) throw new ValidationError("A student's registration number can't be empty");
+  if (!REGISTRATION_NUMBER_FORMAT.test(next)) {
+    throw new ValidationError("A registration number is up to 20 letters, digits, and - / _ . characters");
+  }
+  const [profile] = await db.select().from(UserProfile).where(eq(UserProfile.user_id, userId)).limit(1);
+  if (!profile) throw new NotFoundError("User profile not found");
+  if (profile.user_type !== "STUDENT") throw new ValidationError("Only students have a registration number");
+  const previous = profile.registration_number ?? null;
+  if (previous === next) return;
+  const [clash] = await db
+    .select({ user_id: UserProfile.user_id, first_name: UserProfile.first_name, last_name: UserProfile.last_name })
+    .from(UserProfile)
+    .where(and(eq(UserProfile.registration_number, next), sql`${UserProfile.user_id} <> ${userId}`))
+    .limit(1);
+  if (clash) {
+    const who = `${clash.first_name ?? ""} ${clash.last_name ?? ""}`.trim() || `user #${clash.user_id}`;
+    throw new ConflictError(`Registration number ${next} is already used by ${who}`);
+  }
+  await db.update(UserProfile).set({ registration_number: next }).where(eq(UserProfile.user_id, userId));
+  // A number in the school's own format moves the counter past it, so a later
+  // generated number never repeats it.
+  try {
+    await syncRegistrationSequenceToIssued(await getSchoolCode());
+  } catch {
+    // No school code yet: nothing is generated, nothing to sync.
+  }
+  await recordActivity(
+    userId,
+    "REGISTRATION_NUMBER_CHANGE",
+    `Registration number changed from ${previous ?? "none"} to ${next}`,
+    "UserProfile",
+    userId,
+  );
+}
+
 export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
   const { id } = req.params;
   const userId = parseInt(id);
@@ -269,6 +313,7 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
     address,
     external_id,
     phone_number,
+    registration_number,
   } = req.body;
 
   logger.info("Updating user profile", {
@@ -330,10 +375,13 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
     )
       updateData.external_id = sanitizeString(external_id);
 
-    await db
-      .update(UserProfile)
-      .set(updateData)
-      .where(eq(UserProfile.user_id, userId));
+    // Nothing else changed (e.g. only the phone or the registration number): no empty UPDATE.
+    if (Object.keys(updateData).length > 0) {
+      await db
+        .update(UserProfile)
+        .set(updateData)
+        .where(eq(UserProfile.user_id, userId));
+    }
   }
 
   // Update User table if phone_number is provided
@@ -342,6 +390,12 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
       .update(User)
       .set({ phone_number: sanitizeString(phone_number) })
       .where(eq(User.user_id, userId));
+  }
+
+  // A student's registration number can be changed (a custom or corrected one):
+  // MANAGE_USERS only, unique, and the generator's counter is pulled past it.
+  if (registration_number !== undefined) {
+    await changeRegistrationNumber(req, userId, registration_number);
   }
 
   // Fetch updated profile

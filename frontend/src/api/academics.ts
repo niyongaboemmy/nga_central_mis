@@ -29,6 +29,8 @@ export interface Grade {
   program_id: number;
   name: string;
   level_order: number;
+  /** RQF level of the grade's learners (TVET report cards). */
+  rqf_level?: number | null;
   program_name?: string;
 }
 

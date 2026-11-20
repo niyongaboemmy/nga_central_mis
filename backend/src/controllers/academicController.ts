@@ -821,6 +821,7 @@ export const getGrades = asyncHandler(async (req: any, res: any) => {
       program_id: Grade.program_id,
       name: Grade.name,
       level_order: Grade.level_order,
+      rqf_level: Grade.rqf_level,
       program_name: Program.name,
     })
     .from(Grade)
@@ -852,8 +853,18 @@ export const getGrade = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Grade retrieved successfully", grade[0]);
 });
 
+/** A grade's RQF level: a whole number 1-8, or null/"" for none. */
+export function parseRqfLevel(v: unknown): number | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null || v === "") return null;
+  const n = Number(String(v).replace(/^\s*(level|l)\s*/i, ""));
+  if (!Number.isInteger(n) || n < 1 || n > 8) throw new ValidationError("The RQF level is a whole number from 1 to 8");
+  return n;
+}
+
 export const createGrade = asyncHandler(async (req: any, res: any) => {
-  const { program_id, name, level_order } = req.body;
+  const { program_id, name, level_order, rqf_level } = req.body;
+  const rqf = parseRqfLevel(rqf_level);
 
   if (!program_id || !name || level_order === undefined) {
     throw new ValidationError("Program ID, name, and level order are required");
@@ -885,6 +896,7 @@ export const createGrade = asyncHandler(async (req: any, res: any) => {
     program_id: progId,
     name: sanitizedName,
     level_order: levelOrderNum,
+    rqf_level: rqf ?? null,
   });
 
   const gradeId = (result as any).insertId;
@@ -911,7 +923,7 @@ export const createGrade = asyncHandler(async (req: any, res: any) => {
 export const updateGrade = asyncHandler(async (req: any, res: any) => {
   const { id } = req.params;
   const gradeId = parseInt(id);
-  const { program_id, name, level_order } = req.body;
+  const { program_id, name, level_order, rqf_level } = req.body;
 
   if (isNaN(gradeId)) {
     throw new ValidationError("Invalid grade ID");
@@ -951,6 +963,10 @@ export const updateGrade = asyncHandler(async (req: any, res: any) => {
 
   if (name !== undefined) {
     updateData.name = sanitizeString(name);
+  }
+
+  if (rqf_level !== undefined) {
+    updateData.rqf_level = parseRqfLevel(rqf_level) ?? null;
   }
 
   if (level_order !== undefined) {
@@ -2823,6 +2839,7 @@ export const getClassGroups = asyncHandler(async (req: any, res: any) => {
       grade_id: ClassGroup.grade_id,
       name: ClassGroup.name,
       grade_name: Grade.name,
+      grade_rqf_level: Grade.rqf_level,
       program_name: Program.name,
     })
     .from(ClassGroup)
