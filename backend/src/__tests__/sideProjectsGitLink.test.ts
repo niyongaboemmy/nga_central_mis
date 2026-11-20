@@ -29,12 +29,16 @@ const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISO
 const APP_ENV = ["GITHUB_APP_ID", "GITHUB_APP_SLUG", "GITHUB_APP_PRIVATE_KEY", "GITHUB_WEBHOOK_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "GITHUB_API_URL", "GITHUB_TOKEN", "AI_VAULT_KEK_CURRENT", "AI_VAULT_KEK_1"];
 const savedEnv = Object.fromEntries(APP_ENV.map((k) => [k, process.env[k]]));
 const PUB = { id: 810001, full_name: "aimee/orders-public", html_url: "https://github.com/aimee/orders-public", default_branch: "main", private: false };
+const BIG = { id: 810003, full_name: "studio/big-monorepo", html_url: "https://github.com/studio/big-monorepo", default_branch: "main", private: false };
+const MOB = { id: 810004, full_name: "aimee/orders-mobile", html_url: "https://github.com/aimee/orders-mobile", default_branch: "main", private: false };
 const PRIV = { id: 810002, full_name: "studio/orders-private", html_url: "https://github.com/studio/orders-private", default_branch: "main", private: true };
 const TOKEN = "github_pat_11AAAAAAA0123456789_abcdefghijklmnopqrstuvwxyz";
-type FakeRepo = { branches: Array<{ name: string; sha: string }>; commits: Record<string, any[]>; pulls: any[]; files: Record<string, string[]> };
+type FakeRepo = { branches: Array<{ name: string; sha: string }>; commits: Record<string, any[]>; pulls: any[]; files: Record<string, string[]>; events: any[] };
 const fake: Record<string, FakeRepo> = {
-  [PUB.full_name]: { branches: [], commits: {}, pulls: [], files: {} },
-  [PRIV.full_name]: { branches: [], commits: {}, pulls: [], files: {} },
+  [PUB.full_name]: { branches: [], commits: {}, pulls: [], files: {}, events: [] },
+  [PRIV.full_name]: { branches: [], commits: {}, pulls: [], files: {}, events: [] },
+  [BIG.full_name]: { branches: [], commits: {}, pulls: [], files: {}, events: [] },
+  [MOB.full_name]: { branches: [], commits: {}, pulls: [], files: {}, events: [] },
 };
 const calls: Array<{ url: string; auth: string | null; etag: string | null }> = [];
 let limitHit = false;
@@ -53,7 +57,7 @@ const ghFetch = (async (input: any, init: any = {}) => {
     return json({ id: login === "jkarenzi" ? 5501 : 5502, login, name: login, avatar_url: null });
   }
   if (!m) return json({ message: "Not Found" }, 404);
-  const meta = m[1] === PUB.full_name ? PUB : m[1] === PRIV.full_name ? PRIV : null;
+  const meta = m[1] === PUB.full_name ? PUB : m[1] === PRIV.full_name ? PRIV : m[1] === BIG.full_name ? BIG : m[1] === MOB.full_name ? MOB : null;
   if (!meta || (meta.private && auth !== `Bearer ${TOKEN}`)) return json({ message: "Not Found" }, 404);
   const r = fake[meta.full_name];
   const rest = m[2] ?? "";
@@ -62,7 +66,13 @@ const ghFetch = (async (input: any, init: any = {}) => {
     const e = etagOf(body);
     return inm === e ? new Response(null, { status: 304, headers: { etag: e } }) : json(body, 200, { etag: e });
   };
-  if (rest === "/branches") return withEtag(r.branches.map((b) => ({ name: b.name, commit: { sha: b.sha } })));
+  if (rest === "/branches") {
+    const page = Number(url.searchParams.get("page") || 1);
+    const all = r.branches.map((b) => ({ name: b.name, commit: { sha: b.sha } }));
+    const slice = all.slice((page - 1) * 100, page * 100);
+    return page === 1 ? withEtag(slice) : json(slice);
+  }
+  if (rest === "/events") return json(r.events);
   if (rest === "/pulls") return withEtag(r.pulls);
   const one = /^\/commits\/([0-9a-f]+)$/.exec(rest);
   if (one) return json({ sha: one[1], files: (r.files[one[1]] ?? ["src/app.ts"]).map((filename) => ({ filename })) });
@@ -86,6 +96,7 @@ function push(repo: string, branch: string, list: Array<{ msg: string; login?: s
     if (c.files) r.files[id] = c.files;
   }
   const head = r.commits[branch][r.commits[branch].length - 1].sha;
+  r.events.unshift({ type: "PushEvent", created_at: new Date().toISOString(), payload: { ref: `refs/heads/${branch}` } });
   const b = r.branches.find((x) => x.name === branch);
   if (b) b.sha = head;
   else r.branches.push({ name: branch, sha: head });
@@ -100,7 +111,8 @@ const testAuth = (req: any, res: any, next: any) => {
   req.user = { userId: id, permissions: ["SIDE_PROJECTS_MANAGE_OWN"] };
   next();
 };
-const viewerOf = async (req: any) => ({ userId: Number(req.user.userId), summary: null, detail: null, review: null, manageAny: false }) as Viewer;
+const managers = new Set<number>();
+const viewerOf = async (req: any) => ({ userId: Number(req.user.userId), summary: null, detail: null, review: null, manageAny: managers.has(Number(req.user.userId)) }) as Viewer;
 const app = express();
 app.use(express.json());
 app.use("/side-projects/git", sideProjectsGitRouter(testAuth, viewerOf));
@@ -110,7 +122,7 @@ let server: http.Server;
 const api = () => request(server);
 const as = (id: number) => ({ "X-Test-User": String(id) });
 
-let lead: number, dev: number, freelancer: number;
+let lead: number, dev: number, freelancer: number, projectsLead: number;
 let pubProject: number, privProject: number, key: string;
 const tasks: Record<string, number> = {};
 
@@ -149,7 +161,9 @@ beforeAll(async () => {
   lead = await createUser({ userType: "STAFF" });
   dev = await createUser({ userType: "STAFF" });
   freelancer = await createUser({ userType: "STAFF" });
-  users.push(lead, dev, freelancer);
+  projectsLead = await createUser({ userType: "STAFF" });
+  managers.add(projectsLead);
+  users.push(lead, dev, freelancer, projectsLead);
   await db.execute(sql`UPDATE User SET email = ${`dev${dev}@studio.test`} WHERE user_id = ${dev}`);
   pubProject = await createProject(lead, `Orders public ${Date.now()}`);
   privProject = await createProject(lead, `Orders private ${Date.now()}`);
@@ -316,6 +330,65 @@ describe("connect with a link (no app)", () => {
     expect(panel.body.data.link.tokenHint).toBeTruthy();
   });
 
+});
+
+describe("a repository with many branches", () => {
+  it("connects within the hourly limit: old branches are the starting point, later pushes are read", async () => {
+    const r = fake[BIG.full_name];
+    // 150 branches nobody touched lately (no events), on a fresh repository.
+    for (let i = 0; i < 150; i++) r.branches.push({ name: `old/feature-${i}`, sha: sha(`old${i}`) });
+    r.events = [];
+    push(BIG.full_name, "main", [{ msg: "Recent fix on main", email: `dev${dev}@studio.test` }]);
+    const bigProject = await createProject(lead, `Big monorepo ${Date.now()}`);
+    calls.length = 0;
+    const c = await api().post(`/side-projects/git/projects/${bigProject}/connect-link`).set(as(lead)).send({ url: BIG.html_url });
+    expect(c.status, JSON.stringify(c.body)).toBe(200);
+    const commitLists = calls.filter((x) => x.url.startsWith(`/repos/${BIG.full_name}/commits?`));
+    // Only main was read, not 150 branches; the second page of branches was fetched.
+    expect(commitLists.map((x) => new URLSearchParams(x.url.split("?")[1]).get("sha"))).toEqual(["main"]);
+    expect(calls.some((x) => x.url.includes("/branches?per_page=100&page=2"))).toBe(true);
+    expect(calls.length).toBeLessThan(15);
+    // A push to an old branch afterwards is read on the next sync.
+    push(BIG.full_name, "old/feature-7", [{ msg: "Back to feature 7", email: `dev${dev}@studio.test` }]);
+    await db.execute(sql`UPDATE GitRepoLink SET synced_at = UTC_TIMESTAMP() - INTERVAL 20 MINUTE WHERE project_id = ${bigProject}`);
+    await syncDue();
+    expect((await q(sql`SELECT title FROM GitCommit WHERE project_id = ${bigProject} ORDER BY commit_id`)).map((x) => x.title)).toEqual(["Recent fix on main", "Back to feature 7"]);
+  });
+});
+
+describe("an ecosystem of repositories", () => {
+  it("connects several repositories to one project, applies settings to all, disconnects one", async () => {
+    push(MOB.full_name, "main", [{ msg: "Mobile order screen", email: `dev${dev}@studio.test` }]);
+    // The projects lead isn't on the team but manages every project: no more "Project not found".
+    const r = await api().post(`/side-projects/git/projects/${pubProject}/connect-link`).set(as(projectsLead)).send({ url: MOB.html_url });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const panel = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(lead));
+    expect(panel.body.data.links.map((l: any) => l.fullName)).toEqual([PUB.full_name, MOB.full_name]);
+    expect(panel.body.data.link.fullName).toBe(PUB.full_name);
+    expect(panel.body.data.links[1].commits).toBe(1);
+    expect((await q(sql`SELECT COUNT(*) AS n FROM GitCommit WHERE project_id = ${pubProject} AND title = 'Mobile order screen'`))[0].n).toBe(1);
+    // Settings are the project's: both repositories get them.
+    const st = await api().patch(`/side-projects/git/projects/${pubProject}/settings`).set(as(lead)).send({ automations: false });
+    expect(st.status, JSON.stringify(st.body)).toBe(200);
+    const all = await q(sql`SELECT settings FROM GitRepoLink WHERE project_id = ${pubProject} AND status = 'ACTIVE'`);
+    expect(all.length).toBe(2);
+    expect(all.every((x) => JSON.parse(x.settings).automations === false)).toBe(true);
+    await api().patch(`/side-projects/git/projects/${pubProject}/settings`).set(as(lead)).send({ automations: true });
+    // Sync now covers every repository.
+    push(MOB.full_name, "main", [{ msg: "Mobile cart", email: `dev${dev}@studio.test` }]);
+    await new Promise((res) => setTimeout(res, 31_000));
+    const s = await api().post(`/side-projects/git/projects/${pubProject}/sync`).set(as(dev));
+    expect(s.status, JSON.stringify(s.body)).toBe(200);
+    expect(s.body.data.repos).toBe(2);
+    expect(s.body.data.commits).toBeGreaterThanOrEqual(1);
+    // Disconnect just the mobile repository.
+    const mobId = panel.body.data.links[1].linkId;
+    expect((await api().delete(`/side-projects/git/projects/${pubProject}/link?linkId=${mobId}`).set(as(lead))).status).toBe(200);
+    const after = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(lead));
+    expect(after.body.data.links.map((l: any) => l.fullName)).toEqual([PUB.full_name]);
+    // "That's me" stays the team's own.
+    expect([403, 404]).toContain((await api().post(`/side-projects/git/projects/${pubProject}/authors/claim`).set(as(projectsLead)).send({ email: "x@y.test" })).status);
+  }, 60_000);
 });
 
 describe("rate limit", () => {

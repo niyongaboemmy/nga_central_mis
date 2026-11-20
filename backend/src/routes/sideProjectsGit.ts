@@ -49,9 +49,17 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
     });
   const viewer = async (req: any): Promise<Viewer> => (req._spViewer ??= await viewerOf(req));
   const projectAccess = async (req: any) => accessProject(num(req.params.id, "project"), await viewer(req).catch(() => ({ userId: uid(req) }) as any));
+  // The team, or someone who manages every project (the projects lead): the GitHub tab shows them
+  // the connect and settings controls, so the actions must accept them too.
   const teamAccess = async (req: any) => {
-    const a = await accessProject(num(req.params.id, "project"), { userId: uid(req) });
+    const a = await accessProject(num(req.params.id, "project"), await viewer(req).catch(() => ({ userId: uid(req) }) as any));
     if (!a.canEdit) fail(403, "NOT_ON_TEAM", "Only the project's team can do this");
+    return a;
+  };
+  /** Strictly the team (owner or accepted member): for "That's me" on the project's commits. */
+  const ownTeam = async (req: any) => {
+    const a = await accessProject(num(req.params.id, "project"), { userId: uid(req) });
+    if (!a.isOwner && !a.isMember) fail(403, "NOT_ON_TEAM", "Only the project's team can do this");
     return a;
   };
   const requireGitHub = () => {
@@ -157,7 +165,8 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
         FROM GitCommit c LEFT JOIN UserProfile pr ON pr.user_id = c.author_user_id
         WHERE c.project_id = ${projectId} ORDER BY c.authored_at DESC LIMIT 10`);
       const stats = await one(sql`SELECT COUNT(*) AS commits, COUNT(DISTINCT task_id) AS tasks, ${iso("MAX(pushed_at)")} AS last FROM GitCommit WHERE project_id = ${projectId} AND counted = 1`);
-      const info = link ? await linkMode.linkModeInfo(projectId) : null;
+      const links = await linkMode.linksInfo(projectId);
+      const first = links[0] ?? null;
       return {
         enabled: true,
         appEnabled: githubEnabled(),
@@ -168,8 +177,10 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
         taskKey: key,
         link: link
           ? { fullName: link.fullName, htmlUrl: link.htmlUrl, defaultBranch: link.defaultBranch, pathPrefix: link.pathPrefix, installationId: link.installationId, settings: link.settings,
-              mode: info?.mode ?? "APP", tokenHint: info?.tokenHint ?? null, syncedAt: info?.syncedAt ?? null, syncError: info?.syncError ?? null, lastEventAt: (await one(sql`SELECT ${iso("last_event_at")} AS last_event_at FROM GitRepoLink WHERE link_id = ${link.linkId}`))?.last_event_at ?? null }
+              mode: first?.mode ?? "APP", tokenHint: first?.tokenHint ?? null, syncedAt: first?.syncedAt ?? null, syncError: first?.syncError ?? null, lastEventAt: first?.lastEventAt ?? null }
           : null,
+        // Every repository of the project (migration 142); `link` stays the first one.
+        links,
         settings: link?.settings ?? settingsOf(null, a.project.kind),
         team: team.map((t) => ({ id: Number(t.id), name: t.name, login: t.login ?? null, avatarUrl: t.avatar_url ?? null })),
         unclaimed: unclaimed.map((u) => ({ login: u.login || null, email: u.email || null, name: u.name, commits: Number(u.commits), last: u.last })),
@@ -203,10 +214,13 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
       const prefix = req.body?.pathPrefix ? String(req.body.pathPrefix).replace(/^\/+/, "").slice(0, 255) : null;
       const shared = await many(sql`SELECT project_id, path_prefix FROM GitRepoLink WHERE repo_id = ${repoId} AND status = 'ACTIVE' AND project_id <> ${projectId}`);
       if (shared.length && (!prefix || shared.some((s) => !s.path_prefix))) fail(409, "REPO_IN_USE", "This repository is already connected to another project. Give each project a folder (path prefix) to share it.", "pathPrefix");
+      const inherit = (await one(sql`SELECT settings FROM GitRepoLink WHERE project_id = ${projectId} AND status = 'ACTIVE' AND repo_id <> ${repoId} ORDER BY link_id LIMIT 1`))?.settings ?? null;
       await db.execute(sql`
-        INSERT INTO GitRepoLink (project_id, repo_id, full_name, html_url, installation_id, default_branch, path_prefix, settings, status, connected_by, created_at, updated_at)
-        VALUES (${projectId}, ${repoId}, ${repo!.full_name}, ${repo!.html_url}, ${iid}, ${repo!.default_branch}, ${prefix}, NULL, 'ACTIVE', ${uid(req)}, UTC_TIMESTAMP(), UTC_TIMESTAMP())
-        ON DUPLICATE KEY UPDATE repo_id = VALUES(repo_id), full_name = VALUES(full_name), html_url = VALUES(html_url), installation_id = VALUES(installation_id),
+        INSERT INTO GitRepoLink (project_id, repo_id, full_name, html_url, installation_id, access_mode, default_branch, path_prefix, settings, status, connected_by, created_at, updated_at)
+        VALUES (${projectId}, ${repoId}, ${repo!.full_name}, ${repo!.html_url}, ${iid}, 'APP', ${repo!.default_branch}, ${prefix},
+                ${inherit},
+                'ACTIVE', ${uid(req)}, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+        ON DUPLICATE KEY UPDATE repo_id = VALUES(repo_id), full_name = VALUES(full_name), html_url = VALUES(html_url), installation_id = VALUES(installation_id), access_mode = 'APP',
           default_branch = VALUES(default_branch), path_prefix = VALUES(path_prefix), status = 'ACTIVE', connected_by = VALUES(connected_by), updated_at = UTC_TIMESTAMP()`);
       await db.execute(sql`UPDATE SideProject SET github_url = ${repo!.html_url} WHERE project_id = ${projectId} AND (github_url IS NULL OR github_url = '')`);
       await ensureTaskKey(projectId);
@@ -229,23 +243,20 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
     handle(async (req) => {
       const a = await teamAccess(req);
       const projectId = Number(a.project.project_id);
-      const link = await one(sql`SELECT link_id, access_mode FROM GitRepoLink WHERE project_id = ${projectId} AND status = 'ACTIVE'`);
-      if (!link) fail(409, "NOT_CONNECTED", "Connect the repository first");
-      if (link!.access_mode !== "LINK") return { ok: true, live: true };
+      const any = await one(sql`SELECT COUNT(*) AS n, SUM(access_mode = 'LINK') AS links FROM GitRepoLink WHERE project_id = ${projectId} AND status = 'ACTIVE'`);
+      if (!Number(any?.n)) fail(409, "NOT_CONNECTED", "Connect a repository first");
+      if (!Number(any?.links)) return { ok: true, live: true };
       if (Date.now() - (lastSync.get(projectId) ?? 0) < 30_000) fail(429, "TOO_SOON", "Synced a moment ago. Try again in half a minute");
       lastSync.set(projectId, Date.now());
-      try {
-        return { ok: true, ...(await linkMode.syncLink(Number(link!.link_id))) };
-      } catch (e: any) {
-        if (e instanceof linkMode.SyncError) fail(502, "SYNC_FAILED", e.message);
-        throw e;
-      }
+      const out = await linkMode.syncProject(projectId);
+      if (out.errors.length && out.errors.length === out.repos) fail(502, "SYNC_FAILED", out.errors[0]);
+      return { ok: true, ...out };
     }),
   );
   router.post(
     "/projects/:id/authors/claim",
     handle(async (req) => {
-      const a = await teamAccess(req);
+      const a = await ownTeam(req);
       return linkMode.claimAuthor(Number(a.project.project_id), uid(req), req.body ?? {});
     }),
   );
@@ -254,7 +265,10 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
     handle(async (req) => {
       const a = await teamAccess(req);
       assertManage(a);
-      await db.execute(sql`UPDATE GitRepoLink SET status = 'REMOVED', updated_at = UTC_TIMESTAMP() WHERE project_id = ${Number(a.project.project_id)}`);
+      // ?linkId= disconnects one repository; without it, all of them.
+      const linkId = req.query.linkId ? num(req.query.linkId, "repository") : null;
+      await db.execute(sql`UPDATE GitRepoLink SET status = 'REMOVED', updated_at = UTC_TIMESTAMP()
+        WHERE project_id = ${Number(a.project.project_id)} AND status = 'ACTIVE' ${linkId ? sql`AND link_id = ${linkId}` : sql``}`);
       return { ok: true };
     }),
   );
@@ -278,7 +292,8 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
           s.autoSubmitDays = d;
         }
         if (b.ignoredPaths !== undefined) s.ignoredPaths = (Array.isArray(b.ignoredPaths) ? b.ignoredPaths : String(b.ignoredPaths).split(/[\n,]/)).map((x: string) => String(x).trim()).filter(Boolean).slice(0, 30);
-        await db.execute(sql`UPDATE GitRepoLink SET settings = ${JSON.stringify(s)}, updated_at = UTC_TIMESTAMP() WHERE link_id = ${link.linkId}`);
+        // The tab's settings are the project's: every repository gets them.
+        await db.execute(sql`UPDATE GitRepoLink SET settings = ${JSON.stringify(s)}, updated_at = UTC_TIMESTAMP() WHERE project_id = ${projectId} AND status = 'ACTIVE'`);
         if (b.pathPrefix !== undefined) await db.execute(sql`UPDATE GitRepoLink SET path_prefix = ${b.pathPrefix ? String(b.pathPrefix).replace(/^\/+/, "").slice(0, 255) : null} WHERE link_id = ${link.linkId}`);
       } else if (Object.keys(b).some((k) => k !== "taskKey")) fail(409, "NOT_CONNECTED", "Connect a repository first");
       const now = await linkForProject(projectId);

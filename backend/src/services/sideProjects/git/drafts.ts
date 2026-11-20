@@ -6,7 +6,7 @@ import * as progress from "../progress";
 import * as notify from "../notify";
 import { cleanTitle } from "./refs";
 import { estimateByTask, kigaliDay, roundHalf } from "./hours";
-import { linkForProject } from "./store";
+import { linkForProject, linksForProject } from "./store";
 
 /**
  * The living report draft (GIT_AUTOMATED_REPORTING_ANALYSIS.md §7).
@@ -301,8 +301,8 @@ async function rememberPick(projectId: number, userId: number, l: DraftLine, tas
   }
   const branch = l.key.startsWith("u:") ? l.key.slice(2) : null;
   if (branch && branch !== "default" && !branch.startsWith("PR #")) {
-    const link = await linkForProject(projectId);
-    if (link && branch !== link.defaultBranch) {
+    const links = await linksForProject(projectId);
+    if (links.length && !links.some((l) => l.defaultBranch === branch)) {
       await db.execute(sql`UPDATE GitBranch SET task_id = ${taskId} WHERE project_id = ${projectId} AND name = ${branch} AND task_id IS NULL`);
       await db.execute(sql`UPDATE GitCommit SET task_id = ${taskId} WHERE project_id = ${projectId} AND branch = ${branch} AND task_id IS NULL AND author_user_id = ${userId}`);
     }
