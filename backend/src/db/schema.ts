@@ -195,6 +195,9 @@ export const Grade = mysqlTable("Grade", {
     .references(() => Program.program_id),
   name: varchar("name", { length: 50 }).notNull(),
   level_order: int("level_order").notNull(),
+  // RQF level of this grade's learners (migration 145): TVET report cards print
+  // "QUALIFICATION TITLE: Level <n>" from it (NGA: Year 1 -> 3, Year 2 -> 4, Year 3 -> 5).
+  rqf_level: int("rqf_level"),
 });
 
 // CourseCategory table
