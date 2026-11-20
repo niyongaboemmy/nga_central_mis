@@ -225,6 +225,8 @@ export const Subject = mysqlTable("Subject", {
   // shared by every scheme of this subject rather than re-entered per scheme.
   rqf_level: varchar("rqf_level", { length: 50 }),
   learning_hours: varchar("learning_hours", { length: 100 }),
+  // The module's weight on TVET report cards (learning hours = credits x 10), migration 142.
+  module_weight: int("module_weight"),
 });
 
 // GradeSubject junction table
@@ -635,6 +637,8 @@ export const School = mysqlTable("School", {
   // "120823-0001" -- see utils/registrationNumber.ts.
   school_code: varchar("school_code", { length: 20 }).unique(),
   address: varchar("address", { length: 255 }),
+  // Report card identity block (migration 142): DISTRICT: on TVET cards.
+  district: varchar("district", { length: 100 }),
   contact_email: varchar("contact_email", { length: 150 }),
   contact_phone: varchar("contact_phone", { length: 50 }),
   logo: varchar("logo", { length: 500 }),
@@ -650,6 +654,8 @@ export const School = mysqlTable("School", {
   sector: varchar("sector", { length: 100 }),
   trade: varchar("trade", { length: 150 }),
   qualification_title: varchar("qualification_title", { length: 255 }),
+  // The head of school's name printed above the report card signature (migration 142).
+  head_teacher_name: varchar("head_teacher_name", { length: 150 }),
   status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).default(
     "ACTIVE",
   ),

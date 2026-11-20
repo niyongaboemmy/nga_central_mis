@@ -8,6 +8,8 @@ import {
   deleteSchool,
   uploadSchoolLogo,
   getSchoolLogo,
+  getSchoolProfile,
+  updateSchoolProfile,
 } from "../controllers/schoolController";
 import { authenticate, authorize } from "../middleware/auth";
 import { Permissions } from "../utils/permissions";
@@ -39,6 +41,10 @@ router.get(
   authorize([Permissions.MANAGE_SCHOOLS]),
   getAllSchools,
 );
+// The tenant's school identity block (report cards etc.): read by any signed-in
+// user, edited with MANAGE_SCHOOLS. Before "/:id" so "profile" isn't taken as an id.
+router.get("/profile", authenticate, getSchoolProfile);
+router.put("/profile", authenticate, authorize([Permissions.MANAGE_SCHOOLS]), updateSchoolProfile);
 router.get(
   "/:id",
   authenticate,

@@ -592,6 +592,8 @@ const SchoolModal = ({
     sector: "",
     trade: "",
     qualification_title: "",
+    district: "",
+    head_teacher_name: "",
     status: "ACTIVE",
   });
   const [loading, setLoading] = useState(false);
@@ -615,6 +617,8 @@ const SchoolModal = ({
         sector: "",
         trade: "",
         qualification_title: "",
+        district: "",
+        head_teacher_name: "",
         status: "ACTIVE",
       });
     }
@@ -840,6 +844,37 @@ const SchoolModal = ({
             <p className="text-xs text-gray-400 mt-1 ml-1">
               Sector, Trade, and Qualification Title appear on every Scheme of Work's printed
               cover page.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+              District
+            </label>
+            <input
+              type="text"
+              maxLength={100}
+              value={formData.district || ""}
+              onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+              placeholder="e.g. Gasabo"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+              Head of school's name
+            </label>
+            <input
+              type="text"
+              maxLength={150}
+              value={formData.head_teacher_name || ""}
+              onChange={(e) => setFormData({ ...formData, head_teacher_name: e.target.value })}
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+              placeholder="Printed above the signature on report cards"
+            />
+            <p className="text-xs text-gray-400 mt-1 ml-1">
+              District, contacts, sector, trade, qualification and head of school appear on report cards (Task Mentor).
             </p>
           </div>
 

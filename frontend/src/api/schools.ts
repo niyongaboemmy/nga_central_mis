@@ -16,6 +16,9 @@ export interface School {
   sector?: string;
   trade?: string;
   qualification_title?: string;
+  /** Report card identity block (migration 142). */
+  district?: string;
+  head_teacher_name?: string;
   status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
   created_at?: string;
   updated_at?: string;
