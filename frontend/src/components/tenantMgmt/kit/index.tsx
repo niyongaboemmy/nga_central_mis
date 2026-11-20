@@ -22,11 +22,13 @@ const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean)
 // Accent colours (Package.accent): full class names so Tailwind keeps them
 // ---------------------------------------------------------------------------
 
+// Platform palette: blue only. Packages are told apart by the shade of blue (and their
+// name), never by hue -- the old sky / amber / violet / emerald accents map onto it.
 export const ACCENTS: Record<string, { ring: string; bg: string; text: string; soft: string; grad: string }> = {
-  sky: { ring: "ring-sky-500", bg: "bg-sky-500", text: "text-sky-600 dark:text-sky-300", soft: "bg-sky-50 dark:bg-sky-400/10", grad: "from-sky-400 to-sky-600" },
-  amber: { ring: "ring-amber-500", bg: "bg-amber-500", text: "text-amber-600 dark:text-amber-300", soft: "bg-amber-50 dark:bg-amber-400/10", grad: "from-amber-400 to-orange-500" },
-  violet: { ring: "ring-violet-500", bg: "bg-violet-500", text: "text-violet-600 dark:text-violet-300", soft: "bg-violet-50 dark:bg-violet-400/10", grad: "from-violet-400 to-fuchsia-600" },
-  emerald: { ring: "ring-emerald-500", bg: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-300", soft: "bg-emerald-50 dark:bg-emerald-400/10", grad: "from-emerald-400 to-teal-600" },
+  sky: { ring: "ring-blue-400", bg: "bg-blue-400", text: "text-blue-600 dark:text-blue-300", soft: "bg-blue-50 dark:bg-blue-400/10", grad: "from-blue-300 to-blue-400" },
+  amber: { ring: "ring-blue-500", bg: "bg-blue-500", text: "text-blue-700 dark:text-blue-300", soft: "bg-blue-50 dark:bg-blue-500/10", grad: "from-blue-400 to-blue-500" },
+  violet: { ring: "ring-blue-600", bg: "bg-blue-600", text: "text-blue-700 dark:text-blue-200", soft: "bg-blue-100 dark:bg-blue-500/15", grad: "from-blue-500 to-blue-600" },
+  emerald: { ring: "ring-blue-800", bg: "bg-blue-800", text: "text-blue-800 dark:text-blue-200", soft: "bg-blue-100 dark:bg-blue-600/20", grad: "from-blue-700 to-blue-800" },
 };
 export const accentOf = (a: string | null | undefined) => ACCENTS[a ?? ""] ?? ACCENTS.sky;
 
@@ -207,18 +209,32 @@ export const Meter: React.FC<{ meter: UsageMeter; size?: number }> = ({ meter, s
 };
 
 /** A thin animated bar version of Meter for tables and cards. */
-export const MeterBar: React.FC<{ meter: UsageMeter }> = ({ meter }) => {
+/** "49 MB", "1.2 GB", "250 GB": storage meters count megabytes. */
+export const formatMb = (mb: number) => (mb >= 1024 ? `${(mb / 1024).toLocaleString(undefined, { maximumFractionDigits: mb >= 10240 ? 0 : 1 })} GB` : `${Math.round(mb).toLocaleString()} MB`);
+
+/**
+ * One usage limit as a labelled bar. Blue while there is room, amber from 75 %, red from 90 %.
+ * An unlimited limit draws no bar at all (a full bar read as "at capacity"), just the usage
+ * and "Unlimited".
+ */
+export const MeterBar: React.FC<{ meter: UsageMeter; showLabel?: boolean }> = ({ meter, showLabel = false }) => {
   const ratio = meter.ratio === null ? 0 : Math.min(1, meter.ratio);
-  const color = ratio >= 0.9 ? "bg-red-500" : ratio >= 0.75 ? "bg-amber-500" : "bg-emerald-500";
+  const color = ratio >= 0.9 ? "bg-red-500" : ratio >= 0.75 ? "bg-amber-500" : "bg-brand-600 dark:bg-brand-500";
   const Icon = entIcon(meter.key);
+  const mb = meter.unit === "MB";
+  const fmt = (v: number) => (mb ? formatMb(v) : v.toLocaleString());
+  const unlimited = meter.limit === null;
+  const text = unlimited ? `${fmt(meter.used)} · Unlimited` : `${fmt(meter.used)} of ${fmt(meter.limit!)}`;
   return (
-    <div className="flex items-center gap-2" title={`${meter.label}: ${meter.used} / ${meter.limit ?? "∞"}`}>
-      <Icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-300" aria-hidden />
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-        <motion.div className={cx("h-full rounded-full", meter.ratio === null ? "bg-emerald-500/40" : color)} initial={{ width: 0 }} animate={{ width: meter.ratio === null ? "100%" : `${ratio * 100}%` }} transition={{ duration: 0.8 }} />
+    <div className="flex items-center gap-2" title={`${meter.label}: ${text}`}>
+      <Icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
+      {showLabel && <span className="w-16 shrink-0 text-xs font-medium text-slate-600 dark:text-slate-300">{meter.label}</span>}
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="meter" aria-label={meter.label} aria-valuemin={0} aria-valuemax={unlimited ? undefined : meter.limit!} aria-valuenow={meter.used} aria-valuetext={text}>
+        {!unlimited && <motion.div className={cx("h-full rounded-full", color)} initial={{ width: 0 }} animate={{ width: `${Math.max(ratio * 100, meter.used > 0 ? 2 : 0)}%` }} transition={{ duration: 0.8 }} />}
       </div>
-      <span className="w-20 text-right text-xs tabular-nums text-slate-600 dark:text-slate-300">
-        {meter.used.toLocaleString()}/{meter.limit === null ? "∞" : meter.limit.toLocaleString()}
+      <span className="w-28 shrink-0 text-right text-xs tabular-nums text-slate-600 dark:text-slate-300">
+        {fmt(meter.used)}
+        <span className="text-slate-400 dark:text-slate-500">{unlimited ? " · ∞" : ` / ${fmt(meter.limit!)}`}</span>
       </span>
     </div>
   );
