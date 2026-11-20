@@ -355,25 +355,110 @@ async function adopt(userId: number, by: { login?: string | null; email?: string
   return projects.length;
 }
 
+/** "@aimee-uwera", "https://github.com/aimee-uwera" or "aimee-uwera" -> "aimee-uwera" (or a 400). */
+export function parseLogin(raw: unknown): string {
+  const login = String(raw ?? "").trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?github\.com\//i, "").replace(/[/?#].*$/, "");
+  if (!/^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/.test(login)) fail(400, "VALIDATION", "Type a GitHub username, e.g. aimee-uwera", "login");
+  return login;
+}
+
 /**
- * "My GitHub username is …": no OAuth needed. GitHub confirms the account exists; one account
- * belongs to one person (taken → ask the project lead). Commits already pushed become theirs.
+ * Links GitHub username `raw` to MIS user `userId` (source CLAIM: they typed it; LEAD: the
+ * project lead typed it for them). GitHub confirms the account exists. When GitHub can't be
+ * asked (the shared hourly limit, an outage) but the username already appears in pushed
+ * commits or pull requests, it is linked unverified (github_user_id = -userId, unique and
+ * never a real GitHub id) and confirmed later by Connect GitHub. One account, one person.
+ * Commits and pull requests already pushed by it become theirs.
  */
-export async function claimLogin(userId: number, raw: unknown) {
-  const login = String(raw ?? "").trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?github\.com\//i, "").replace(/\/.*$/, "");
-  if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(login)) fail(400, "VALIDATION", "Type your GitHub username, e.g. aimee-uwera", "login");
+export async function linkLogin(userId: number, raw: unknown, source: "CLAIM" | "LEAD" = "CLAIM") {
+  const login = parseLogin(raw);
   const r = await restGet(`/users/${login}`);
   if (r.status === 404) fail(400, "NOT_FOUND", "GitHub has no account with this username", "login");
-  if (r.status !== 200 || !r.data) fail(503, "GITHUB_UNAVAILABLE", "Couldn't check the username with GitHub. Try again in a minute", "login");
-  const u = r.data;
-  const taken = await one(sql`SELECT user_id FROM GitIdentity WHERE (github_user_id = ${u.id} OR LOWER(login) = ${String(u.login).toLowerCase()}) AND user_id <> ${userId}`);
+  let u: { id: number; login: string; name: string | null; avatar_url: string | null };
+  let verified = true;
+  if (r.status === 200 && r.data) {
+    u = { id: Number(r.data.id), login: String(r.data.login), name: r.data.name ?? null, avatar_url: r.data.avatar_url ?? null };
+  } else {
+    const seen = await one(sql`
+      SELECT author_login AS login FROM GitCommit WHERE LOWER(author_login) = ${login.toLowerCase()}
+      UNION SELECT author_login FROM GitPullRequest WHERE LOWER(author_login) = ${login.toLowerCase()} LIMIT 1`);
+    if (!seen) fail(503, "GITHUB_UNAVAILABLE", "Couldn't check the username with GitHub. Try again in a minute", "login");
+    u = { id: -userId, login: String(seen.login), name: null, avatar_url: `https://github.com/${encodeURIComponent(String(seen.login))}.png?size=96` };
+    verified = false;
+  }
+  const taken = await one(sql`SELECT user_id FROM GitIdentity WHERE (github_user_id = ${u.id} OR LOWER(login) = ${u.login.toLowerCase()}) AND user_id <> ${userId}`);
   if (taken) fail(409, "TAKEN", "This GitHub account is linked to someone else. Ask the project lead to check it", "login");
   await db.execute(sql`
     INSERT INTO GitIdentity (user_id, github_user_id, login, name, avatar_url, emails, prefs, source, verified_at, created_at, updated_at)
-    VALUES (${userId}, ${u.id}, ${u.login}, ${u.name ?? null}, ${u.avatar_url ?? null}, NULL, NULL, 'CLAIM', UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())
-    ON DUPLICATE KEY UPDATE github_user_id = VALUES(github_user_id), login = VALUES(login), name = VALUES(name), avatar_url = VALUES(avatar_url), source = 'CLAIM', updated_at = UTC_TIMESTAMP()`);
+    VALUES (${userId}, ${u.id}, ${u.login}, ${u.name}, ${u.avatar_url}, NULL, NULL, ${source}, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())
+    ON DUPLICATE KEY UPDATE github_user_id = VALUES(github_user_id), login = VALUES(login), name = VALUES(name), avatar_url = VALUES(avatar_url),
+      source = VALUES(source), updated_at = UTC_TIMESTAMP()`);
   const projects = await adopt(userId, { login: u.login });
-  return { login: u.login as string, name: (u.name ?? null) as string | null, avatarUrl: (u.avatar_url ?? null) as string | null, projects };
+  return { login: u.login, name: u.name, avatarUrl: u.avatar_url, verified, projects };
+}
+
+/** "My GitHub username is …" (no OAuth needed). */
+export async function claimLogin(userId: number, raw: unknown) {
+  return linkLogin(userId, raw, "CLAIM");
+}
+
+/** Who is on the project (owner or accepted member), or null. */
+async function teamRole(projectId: number, userId: number): Promise<"OWNER" | "MEMBER" | null> {
+  const r = await one(sql`
+    SELECT 'OWNER' AS role FROM SideProject WHERE project_id = ${projectId} AND owner_user_id = ${userId}
+    UNION SELECT 'MEMBER' FROM SideProjectMember WHERE project_id = ${projectId} AND user_id = ${userId} AND status = 'ACCEPTED' LIMIT 1`);
+  return r ? (r.role as "OWNER" | "MEMBER") : null;
+}
+
+/**
+ * The project lead (or the person themself) sets a teammate's GitHub username, so their
+ * commits are matched and their report drafts written. An account the person connected
+ * themself (OAuth) is theirs: only they change it.
+ */
+export async function setTeammateLogin(projectId: number, actorId: number, targetId: number, raw: unknown, canManage: boolean) {
+  if (!(await teamRole(projectId, targetId))) fail(404, "NOT_ON_TEAM", "This person isn't on the project's team");
+  const self = actorId === targetId;
+  if (!self && !canManage) fail(403, "FORBIDDEN", "Only the project lead can set someone else's GitHub username");
+  const cur = await one(sql`SELECT login, source FROM GitIdentity WHERE user_id = ${targetId}`);
+  if (!self && cur && String(cur.source) === "OAUTH")
+    fail(409, "OWN_ACCOUNT", `They connected their own GitHub account (@${cur.login}); only they can change it`, "login");
+  if (cur && String(cur.login).toLowerCase() === parseLogin(raw).toLowerCase()) {
+    return { login: String(cur.login), name: null, avatarUrl: null, verified: true, projects: await adopt(targetId, { login: String(cur.login) }) };
+  }
+  if (cur) await releaseLogin(targetId, String(cur.login));
+  return linkLogin(targetId, raw, self ? "CLAIM" : "LEAD");
+}
+
+/** Unlinks a teammate's username (the lead, unless they connected it themself; or the person). */
+export async function clearTeammateLogin(projectId: number, actorId: number, targetId: number, canManage: boolean) {
+  if (!(await teamRole(projectId, targetId))) fail(404, "NOT_ON_TEAM", "This person isn't on the project's team");
+  const self = actorId === targetId;
+  if (!self && !canManage) fail(403, "FORBIDDEN", "Only the project lead can change someone else's GitHub username");
+  const cur = await one(sql`SELECT login, source FROM GitIdentity WHERE user_id = ${targetId}`);
+  if (!cur) return { ok: true };
+  if (!self && String(cur.source) === "OAUTH") fail(409, "OWN_ACCOUNT", "They connected their own GitHub account; only they can disconnect it");
+  await releaseLogin(targetId, String(cur.login));
+  await db.execute(sql`DELETE FROM GitIdentity WHERE user_id = ${targetId}`);
+  return { ok: true };
+}
+
+/**
+ * A wrong username was linked: commits matched only through it (not through an explicit
+ * author mapping or the person's MIS email) go back to "unmatched", and drafts are redone.
+ */
+async function releaseLogin(userId: number, login: string) {
+  const l = login.toLowerCase();
+  const mapped = await one(sql`SELECT 1 AS x FROM GitAuthorMap WHERE key_type = 'LOGIN' AND key_value = ${l} AND user_id = ${userId}`);
+  if (mapped) return;
+  const projects = (await many(sql`SELECT DISTINCT project_id FROM GitCommit WHERE author_user_id = ${userId} AND LOWER(author_login) = ${l}`)).map((r) => Number(r.project_id));
+  // Read the MIS email first: User and GitCommit use different collations, so no join.
+  const email = String((await one(sql`SELECT email FROM User WHERE user_id = ${userId}`))?.email ?? "").toLowerCase();
+  await db.execute(sql`
+    UPDATE GitCommit SET author_user_id = NULL
+    WHERE author_user_id = ${userId} AND LOWER(author_login) = ${l} AND (${email} = '' OR LOWER(COALESCE(author_email, '')) <> ${email})`);
+  await db.execute(sql`UPDATE GitPullRequest SET author_user_id = NULL WHERE author_user_id = ${userId} AND LOWER(author_login) = ${l}`);
+  const { refreshDraft } = await import("./drafts");
+  for (const p of projects) await refreshDraft(p, userId).catch(() => undefined);
 }
 
 /**

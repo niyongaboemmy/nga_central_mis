@@ -20,6 +20,7 @@ import { sideProjectsGitRouter } from "../routes/sideProjectsGit";
 import type { Viewer } from "../services/sideProjects/access";
 import { setGitHubFetch } from "../services/sideProjects/git/github";
 import { syncDue } from "../services/sideProjects/git/linkMode";
+import { suggestAuthor } from "../routes/sideProjectsGit";
 
 const rows = (r: unknown): any[] => (Array.isArray(r) && Array.isArray(r[0]) ? r[0] : (r as any[]));
 const q = async (s: any) => rows(await db.execute(s));
@@ -389,6 +390,86 @@ describe("an ecosystem of repositories", () => {
     // "That's me" stays the team's own.
     expect([403, 404]).toContain((await api().post(`/side-projects/git/projects/${pubProject}/authors/claim`).set(as(projectsLead)).send({ email: "x@y.test" })).status);
   }, 60_000);
+});
+
+describe("teammates' GitHub usernames", () => {
+  const author = async (title: string) => (await q(sql`SELECT author_user_id FROM GitCommit WHERE project_id = ${pubProject} AND title = ${title}`))[0]?.author_user_id ?? null;
+  const resync = async () => {
+    await db.execute(sql`UPDATE GitRepoLink SET synced_at = UTC_TIMESTAMP() - INTERVAL 20 MINUTE WHERE project_id = ${pubProject}`);
+    await syncDue();
+  };
+
+  it("the lead sets a member's username; their pushed commits become theirs", async () => {
+    push(PUB.full_name, "main", [{ msg: "Delivery slots API", login: "kezo-dev", email: "kezo@home.test", minsAgo: 2 }]);
+    await resync();
+    expect(await author("Delivery slots API")).toBeNull();
+
+    // A member can't set someone else's; nobody can for a person off the team.
+    expect((await api().put(`/side-projects/git/projects/${pubProject}/team/${dev}/github`).set(as(freelancer)).send({ login: "kezo-dev" })).status).toBe(403);
+    expect((await api().put(`/side-projects/git/projects/${pubProject}/team/${projectsLead}/github`).set(as(lead)).send({ login: "kezo-dev" })).status).toBe(404);
+    expect((await api().put(`/side-projects/git/projects/${pubProject}/team/${freelancer}/github`).set(as(lead)).send({ login: "not a login!" })).status).toBe(400);
+
+    const ok = await api().put(`/side-projects/git/projects/${pubProject}/team/${freelancer}/github`).set(as(lead)).send({ login: "https://github.com/kezo-dev" });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body.data).toMatchObject({ login: "kezo-dev", verified: true });
+    expect(Number(await author("Delivery slots API"))).toBe(freelancer);
+
+    const panel = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(lead));
+    const me = panel.body.data.team.find((t: any) => t.id === freelancer);
+    expect(me).toMatchObject({ login: "kezo-dev", source: "LEAD", role: "MEMBER", verified: true });
+    expect(me.commits).toBeGreaterThan(0);
+    expect(panel.body.data.team.find((t: any) => t.id === lead).role).toBe("OWNER");
+  });
+
+  it("an account someone connected themself is theirs; they may change it", async () => {
+    await db.execute(sql`
+      INSERT INTO GitIdentity (user_id, github_user_id, login, source, verified_at, created_at, updated_at)
+      VALUES (${dev}, 990001, 'dev-oauth', 'OAUTH', UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())
+      ON DUPLICATE KEY UPDATE github_user_id = 990001, login = 'dev-oauth', source = 'OAUTH'`);
+    const lead409 = await api().put(`/side-projects/git/projects/${pubProject}/team/${dev}/github`).set(as(lead)).send({ login: "someone-else" });
+    expect(lead409.status).toBe(409);
+    expect((await api().delete(`/side-projects/git/projects/${pubProject}/team/${dev}/github`).set(as(lead))).status).toBe(409);
+    expect((await api().delete(`/side-projects/git/projects/${pubProject}/team/${dev}/github`).set(as(dev))).status).toBe(200);
+  });
+
+  it("links from pushed commits while GitHub's limit is used up, unverified", async () => {
+    push(PUB.full_name, "main", [{ msg: "Ghost commit", login: "dev-ghost", email: "ghost@home.test", minsAgo: 1 }]);
+    await resync();
+    limitHit = true;
+    try {
+      const seen = await api().put(`/side-projects/git/projects/${pubProject}/team/${dev}/github`).set(as(lead)).send({ login: "dev-ghost" });
+      expect(seen.status, JSON.stringify(seen.body)).toBe(200);
+      expect(seen.body.data.verified).toBe(false);
+      expect(Number(await author("Ghost commit"))).toBe(dev);
+      const unseen = await api().put(`/side-projects/git/projects/${pubProject}/team/${dev}/github`).set(as(lead)).send({ login: "never-pushed" });
+      expect(unseen.status).toBe(503);
+    } finally {
+      limitHit = false;
+    }
+    const panel = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(lead));
+    expect(panel.body.data.team.find((t: any) => t.id === dev)).toMatchObject({ login: "dev-ghost", verified: false });
+  });
+
+  it("unlinking gives back the commits matched only through that username", async () => {
+    expect((await api().delete(`/side-projects/git/projects/${pubProject}/team/${freelancer}/github`).set(as(lead))).status).toBe(200);
+    expect(await author("Delivery slots API")).toBeNull();
+    const panel = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(lead));
+    expect(panel.body.data.team.find((t: any) => t.id === freelancer).login).toBeNull();
+    expect(panel.body.data.unclaimed.some((u: any) => u.login === "kezo-dev")).toBe(true);
+  });
+});
+
+describe("suggestAuthor", () => {
+  const unclaimed = [
+    { login: "niyongaboemmy", email: null, name: "Niyongabo Emmanuel", commits: 17 },
+    { login: "random-bot", email: null, name: "random-bot", commits: 3 },
+  ];
+  it("matches the same name in any order, or a login made of the names", () => {
+    expect(suggestAuthor("Niyongabo Emmanuel", unclaimed)).toMatchObject({ login: "niyongaboemmy", commits: 17 });
+    expect(suggestAuthor("Emmanuel Niyongabo (Super)", unclaimed)?.login).toBe("niyongaboemmy");
+    expect(suggestAuthor("Niyongabo Emmanuel", [{ login: "niyongaboemmy", email: null, name: null, commits: 2 }])?.login).toBe("niyongaboemmy");
+    expect(suggestAuthor("Aimee Uwera", unclaimed)).toBeNull();
+  });
 });
 
 describe("rate limit", () => {
