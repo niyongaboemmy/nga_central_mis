@@ -422,7 +422,7 @@ export const KpiTile: React.FC<{ icon: LucideIcon; label: string; value: number;
       {...m("reveal")}
       {...(onClick ? { ...m("tap"), whileHover: { y: -3 }, onClick, type: "button" } : {})}
       className={cx(
-        "relative flex w-full flex-col items-start gap-2 rounded-2xl border bg-white p-4 text-left shadow-sm dark:bg-slate-900",
+        "relative flex w-full flex-col items-start gap-2 rounded-2xl border bg-white p-4 text-left transition-colors dark:bg-slate-900",
         alert && value > 0 ? "border-red-300 dark:border-red-500/50" : "border-slate-200 dark:border-slate-700",
       )}
     >

@@ -369,6 +369,23 @@ export interface PlatformOverview {
   trend: Array<{ week: string; submitted: number; activated: number }>;
   /** the caller's platform capabilities (UI gating) */
   caps: string[];
+  /** invoices still in draft (nobody has issued them) */
+  draftInvoices?: number;
+  /** applications waiting on the platform, most urgent first */
+  attention?: AttentionItem[];
+  generatedAt?: string;
+}
+
+export interface AttentionItem {
+  applicationId: number;
+  ref: string | null;
+  schoolName: string;
+  status: ApplicationStatus;
+  pkg: string | null;
+  invoiceStatus: string | null;
+  invoiceAmount: number | null;
+  since: string | null;
+  ageDays: number;
 }
 
 export interface ApplicationListItem {
