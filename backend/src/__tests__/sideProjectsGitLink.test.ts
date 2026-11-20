@@ -21,6 +21,10 @@ import type { Viewer } from "../services/sideProjects/access";
 import { setGitHubFetch } from "../services/sideProjects/git/github";
 import { syncDue } from "../services/sideProjects/git/linkMode";
 import { suggestAuthor } from "../routes/sideProjectsGit";
+import { findRefs } from "../services/sideProjects/git/refs";
+import { roleOrder, setTestProviders } from "../services/aiProviders/registry";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+import * as drafts from "../services/sideProjects/git/drafts";
 
 const rows = (r: unknown): any[] => (Array.isArray(r) && Array.isArray(r[0]) ? r[0] : (r as any[]));
 const q = async (s: any) => rows(await db.execute(s));
@@ -456,6 +460,79 @@ describe("teammates' GitHub usernames", () => {
     const panel = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(lead));
     expect(panel.body.data.team.find((t: any) => t.id === freelancer).login).toBeNull();
     expect(panel.body.data.unclaimed.some((u: any) => u.login === "kezo-dev")).toBe(true);
+  });
+});
+
+describe("confirming and precedence", () => {
+  const author = async (title: string) => (await q(sql`SELECT author_user_id FROM GitCommit WHERE project_id = ${pubProject} AND title = ${title}`))[0]?.author_user_id ?? null;
+  const resync = async () => {
+    await db.execute(sql`UPDATE GitRepoLink SET synced_at = UTC_TIMESTAMP() - INTERVAL 20 MINUTE WHERE project_id = ${pubProject}`);
+    await syncDue();
+  };
+
+  it("an unconfirmed username is confirmed from its noreply commit email at the next sync", async () => {
+    // dev is @dev-ghost, linked unverified in the previous block.
+    expect(Number((await q(sql`SELECT github_user_id FROM GitIdentity WHERE user_id = ${dev}`))[0].github_user_id)).toBeLessThan(0);
+    push(PUB.full_name, "main", [{ msg: "Ghost via web", login: "dev-ghost", email: "88001+dev-ghost@users.noreply.github.com", minsAgo: 1 }]);
+    await resync();
+    expect(Number((await q(sql`SELECT github_user_id FROM GitIdentity WHERE user_id = ${dev}`))[0].github_user_id)).toBe(88001);
+    const panel = await api().get(`/side-projects/git/projects/${pubProject}`).set(as(lead));
+    expect(panel.body.data.team.find((t: any) => t.id === dev).verified).toBe(true);
+  });
+
+  it("a linked GitHub login wins over a commit email that belongs to another MIS account", async () => {
+    // The lead's MIS email is someone's personal git email: their commits went to the lead.
+    const leadEmail = `lead${lead}@studio.test`;
+    await db.execute(sql`UPDATE User SET email = ${leadEmail} WHERE user_id = ${lead}`);
+    push(PUB.full_name, "main", [{ msg: "Second account work", login: "kezo-dev", email: leadEmail, minsAgo: 1 }]);
+    await resync();
+    expect(Number(await author("Second account work"))).toBe(lead);
+    const ok = await api().put(`/side-projects/git/projects/${pubProject}/team/${freelancer}/github`).set(as(lead)).send({ login: "kezo-dev" });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(Number(await author("Second account work"))).toBe(freelancer);
+  });
+
+  it("an unknown AI role falls back to the default order instead of crashing (Word it with AI)", () => {
+    expect(roleOrder("assist" as any)).toBeUndefined();
+    expect(roleOrder("draft")?.length).toBeGreaterThan(0);
+  });
+
+  it("Word it with AI writes the draft with the draft role, and survives a provider failure", async () => {
+    setAiPolicyForTests(AI_POLICY_ALL_ON);
+    const seen: string[] = [];
+    const provider = (name: string, fail = false) => ({
+      name,
+      isConfigured: () => true,
+      supportsStrictSchema: true,
+      generateJSON: async () => {
+        seen.push(name);
+        if (fail) throw Object.assign(new Error("503 overloaded"), { status: 503 });
+        return { data: { did: "I added delivery slots and tidied the footer.", nextSteps: "Finish payments." }, model: `${name}-m` };
+      },
+    });
+    try {
+      const got = await api().get(`/side-projects/git/projects/${pubProject}/draft?polish=0`).set(as(freelancer));
+      expect(got.status, JSON.stringify(got.body)).toBe(200);
+      const id = got.body.data.draft.id;
+      setTestProviders({ glm: provider("glm", true), gemini: provider("gemini") } as any);
+      const d = await drafts.polishDraft(id, freelancer);
+      expect(d.did).toBe("I added delivery slots and tidied the footer.");
+      expect(d.aiPolished).toBe(true);
+      expect(seen).toEqual(["glm", "gemini"]); // the draft role's order, glm first
+      setTestProviders({ glm: provider("glm", true) } as any);
+      await db.execute(sql`UPDATE SideProjectReportDraft SET ai_polished = 0 WHERE draft_id = ${id}`);
+      await expect(drafts.polishDraft(id, freelancer)).rejects.toBeTruthy();
+    } finally {
+      setTestProviders(null);
+      setAiPolicyForTests(null);
+    }
+  });
+
+  it("GitHub's pull request numbers are not task references", () => {
+    expect(findRefs("Merge pull request #56 from niyongaboemmy/feat/multi-tenancy", "ANCM", { allowBare: true })).toEqual([]);
+    expect(findRefs("feat(side-projects): several repositories (#141)", "ANCM", { allowBare: true })).toEqual([]);
+    expect(findRefs("Fix the form for #27 (#141)", "ANCM", { allowBare: true })).toEqual([27]);
+    expect(findRefs("Merge pull request #12 from x/feat/ANCM-27-form", "ANCM", { allowBare: true })).toEqual([27]);
   });
 });
 

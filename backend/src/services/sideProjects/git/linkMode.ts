@@ -6,6 +6,7 @@ import { fail, many, one } from "../core";
 import { restGet, type ApiReply } from "./github";
 import { applyEvent } from "./ingest";
 import { ensureTaskKey } from "./store";
+import { noreplyId } from "./refs";
 
 /**
  * Connect with a link (migration 141): no GitHub App, no install, no OAuth. The project lead
@@ -284,6 +285,8 @@ export async function syncLink(linkId: number, now = new Date()) {
       await refreshDraft(t.projectId, t.userId).catch(() => undefined);
     }
   }
+  // Usernames linked while GitHub couldn't be asked get confirmed as soon as possible.
+  await confirmPending(projectId).catch((e) => logger.warn(`[git] confirm identities p${projectId}: ${e?.message ?? e}`));
   return out;
 }
 
@@ -346,6 +349,7 @@ export async function syncProject(projectId: number) {
 async function adopt(userId: number, by: { login?: string | null; email?: string | null }) {
   const login = by.login?.toLowerCase() ?? null;
   const email = by.email?.toLowerCase() ?? null;
+  if (login) await takeOverLogin(userId, login);
   const match = sql`author_user_id IS NULL AND (${login ? sql`LOWER(author_login) = ${login}` : sql`0`} OR ${email ? sql`author_email = ${email}` : sql`0`})`;
   const projects = (await many(sql`SELECT DISTINCT project_id FROM GitCommit WHERE ${match}`)).map((r) => Number(r.project_id));
   await db.execute(sql`UPDATE GitCommit SET author_user_id = ${userId} WHERE ${match}`);
@@ -353,6 +357,93 @@ async function adopt(userId: number, by: { login?: string | null; email?: string
   const { refreshDraft } = await import("./drafts");
   for (const p of projects) await refreshDraft(p, userId).catch(() => undefined);
   return projects.length;
+}
+
+/**
+ * A GitHub login outranks a commit email (resolveAuthor checks the login first). Commits
+ * pushed before the login was linked were matched by email, possibly to another MIS account
+ * of the same person (e.g. the super-admin account whose email is their personal git email).
+ * Those move to the login's owner, except an author the lead mapped explicitly; the previous
+ * owners' drafts are redone.
+ */
+async function takeOverLogin(userId: number, login: string) {
+  const where = sql`LOWER(author_login) = ${login} AND author_user_id IS NOT NULL AND author_user_id <> ${userId}
+    AND NOT EXISTS (SELECT 1 FROM GitAuthorMap m WHERE m.key_type = 'EMAIL' AND m.key_value = LOWER(GitCommit.author_email) AND m.user_id IS NOT NULL)`;
+  const moved = await many(sql`SELECT DISTINCT project_id, author_user_id FROM GitCommit WHERE ${where}`);
+  if (!moved.length) return;
+  await db.execute(sql`UPDATE GitCommit SET author_user_id = ${userId} WHERE ${where}`);
+  await db.execute(sql`UPDATE GitPullRequest SET author_user_id = ${userId} WHERE LOWER(author_login) = ${login} AND author_user_id IS NOT NULL AND author_user_id <> ${userId}`);
+  const { refreshDraft } = await import("./drafts");
+  for (const m of moved) await refreshDraft(Number(m.project_id), Number(m.author_user_id)).catch(() => undefined);
+}
+
+/** The GitHub account id behind a login, read from its "<id>+<login>@users.noreply.github.com" commit email. */
+async function idFromCommits(login: string): Promise<number | null> {
+  const rows = await many(sql`SELECT DISTINCT author_email FROM GitCommit WHERE LOWER(author_login) = ${login.toLowerCase()} AND author_email LIKE '%@users.noreply.github.com' LIMIT 20`);
+  for (const r of rows) {
+    const email = String(r.author_email ?? "");
+    const id = noreplyId(email);
+    const name = email.split("@")[0].split("+")[1]?.toLowerCase();
+    if (id && name === login.toLowerCase()) return id;
+  }
+  return null;
+}
+
+/** A read token from a repository linked to one of the person's projects (or this project), for GitHub lookups. */
+async function lookupToken(userId: number, projectId?: number): Promise<string | null> {
+  const rows = await many(sql`
+    SELECT l.project_id, l.token_sealed FROM GitRepoLink l
+    WHERE l.status = 'ACTIVE' AND l.access_mode = 'LINK' AND l.token_sealed IS NOT NULL
+      AND (l.project_id = ${projectId ?? 0}
+        OR l.project_id IN (SELECT project_id FROM SideProject WHERE owner_user_id = ${userId})
+        OR l.project_id IN (SELECT project_id FROM SideProjectMember WHERE user_id = ${userId} AND status = 'ACCEPTED'))
+    ORDER BY l.project_id = ${projectId ?? 0} DESC, l.link_id LIMIT 3`);
+  for (const r of rows) {
+    try {
+      const t = tokenOf(Number(r.project_id), r.token_sealed);
+      if (t) return t;
+    } catch {
+      /* unreadable token: try the next */
+    }
+  }
+  return null;
+}
+
+/**
+ * Confirms identities linked while GitHub couldn't be asked (github_user_id < 0): from a
+ * noreply commit email, else by asking GitHub with the project's token. Runs after each sync.
+ */
+export async function confirmPending(projectId: number): Promise<number> {
+  const rows = await many(sql`
+    SELECT gi.user_id, gi.login FROM GitIdentity gi
+    WHERE gi.github_user_id < 0 AND gi.user_id IN (
+      SELECT owner_user_id FROM SideProject WHERE project_id = ${projectId}
+      UNION SELECT user_id FROM SideProjectMember WHERE project_id = ${projectId} AND status = 'ACCEPTED')`);
+  let done = 0;
+  for (const r of rows) {
+    const userId = Number(r.user_id);
+    const login = String(r.login);
+    let id = await idFromCommits(login);
+    let name: string | null = null;
+    let avatar: string | null = null;
+    if (!id) {
+      const reply = await restGet(`/users/${login}`, { token: await lookupToken(userId, projectId) });
+      if (reply.status === 200 && reply.data?.id) {
+        id = Number(reply.data.id);
+        name = reply.data.name ?? null;
+        avatar = reply.data.avatar_url ?? null;
+      }
+    }
+    if (!id) continue;
+    const clash = await one(sql`SELECT user_id FROM GitIdentity WHERE github_user_id = ${id} AND user_id <> ${userId}`);
+    if (clash) continue;
+    await db.execute(sql`
+      UPDATE GitIdentity SET github_user_id = ${id}, name = COALESCE(${name}, name),
+        avatar_url = COALESCE(${avatar}, ${`https://avatars.githubusercontent.com/u/${id}?v=4`}), updated_at = UTC_TIMESTAMP()
+      WHERE user_id = ${userId} AND github_user_id < 0`);
+    done++;
+  }
+  return done;
 }
 
 /** "@aimee-uwera", "https://github.com/aimee-uwera" or "aimee-uwera" -> "aimee-uwera" (or a 400). */
@@ -372,12 +463,18 @@ export function parseLogin(raw: unknown): string {
  */
 export async function linkLogin(userId: number, raw: unknown, source: "CLAIM" | "LEAD" = "CLAIM") {
   const login = parseLogin(raw);
-  const r = await restGet(`/users/${login}`);
+  // A repository token (when the person's projects have one) has its own hourly allowance.
+  const r = await restGet(`/users/${login}`, { token: await lookupToken(userId).catch(() => null) });
   if (r.status === 404) fail(400, "NOT_FOUND", "GitHub has no account with this username", "login");
   let u: { id: number; login: string; name: string | null; avatar_url: string | null };
   let verified = true;
+  const fromNoreply = r.status === 200 ? null : await idFromCommits(login);
   if (r.status === 200 && r.data) {
     u = { id: Number(r.data.id), login: String(r.data.login), name: r.data.name ?? null, avatar_url: r.data.avatar_url ?? null };
+  } else if (fromNoreply) {
+    // GitHub's own noreply commit email names the account id: as good as asking GitHub.
+    const seen = await one(sql`SELECT author_login AS login FROM GitCommit WHERE LOWER(author_login) = ${login.toLowerCase()} LIMIT 1`);
+    u = { id: fromNoreply, login: String(seen?.login ?? login), name: null, avatar_url: `https://avatars.githubusercontent.com/u/${fromNoreply}?v=4` };
   } else {
     const seen = await one(sql`
       SELECT author_login AS login FROM GitCommit WHERE LOWER(author_login) = ${login.toLowerCase()}

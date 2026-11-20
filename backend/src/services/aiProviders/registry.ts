@@ -59,7 +59,9 @@ const DEFAULT_ROLE_ORDERS: Record<Exclude<AIRole, "interactive">, string> = {
 
 export function roleOrder(role?: AIRole): string[] | undefined {
   if (!role || role === "interactive") return undefined;
-  const raw = process.env[`AI_ROLE_ORDER_${role.toUpperCase()}`] || DEFAULT_ROLE_ORDERS[role];
+  const raw = process.env[`AI_ROLE_ORDER_${role.toUpperCase()}`] || DEFAULT_ROLE_ORDERS[role as keyof typeof DEFAULT_ROLE_ORDERS];
+  // An unknown role (a cast slipped past the types) uses the default order instead of crashing.
+  if (!raw) return undefined;
   return raw.split(",").map((s) => s.trim()).filter(Boolean);
 }
 

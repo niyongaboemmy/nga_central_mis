@@ -412,7 +412,7 @@ export async function polishDraft(id: number, userId: number): Promise<Draft> {
       schemaName: "progress_report",
       maxOutputTokens: 500,
     },
-    { feature: "side_project_report_draft", actorUserId: userId, role: "assist" as any },
+    { feature: "side_project_report_draft", actorUserId: userId, role: "draft" },
   );
   const did = String(r.data?.did ?? "").trim().slice(0, 2000);
   const next = String(r.data?.nextSteps ?? "").trim().slice(0, 1000);
