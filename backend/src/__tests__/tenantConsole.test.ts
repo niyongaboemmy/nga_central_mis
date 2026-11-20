@@ -249,8 +249,15 @@ describe("platform console: overview, staff, settings, audit", () => {
     expect(before.status).toBe(200);
     await seedApplication({ status: "PROVISIONING_FAILED" });
     await seedApplication({ status: "SUBMITTED" });
+    await seedApplication({ status: "APPROVED_AWAITING_PAYMENT" });
     const after = await request(app).get("/platform/overview").set(auth(owner.token));
     const o = after.body.data;
+    // An approved application waits for payment even before its invoice is issued.
+    expect(o.awaitingPayment).toBe(before.body.data.awaitingPayment + 1);
+    expect(typeof o.draftInvoices).toBe("number");
+    // "Needs you now": the failed setup comes first, each row with its school and age.
+    expect(o.attention[0]).toMatchObject({ status: "PROVISIONING_FAILED", schoolName: expect.any(String), ageDays: expect.any(Number) });
+    expect(o.attention.length).toBeLessThanOrEqual(8);
     expect(o.applications.SUBMITTED).toBe(before.body.data.applications.SUBMITTED + 1);
     expect(o.provisioningFailures).toBe(before.body.data.provisioningFailures + 1);
     expect(o.tenants.ACTIVE).toBeGreaterThanOrEqual(1);

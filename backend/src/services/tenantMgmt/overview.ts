@@ -34,7 +34,12 @@ export async function overview(callerCaps: string[]) {
   const [tRows] = await pool.query<RowDataPacket[]>("SELECT status, COUNT(*) AS n FROM Tenant GROUP BY status");
   for (const r of tRows) if (String(r.status) in tenants) tenants[String(r.status)] = Number(r.n);
 
-  const [[awaiting]] = await pool.query<RowDataPacket[]>("SELECT COUNT(*) AS n FROM Invoice WHERE status IN ('ISSUED','OVERDUE')");
+  // Awaiting payment = approved applications (their invoice may still be a draft) plus
+  // schools' issued / overdue invoices. Counting invoices alone showed 0 for an approved
+  // application whose invoice nobody had issued yet.
+  const [[awaitingSchools]] = await pool.query<RowDataPacket[]>("SELECT COUNT(*) AS n FROM Invoice WHERE status IN ('ISSUED','OVERDUE') AND application_id IS NULL");
+  const awaiting = { n: (applications.APPROVED_AWAITING_PAYMENT ?? 0) + Number(awaitingSchools.n) };
+  const [[drafts]] = await pool.query<RowDataPacket[]>("SELECT COUNT(*) AS n FROM Invoice WHERE status = 'DRAFT'");
   const [[toConfirm]] = await pool.query<RowDataPacket[]>("SELECT COUNT(*) AS n FROM Payment WHERE status = 'SUBMITTED'");
   const now = new Date();
   const in30 = new Date(now.getTime() + 30 * DAY_MS);
@@ -67,8 +72,34 @@ export async function overview(callerCaps: string[]) {
     if (b) b.activated++;
   }
 
+  // What needs someone now, oldest first: the "Needs you now" list on the overview.
+  const [att] = await pool.query<RowDataPacket[]>(
+    `SELECT a.application_id, a.ref, a.school_name, a.status, a.approved_package, a.requested_package,
+            COALESCE(a.last_activity_at, a.submitted_at, a.created_at) AS since,
+            (SELECT i.status FROM Invoice i WHERE i.application_id = a.application_id ORDER BY i.invoice_id DESC LIMIT 1) AS invoice_status,
+            (SELECT i.amount FROM Invoice i WHERE i.application_id = a.application_id ORDER BY i.invoice_id DESC LIMIT 1) AS invoice_amount
+       FROM TenantApplication a
+      WHERE a.status IN ('SUBMITTED','UNDER_REVIEW','APPROVED_AWAITING_PAYMENT','PAYMENT_SUBMITTED','PAYMENT_CONFIRMED','PROVISIONING','PROVISIONING_FAILED')
+      ORDER BY FIELD(a.status, 'PROVISIONING_FAILED','PAYMENT_SUBMITTED','SUBMITTED','UNDER_REVIEW','APPROVED_AWAITING_PAYMENT','PAYMENT_CONFIRMED','PROVISIONING'), since
+      LIMIT 8`,
+  );
+  const attention = att.map((r) => ({
+    applicationId: Number(r.application_id),
+    ref: r.ref ?? null,
+    schoolName: String(r.school_name ?? ""),
+    status: String(r.status),
+    pkg: r.approved_package ?? r.requested_package ?? null,
+    invoiceStatus: r.invoice_status ?? null,
+    invoiceAmount: r.invoice_amount == null ? null : Number(r.invoice_amount),
+    since: r.since ? new Date(r.since).toISOString() : null,
+    ageDays: r.since ? Math.max(0, Math.floor((now.getTime() - new Date(r.since).getTime()) / DAY_MS)) : 0,
+  }));
+
   return {
     applications,
+    draftInvoices: Number(drafts.n),
+    attention,
+    generatedAt: now.toISOString(),
     awaitingPayment: Number(awaiting.n),
     paymentsToConfirm: Number(toConfirm.n),
     provisioningFailures: applications.PROVISIONING_FAILED ?? 0,

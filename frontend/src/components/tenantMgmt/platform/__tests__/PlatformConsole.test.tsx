@@ -138,9 +138,33 @@ describe("overview", () => {
     );
     const toReview = await screen.findByRole("button", { name: /To review/ });
     expect(within(toReview).getByText("7")).toBeInTheDocument();
-    expect(within(screen.getByRole("button", { name: /To confirm/ })).getByText("5")).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: /to confirm/i })).getByText("5")).toBeInTheDocument();
     expect(screen.getByText("1,500,000 RWF")).toBeInTheDocument();
     for (const t of ["Overview", "Applications", "Billing", "Schools", "Packages", "Settings", "Audit", "Support"]) expect(screen.getByRole("tab", { name: new RegExp(t) })).toBeInTheDocument();
+  });
+
+  it("lists what needs the team now with the next action, and counts approved applications as awaiting pay", async () => {
+    api.overview.mockResolvedValue({
+      ...overview(ALL_CAPS),
+      awaitingPayment: 1,
+      draftInvoices: 1,
+      attention: [
+        { applicationId: 1, ref: "APP-2026-0001", schoolName: "Hill Academy", status: "APPROVED_AWAITING_PAYMENT", pkg: "max", invoiceStatus: "DRAFT", invoiceAmount: 0, since: new Date().toISOString(), ageDays: 1 },
+        { applicationId: 2, ref: "APP-2026-0002", schoolName: "Lake School", status: "PROVISIONING_FAILED", pkg: "gold", invoiceStatus: "PAID", invoiceAmount: 0, since: new Date().toISOString(), ageDays: 0 },
+      ],
+    });
+    render(
+      <MemoryRouter initialEntries={["/platform/overview"]}>
+        <Routes>
+          <Route path="/platform/*" element={<PlatformConsole />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("button", { name: "Hill Academy: Issue the invoice" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Lake School: Retry setup" })).toBeInTheDocument();
+    expect(screen.getByText(/invoice not issued/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /1 draft invoice to issue/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Awaiting pay/ })).toHaveTextContent("1");
   });
 
   it("hides tabs and tile actions the caller lacks", async () => {
@@ -156,9 +180,9 @@ describe("overview", () => {
     expect(screen.getByText("7")).toBeInTheDocument();
     // counts shown, but not clickable without review / billing caps
     expect(screen.queryByRole("button", { name: /To review/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /To confirm/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /to confirm/i })).toBeNull();
     // schools tiles stay actionable with PLATFORM_TENANTS_VIEW
-    expect(screen.getByRole("button", { name: /Grace/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /grace/i })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /Applications/ })).toBeNull();
     expect(screen.queryByRole("tab", { name: /Billing/ })).toBeNull();
     expect(screen.queryByRole("tab", { name: /Packages/ })).toBeNull();
@@ -346,7 +370,7 @@ describe("billing", () => {
     api.invoices.mockResolvedValue([INVOICE]);
     inProvider(<BillingPage />, "/platform/billing", "/platform/billing");
     expect(await screen.findByText("INV-2026-0007")).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /To confirm/ })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /to confirm/i })).toBeNull();
     expect(screen.queryByRole("button", { name: "Waive" })).toBeNull();
     expect(screen.getByRole("button", { name: "Void" })).toBeInTheDocument();
   });
@@ -415,7 +439,7 @@ describe("school lifecycle", () => {
     expect(within(bar).queryByRole("button", { name: /Delete/ })).toBeNull();
     expect(within(bar).queryByRole("button", { name: /Suspend/ })).toBeNull();
     expect(within(bar).queryByRole("button", { name: /Archive/ })).toBeNull();
-    expect(within(bar).getByRole("button", { name: /Grace/ })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: /grace/i })).toBeInTheDocument();
   });
 });
 

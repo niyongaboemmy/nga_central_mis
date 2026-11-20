@@ -183,7 +183,7 @@ export const IconBtn: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & {
 );
 
 export const Card: React.FC<{ className?: string; children: React.ReactNode }> = ({ className, children }) => (
-  <div className={cx("rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900", className)}>{children}</div>
+  <div className={cx("rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900", className)}>{children}</div>
 );
 
 export const Spinner: React.FC = () => (
