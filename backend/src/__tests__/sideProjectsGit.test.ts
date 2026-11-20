@@ -212,12 +212,14 @@ afterAll(async () => {
 });
 
 describe("task keys, references and commands", () => {
-  it("finds KEY-n (any case), bare #n only when allowed, and closing words", () => {
+  it("finds KEY-n (any case), \"task #n\" only when allowed, and closing words with the key", () => {
     expect(findRefs("feat/FOP-27-order-form", "FOP")).toEqual([27]);
     expect(findRefs("fop-27 and FOP-128, not XFOP-9", "FOP")).toEqual([27, 128]);
-    expect(findRefs("fix #12 now", "FOP")).toEqual([]);
-    expect(findRefs("fix #12 now", "FOP", { allowBare: true })).toEqual([12]);
-    expect(closingRefs("Closes FOP-27, fixes #30", "FOP").sort()).toEqual([27, 30]);
+    // A bare #12 is a GitHub pull request / issue number, never a task.
+    expect(findRefs("fix #12 now", "FOP", { allowBare: true })).toEqual([]);
+    expect(findRefs("fix task #12 now", "FOP")).toEqual([]);
+    expect(findRefs("fix task #12 now", "FOP", { allowBare: true })).toEqual([12]);
+    expect(closingRefs("Closes FOP-27, fixes #30", "FOP")).toEqual([27]);
   });
   it("parses commit commands", () => {
     expect(parseCommands("FOP-1 add form #time 1h30m").timeHours).toBe(1.5);

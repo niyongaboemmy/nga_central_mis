@@ -2,9 +2,11 @@
  * Task references in Git (GIT_AUTOMATED_REPORTING_ANALYSIS.md §5).
  *
  * A project has a task key (2-5 capital letters, e.g. FOP); a task is KEY-<task_id> (FOP-27).
- * Branch names, PR titles/bodies and commit messages are scanned for references; inside a
- * connected repository a bare #27 is accepted too, but only when 27 is a task of the project
- * (so GitHub issue numbers that aren't tasks are ignored).
+ * Branch names, PR titles/bodies and commit messages are scanned for references. A bare "#27"
+ * is NOT a task: on GitHub it is a pull request or issue number ("Merge pull request #56",
+ * "(#141)", "see #50"), and task ids are small global numbers that collide with them. Only the
+ * explicit "task #27" (or "task 27") is read as a task besides KEY-27, and only when 27 is a
+ * task of the project.
  *
  * Commit commands (Jira smart-commit style, optional):
  *   #time 1h30m | #time 45m | #time 2h   hours hint for that commit's task
@@ -25,7 +27,7 @@ export function suggestKey(title: string): string {
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Task ids referenced in a text: KEY-123 (any case), and #123 when allowBare. */
+/** Task ids referenced in a text: KEY-123 (any case), and "task #123" when allowBare. */
 export function findRefs(text: string | null | undefined, key: string | null, opts: { allowBare?: boolean } = {}): number[] {
   if (!text) return [];
   const out = new Set<number>();
@@ -33,22 +35,17 @@ export function findRefs(text: string | null | undefined, key: string | null, op
     const re = new RegExp(`(?:^|[^A-Za-z0-9])${esc(key)}-(\\d{1,10})(?![0-9])`, "gi");
     for (const m of text.matchAll(re)) out.add(Number(m[1]));
   }
-  if (opts.allowBare) {
-    // GitHub's own pull request numbers are not task ids: "Merge pull request #56 from ...",
-    // and the "(#141)" a squash merge appends to the title.
-    const plain = text
-      .replace(/^Merge pull request #\d+/gim, "")
-      .replace(/\s\(#\d+\)\s*$/gm, "");
-    for (const m of plain.matchAll(/(?:^|[\s(\[/])#(\d{1,10})(?![0-9])/g)) out.add(Number(m[1]));
-  }
+  // GitHub's own numbers (#56) are pull requests and issues; only "task #27" names a task.
+  if (opts.allowBare) for (const m of text.matchAll(/\btask\s*#?\s*(\d{1,10})(?![0-9])/gi)) out.add(Number(m[1]));
   return [...out];
 }
 
-/** Closing words in a PR body/title: "Closes FOP-27", "fixes #27". */
+/** Closing words in a PR body/title: "Closes FOP-27" (not "fixes #27": that is a GitHub issue). */
 export function closingRefs(text: string | null | undefined, key: string | null): number[] {
   if (!text) return [];
   const out = new Set<number>();
-  const target = key ? `(?:${esc(key)}-|#)` : "#";
+  if (!key) return [];
+  const target = `${esc(key)}-`;
   const re = new RegExp(`\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s*:?\\s+${target}(\\d{1,10})\\b`, "gi");
   for (const m of text.matchAll(re)) out.add(Number(m[1]));
   return [...out];
