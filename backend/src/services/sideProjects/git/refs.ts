@@ -4,9 +4,9 @@
  * A project has a task key (2-5 capital letters, e.g. FOP); a task is KEY-<task_id> (FOP-27).
  * Branch names, PR titles/bodies and commit messages are scanned for references. A bare "#27"
  * is NOT a task: on GitHub it is a pull request or issue number ("Merge pull request #56",
- * "(#141)", "see #50"), and task ids are small global numbers that collide with them. Only the
- * explicit "task #27" (or "task 27") is read as a task besides KEY-27, and only when 27 is a
- * task of the project.
+ * "(#141)", "see #50"), and task ids are small global numbers that collide with them. Prose
+ * like "task 53 went to Done" is not a reference either (a PR describing a bug closed the very
+ * tasks it described). Only KEY-27 is a task reference.
  *
  * Commit commands (Jira smart-commit style, optional):
  *   #time 1h30m | #time 45m | #time 2h   hours hint for that commit's task
@@ -27,7 +27,7 @@ export function suggestKey(title: string): string {
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Task ids referenced in a text: KEY-123 (any case), and "task #123" when allowBare. */
+/** Task ids referenced in a text: KEY-123 (any case). `allowBare` is kept for callers and ignored. */
 export function findRefs(text: string | null | undefined, key: string | null, opts: { allowBare?: boolean } = {}): number[] {
   if (!text) return [];
   const out = new Set<number>();
@@ -35,8 +35,7 @@ export function findRefs(text: string | null | undefined, key: string | null, op
     const re = new RegExp(`(?:^|[^A-Za-z0-9])${esc(key)}-(\\d{1,10})(?![0-9])`, "gi");
     for (const m of text.matchAll(re)) out.add(Number(m[1]));
   }
-  // GitHub's own numbers (#56) are pull requests and issues; only "task #27" names a task.
-  if (opts.allowBare) for (const m of text.matchAll(/\btask\s*#?\s*(\d{1,10})(?![0-9])/gi)) out.add(Number(m[1]));
+  void opts; // GitHub's own numbers (#56) are pull requests and issues, never tasks.
   return [...out];
 }
 
