@@ -42,7 +42,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({ invoice, instructions, pdfUrl
             <span className="font-mono text-sm font-semibold text-slate-800 dark:text-gray-100">{invoice.number ?? `#${invoice.id}`}</span>
             <StatusPill status={overdue && invoice.status !== "OVERDUE" ? "OVERDUE" : invoice.status} />
             {pending && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800 dark:bg-violet-400/15 dark:text-violet-200">
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-400/15 dark:text-blue-200">
                 <Hourglass className="h-3 w-3" aria-hidden /> Proof sent
               </span>
             )}

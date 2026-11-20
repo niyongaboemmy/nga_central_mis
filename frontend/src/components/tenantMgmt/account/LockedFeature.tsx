@@ -12,11 +12,11 @@ export const LockedCard: React.FC<{ feature: string; label?: string }> = ({ feat
   const reduced = useReducedMotion();
   const Icon = entIcon(feature);
   return (
-    <motion.div {...m("reveal")} className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900" role="status">
+    <motion.div {...m("reveal")} className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white p-6 text-center dark:border-gray-700 dark:bg-gray-900" role="status">
       <span className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-300">
         <Icon className="h-8 w-8" aria-hidden />
         <motion.span
-          className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-white shadow"
+          className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-white"
           animate={reduced ? undefined : { rotate: [0, -12, 12, -6, 0] }}
           transition={{ duration: 0.9, repeat: Infinity, repeatDelay: 2.5 }}
         >

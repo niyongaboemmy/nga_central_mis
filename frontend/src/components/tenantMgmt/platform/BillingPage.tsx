@@ -113,7 +113,7 @@ export const PaymentsQueue: React.FC = () => {
           {rows.map((p) => {
             const match = p.amount === p.invoice.amount;
             return (
-              <motion.li key={p.id} layout {...m("reveal")} className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+              <motion.li key={p.id} layout {...m("reveal")} className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
                 <button
                   type="button"
                   onClick={() => p.proofUrl && setPreview(p)}
@@ -223,7 +223,7 @@ export const InvoiceList: React.FC<{ invoices: Invoice[]; onChange: (inv: Invoic
                 key={inv.id}
                 layout
                 {...m("reveal")}
-                className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-900 md:flex-row md:items-center md:gap-4"
+                className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 md:flex-row md:items-center md:gap-4"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">

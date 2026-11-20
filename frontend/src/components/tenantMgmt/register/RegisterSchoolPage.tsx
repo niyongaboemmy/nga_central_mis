@@ -56,7 +56,7 @@ const WizardProgress: React.FC<{ step: number; maxReached: number; onJump: (i: n
               animate={{ scale: active ? 1.12 : 1 }}
               transition={{ type: "spring", stiffness: 400, damping: 22 }}
               className={cx(
-                "flex h-10 w-10 items-center justify-center rounded-full border-2 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-default dark:focus-visible:ring-offset-gray-900",
+                "flex h-10 w-10 items-center justify-center rounded-full border-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-default dark:focus-visible:ring-offset-gray-900",
                 done && "border-emerald-500 bg-emerald-500 text-white",
                 active && "border-brand-500 bg-white text-brand-600 dark:bg-gray-900 dark:text-brand-200",
                 !done && !active && "border-slate-300 bg-white text-slate-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300",
@@ -90,7 +90,7 @@ const Submitted: React.FC<{ app: Application }> = ({ app }) => {
         initial={{ scale: 0, rotate: -30 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 16 }}
-        className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xl"
+        className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-white"
       >
         <Check className="h-11 w-11" aria-hidden />
       </motion.span>
@@ -279,7 +279,7 @@ const RegisterSchoolPage: React.FC = () => {
           </div>
         </header>
 
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-200/50 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-8">
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-slate-200/50 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-8">
           {submitted ? (
             <Submitted app={submitted} />
           ) : (

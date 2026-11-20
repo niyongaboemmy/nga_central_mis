@@ -37,7 +37,7 @@ const useIsDesktop = () => {
 type Tab = "progress" | "timeline" | "messages";
 
 const Panel: React.FC<{ id: string; icon: React.ComponentType<{ className?: string }>; title: string; badge?: number; children: React.ReactNode }> = ({ id, icon: Icon, title, badge, children }) => (
-  <section aria-labelledby={id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+  <section aria-labelledby={id} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
     <h2 id={id} className="mb-3 flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
       <Icon className="h-4 w-4 text-brand-600 dark:text-brand-200" />
       {title}
@@ -142,7 +142,7 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
 
   return shell(
     <>
-      <motion.section {...m("reveal")} className="mb-5 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+      <motion.section {...m("reveal")} className="mb-5 rounded-3xl border border-slate-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 sm:p-6">
         <div className="mb-5 flex flex-wrap items-center gap-2">
           <h1 ref={heading} tabIndex={-1} className="mr-auto min-w-0 break-words text-xl font-extrabold text-slate-900 focus:outline-none dark:text-white sm:text-2xl">
             {app.schoolName}
@@ -163,7 +163,7 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
             onClick={() => setTab(t.key)}
             className={cx(
               "relative flex flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-1.5 text-sm font-semibold",
-              tab === t.key ? "bg-white text-slate-900 shadow dark:bg-gray-700 dark:text-white" : "text-slate-600 dark:text-gray-300",
+              tab === t.key ? "bg-white text-slate-900 dark:bg-gray-700 dark:text-white" : "text-slate-600 dark:text-gray-300",
             )}
           >
             <t.icon className="h-4 w-4" aria-hidden />

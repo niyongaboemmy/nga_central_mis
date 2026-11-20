@@ -348,7 +348,7 @@ const DocCard: React.FC<{ appId: number; doc: ApplicationDocument; onPreview: ()
     if (next) onDoc(next);
   };
   return (
-    <li className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+    <li className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900">
       <button type="button" onClick={onPreview} className="flex h-36 w-full items-center justify-center bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-gray-800">
         {isPdf(doc.url) ? <FileText className="h-12 w-12 text-slate-400" aria-hidden /> : <img src={doc.url} alt="" className="h-full w-full object-cover" />}
         <span className="sr-only">Preview {DOC_LABELS[doc.kind] ?? doc.kind}</span>
@@ -477,7 +477,7 @@ const MessagesTab: React.FC<{ d: ApplicationDetail; onSent: (m: ThreadMessage) =
               <motion.li key={msg.id} {...m("reveal")} className={cx("flex", mine ? "justify-end" : msg.author === "SYSTEM" ? "justify-center" : "justify-start")}>
                 <div
                   className={cx(
-                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm",
+                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
                     msg.internal
                       ? "border border-dashed border-amber-400 bg-amber-50 text-amber-950 dark:bg-amber-400/10 dark:text-amber-50"
                       : mine
@@ -670,7 +670,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
         <AnimatePresence>
           {done && (
             <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex flex-col items-center gap-2 py-10" role="status">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white">
                 <Check className="h-9 w-9" aria-hidden />
               </span>
               <span className="text-lg font-bold text-slate-900 dark:text-white">Approved</span>

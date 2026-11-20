@@ -118,7 +118,7 @@ const TenantStatusBanner: React.FC = () => {
                 key={w.key}
                 layout
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="flex w-full items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-1.5 shadow-sm dark:border-red-500/40 dark:bg-gray-900 sm:w-72"
+                className="flex w-full items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-1.5 dark:border-red-500/40 dark:bg-gray-900 sm:w-72"
               >
                 <span className="sr-only">{w.label} almost at its limit</span>
                 <div className="min-w-0 flex-1">

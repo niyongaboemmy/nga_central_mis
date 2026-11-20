@@ -112,7 +112,7 @@ const PackagesPage: React.FC = () => {
                 const n = dirtyBy[p.code] ?? 0;
                 return (
                   <th key={p.code} scope="col" className={cx("min-w-[12rem] p-3 align-top font-normal", colCls(p.code))}>
-                    <div className={cx("mb-2 h-1.5 rounded-full bg-gradient-to-r", a.grad)} aria-hidden />
+                    <span className={cx("mb-2 block h-2 w-2 rounded-full", a.bg)} aria-hidden />
                     <div className="space-y-2 text-left">
                       <input aria-label={`${p.code} name`} value={d.meta.name} onChange={(e) => setMeta(p.code, { name: e.target.value })} className={cx(inputCls, "font-bold", a.text)} />
                       <input aria-label={`${p.code} tagline`} placeholder="Tagline" value={d.meta.tagline ?? ""} onChange={(e) => setMeta(p.code, { tagline: e.target.value || null })} className={cx(inputCls, "py-1 text-xs")} />

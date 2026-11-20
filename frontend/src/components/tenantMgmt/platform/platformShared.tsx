@@ -144,7 +144,7 @@ export const Btn: React.FC<
       {...(m("tap") as object)}
       disabled={disabled || busy}
       className={cx(
-        "inline-flex items-center justify-center gap-1.5 rounded-full font-semibold shadow-sm transition-colors focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-1.5 rounded-full font-semibold transition-colors focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
         size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm",
         BTN_TONES[tone],
         className,
@@ -234,7 +234,7 @@ export const Switch: React.FC<{ checked: boolean; onChange: (v: boolean) => void
     >
       <span className={cx("relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors", checked ? "bg-emerald-500" : "bg-slate-300 dark:bg-gray-600")}>
         <motion.span
-          className="h-5 w-5 rounded-full bg-white shadow"
+          className="h-5 w-5 rounded-full bg-white"
           animate={{ x: checked ? 20 : 0 }}
           transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 600, damping: 32 }}
         />
