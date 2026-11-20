@@ -103,7 +103,7 @@ const PackagesPage: React.FC = () => {
         <table className="w-full min-w-0 border-collapse text-sm">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 w-48 bg-white p-3 text-left align-bottom dark:bg-slate-900">
+              <th className="sticky left-0 z-10 w-48 bg-white p-3 text-left align-bottom dark:bg-gray-900">
                 <span className="sr-only">Entitlement</span>
               </th>
               {packages.map((p) => {
@@ -147,17 +147,17 @@ const PackagesPage: React.FC = () => {
               return (
                 <Fragment key={g.kind}>
                   <tr>
-                    <th colSpan={packages.length + 1} scope="colgroup" className="bg-slate-50 px-3 py-1.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <th colSpan={packages.length + 1} scope="colgroup" className="bg-slate-50 px-3 py-1.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600 dark:bg-gray-800 dark:text-gray-300">
                       {g.label}
                     </th>
                   </tr>
                   {rows.map((e) => {
                     const Icon = entIcon(e.key);
                     return (
-                      <tr key={e.key} className="border-t border-slate-100 dark:border-slate-800">
-                        <th scope="row" className="sticky left-0 z-10 bg-white p-2 pl-3 text-left font-medium text-slate-800 dark:bg-slate-900 dark:text-slate-100">
+                      <tr key={e.key} className="border-t border-slate-100 dark:border-gray-800">
+                        <th scope="row" className="sticky left-0 z-10 bg-white p-2 pl-3 text-left font-medium text-slate-800 dark:bg-gray-900 dark:text-gray-100">
                           <span className="flex items-center gap-2">
-                            <Icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-300" aria-hidden />
+                            <Icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-gray-300" aria-hidden />
                             <span className="truncate">{e.label}</span>
                           </span>
                         </th>
@@ -198,7 +198,7 @@ const PriceInput: React.FC<{ label: string; short: string; value: number | null;
       onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
       className={cx(inputCls, "py-1 pr-10 text-right text-xs tabular-nums")}
     />
-    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 dark:text-slate-300">{short}</span>
+    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 dark:text-gray-300">{short}</span>
   </label>
 );
 
@@ -231,7 +231,7 @@ const LimitInput: React.FC<{ label: string; value: number | null; onChange: (v: 
         aria-label={`${label}: unlimited`}
         title="Unlimited"
         onClick={() => onChange(unlimited ? last : null)}
-        className={cx("flex h-7 w-7 items-center justify-center rounded-full", unlimited ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300")}
+        className={cx("flex h-7 w-7 items-center justify-center rounded-full", unlimited ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-300")}
       >
         <InfinityIcon className="h-4 w-4" aria-hidden />
       </button>

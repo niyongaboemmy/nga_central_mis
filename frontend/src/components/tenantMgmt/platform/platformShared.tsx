@@ -131,7 +131,7 @@ const BTN_TONES = {
   success: "bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-500",
   warning: "bg-amber-500 text-white hover:bg-amber-400 focus-visible:ring-amber-500",
   ghost:
-    "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus-visible:ring-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+    "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus-visible:ring-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800",
 } as const;
 
 export const Btn: React.FC<
@@ -173,7 +173,7 @@ export const IconBtn: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & {
       "inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-40",
       tone === "danger"
         ? "text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-400/10"
-        : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+        : "text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800",
       className,
     )}
     {...rest}
@@ -183,7 +183,7 @@ export const IconBtn: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & {
 );
 
 export const Card: React.FC<{ className?: string; children: React.ReactNode }> = ({ className, children }) => (
-  <div className={cx("rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900", className)}>{children}</div>
+  <div className={cx("rounded-2xl border border-slate-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900", className)}>{children}</div>
 );
 
 export const Spinner: React.FC = () => (
@@ -194,13 +194,13 @@ export const Spinner: React.FC = () => (
 );
 
 export const inputCls =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100";
 
 export const Field: React.FC<{ label: string; icon?: LucideIcon; children: (id: string) => React.ReactNode; className?: string }> = ({ label, icon: Icon, children, className }) => {
   const id = useId();
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+      <label htmlFor={id} className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-gray-300">
         {Icon && <Icon className="h-3.5 w-3.5" aria-hidden />}
         {label}
       </label>
@@ -232,14 +232,14 @@ export const Switch: React.FC<{ checked: boolean; onChange: (v: boolean) => void
       onClick={() => onChange(!checked)}
       className="inline-flex items-center gap-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50"
     >
-      <span className={cx("relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors", checked ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600")}>
+      <span className={cx("relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors", checked ? "bg-emerald-500" : "bg-slate-300 dark:bg-gray-600")}>
         <motion.span
           className="h-5 w-5 rounded-full bg-white shadow"
           animate={{ x: checked ? 20 : 0 }}
           transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 600, damping: 32 }}
         />
       </span>
-      {showLabel && <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</span>}
+      {showLabel && <span className="text-sm font-medium text-slate-700 dark:text-gray-200">{label}</span>}
     </button>
   );
 };
@@ -252,7 +252,7 @@ export const Stepper: React.FC<{ value: number; onChange: (v: number) => void; m
   label,
   unit = "d",
 }) => (
-  <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800" role="group" aria-label={label}>
+  <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800" role="group" aria-label={label}>
     <IconBtn icon={Minus} label={`${label}: less`} onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} className="h-7 w-7" />
     <input
       type="number"
@@ -263,7 +263,7 @@ export const Stepper: React.FC<{ value: number; onChange: (v: number) => void; m
       onChange={(e) => onChange(Math.min(max, Math.max(min, Number(e.target.value) || 0)))}
       className="w-14 bg-transparent text-center text-sm font-bold tabular-nums text-slate-900 focus:outline-none dark:text-white"
     />
-    <span className="pr-1 text-xs text-slate-600 dark:text-slate-300">{unit}</span>
+    <span className="pr-1 text-xs text-slate-600 dark:text-gray-300">{unit}</span>
     <IconBtn icon={Plus} label={`${label}: more`} onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} className="h-7 w-7" />
   </div>
 );
@@ -362,7 +362,7 @@ export const CountBadge: React.FC<{ n: number; tone?: "red" | "slate"; label?: s
     <span
       className={cx(
         "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-5",
-        tone === "red" ? "bg-red-500 text-white" : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+        tone === "red" ? "bg-red-500 text-white" : "bg-slate-200 text-slate-700 dark:bg-gray-700 dark:text-gray-200",
       )}
     >
       {n > 99 ? "99+" : n}
@@ -386,7 +386,7 @@ export function TabBar<T extends string>({
 }) {
   const reduced = useReducedMotion();
   return (
-    <div role="tablist" aria-label={label} className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700">
+    <div role="tablist" aria-label={label} className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-gray-700">
       {tabs.map((t) => {
         const on = t.value === value;
         const Icon = t.icon;
@@ -399,7 +399,7 @@ export function TabBar<T extends string>({
             onClick={() => onChange(t.value)}
             className={cx(
               "relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-              on ? "text-brand-700 dark:text-brand-200" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white",
+              on ? "text-brand-700 dark:text-brand-200" : "text-slate-600 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white",
             )}
           >
             {Icon && <Icon className="h-4 w-4" aria-hidden />}

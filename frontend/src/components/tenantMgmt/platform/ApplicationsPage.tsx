@@ -144,7 +144,7 @@ const AppRow: React.FC<{ row: ApplicationListItem; accent: string; pkgName: stri
     <motion.li layout {...m("reveal")}>
       <Link
         to={`/platform/applications/${r.id}`}
-        className="relative flex flex-col gap-2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 pl-4 shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 md:grid md:grid-cols-[1fr_auto_auto_auto_auto] md:items-center md:gap-4"
+        className="relative flex flex-col gap-2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 pl-4 shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 md:grid md:grid-cols-[1fr_auto_auto_auto_auto] md:items-center md:gap-4"
       >
         <span className={cx("absolute inset-y-0 left-0 w-1", accent)} aria-hidden />
         <span className="min-w-0">
@@ -156,15 +156,15 @@ const AppRow: React.FC<{ row: ApplicationListItem; accent: string; pkgName: stri
             )}
             <span className="truncate font-semibold text-slate-900 dark:text-white">{r.schoolName}</span>
           </span>
-          <span className="block truncate text-xs text-slate-600 dark:text-slate-300">
+          <span className="block truncate text-xs text-slate-600 dark:text-gray-300">
             {[r.ref, r.district, r.applicantName].filter(Boolean).join(" · ")}
           </span>
         </span>
         <span className="flex flex-wrap items-center gap-2">
           <StatusPill status={r.status} />
-          {pkgName && <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{pkgName}</span>}
+          {pkgName && <span className="text-xs font-semibold text-slate-700 dark:text-gray-200">{pkgName}</span>}
         </span>
-        <span className={cx("inline-flex items-center gap-1 text-xs font-semibold tabular-nums", r.slaBreached ? "text-red-700 dark:text-red-300" : "text-slate-600 dark:text-slate-300")}>
+        <span className={cx("inline-flex items-center gap-1 text-xs font-semibold tabular-nums", r.slaBreached ? "text-red-700 dark:text-red-300" : "text-slate-600 dark:text-gray-300")}>
           {r.slaBreached && !reduced ? (
             <motion.span animate={{ scale: [1, 1.25, 1] }} transition={{ duration: 1.2, repeat: Infinity }} className="inline-flex">
               <Clock className="h-3.5 w-3.5" aria-hidden />
@@ -184,7 +184,7 @@ const AppRow: React.FC<{ row: ApplicationListItem; accent: string; pkgName: stri
               <span className="sr-only">Assigned to {r.assignedTo.name}</span>
             </span>
           ) : (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 dark:border-slate-600" title="Unassigned">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 dark:border-gray-600" title="Unassigned">
               <UserRound className="h-3.5 w-3.5" aria-hidden />
               <span className="sr-only">Unassigned</span>
             </span>
@@ -192,7 +192,7 @@ const AppRow: React.FC<{ row: ApplicationListItem; accent: string; pkgName: stri
         </span>
         <span className="hidden md:block">
           <CountBadge n={r.unread} tone="slate" label="unread" />
-          {!r.unread && <FileStack className="h-4 w-4 text-slate-300 dark:text-slate-600" aria-hidden />}
+          {!r.unread && <FileStack className="h-4 w-4 text-slate-300 dark:text-gray-600" aria-hidden />}
         </span>
       </Link>
     </motion.li>

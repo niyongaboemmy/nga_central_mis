@@ -74,7 +74,7 @@ const DiffPanel: React.FC<{ from: PackageInfo; to: PackageInfo }> = ({ from, to 
   const fmt = (v: number | null, key: string) => (v === null ? "∞" : `${v.toLocaleString()}${key === "limit.storage_gb" ? " GB" : ""}`);
   return (
     <div className="space-y-3" data-testid="plan-diff">
-      <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+      <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-gray-100">
         <span>{from.name}</span>
         <ArrowRight className="h-4 w-4" aria-hidden />
         <span className={accentOf(to.accent).text}>{to.name}</span>
@@ -297,7 +297,7 @@ const SubscriptionPage: React.FC = () => {
             <div className="mt-1 text-sm text-white/90">{sub?.billingCycle === "YEAR" ? "Yearly" : "Per term"}</div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <StatusPill status={tenant.status} className="bg-white/90 text-slate-900 dark:bg-white/90 dark:text-slate-900" />
+            <StatusPill status={tenant.status} className="bg-white/90 text-slate-900 dark:bg-white/90 dark:text-gray-900" />
             {pendingChange && (
               <button
                 type="button"
@@ -402,7 +402,7 @@ const SubscriptionPage: React.FC = () => {
               </div>
               <AnimatePresence mode="wait">
                 {target && diff && (
-                  <motion.div key={target.code} {...m("reveal")} className="space-y-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/60">
+                  <motion.div key={target.code} {...m("reveal")} className="space-y-4 rounded-2xl bg-slate-50 p-4 dark:bg-gray-800/60">
                     <DiffPanel from={pkg} to={target} />
                     <div className="flex flex-wrap items-center gap-3">
                       {diff.downgrade ? (
@@ -451,14 +451,14 @@ const SubscriptionPage: React.FC = () => {
           <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
             <History className="h-4 w-4" aria-hidden /> History
           </h2>
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+          <ul className="divide-y divide-slate-100 dark:divide-gray-800">
             {history.map((inv) => (
               <li key={inv.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
-                <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">{inv.number ?? `#${inv.id}`}</span>
+                <span className="font-mono font-semibold text-slate-800 dark:text-gray-100">{inv.number ?? `#${inv.id}`}</span>
                 <StatusPill status={inv.status} />
-                <span className="text-xs text-slate-600 dark:text-slate-300">{shortDate(inv.issuedAt ?? inv.periodStart)}</span>
+                <span className="text-xs text-slate-600 dark:text-gray-300">{shortDate(inv.issuedAt ?? inv.periodStart)}</span>
                 <span className="ml-auto tabular-nums font-semibold text-slate-900 dark:text-white">{formatMoney(inv.amount, inv.currency)}</span>
-                <a href={pdfOf(inv)} target="_blank" rel="noopener noreferrer" className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
+                <a href={pdfOf(inv)} target="_blank" rel="noopener noreferrer" className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800">
                   <FileDown className="h-4 w-4" aria-hidden />
                   <span className="sr-only">PDF of {inv.number ?? inv.id}</span>
                 </a>

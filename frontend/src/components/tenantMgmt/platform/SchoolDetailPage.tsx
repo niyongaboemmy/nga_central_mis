@@ -59,7 +59,7 @@ const SchoolDetailPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Link to="/platform/schools" className="rounded-full p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="Back to schools">
+        <Link to="/platform/schools" className="rounded-full p-2 text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800" aria-label="Back to schools">
           <ArrowLeft className="h-5 w-5" aria-hidden />
         </Link>
         <h1 className="flex min-w-0 flex-1 items-center gap-2 truncate text-xl font-bold text-slate-900 dark:text-white">
@@ -129,7 +129,7 @@ const OverviewTab: React.FC<{ d: TenantDetail; onRun: (r: ProvisioningRun) => vo
         <dl className="grid gap-3 sm:grid-cols-3">
           {facts.map(([k, v]) => (
             <div key={k}>
-              <dt className="text-xs text-slate-600 dark:text-slate-300">{k}</dt>
+              <dt className="text-xs text-slate-600 dark:text-gray-300">{k}</dt>
               <dd className="text-sm font-semibold text-slate-900 dark:text-white">{v}</dd>
             </div>
           ))}
@@ -142,11 +142,11 @@ const OverviewTab: React.FC<{ d: TenantDetail; onRun: (r: ProvisioningRun) => vo
 };
 
 const STEP_ICON: Record<StepStatus, { icon: LucideIcon; cls: string; spin?: boolean }> = {
-  PENDING: { icon: Clock, cls: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300" },
-  RUNNING: { icon: Loader2, cls: "bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200", spin: true },
+  PENDING: { icon: Clock, cls: "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-300" },
+  RUNNING: { icon: Loader2, cls: "bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-200", spin: true },
   DONE: { icon: Check, cls: "bg-emerald-500 text-white" },
   FAILED: { icon: X, cls: "bg-red-500 text-white" },
-  SKIPPED: { icon: SkipForward, cls: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300" },
+  SKIPPED: { icon: SkipForward, cls: "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-300" },
 };
 
 export const ProvisioningPanel: React.FC<{ run: ProvisioningRun; onRun: (r: ProvisioningRun) => void }> = ({ run, onRun }) => {
@@ -189,14 +189,14 @@ export const ProvisioningPanel: React.FC<{ run: ProvisioningRun; onRun: (r: Prov
           const Icon = meta.icon;
           return (
             <motion.li key={s.key} layout {...m("reveal")}>
-              <details className="group rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60">
+              <details className="group rounded-xl hover:bg-slate-50 dark:hover:bg-gray-800/60">
                 <summary className="flex cursor-pointer list-none items-center gap-3 p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
                   <span className={cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", meta.cls)}>
                     <Icon className={cx("h-4 w-4", meta.spin && "animate-spin")} aria-hidden />
                   </span>
                   <span className="flex-1 text-sm font-medium text-slate-900 dark:text-white">{s.label}</span>
                   <span className="sr-only">{statusLabel(s.status)}</span>
-                  {s.finishedAt && <span className="text-xs text-slate-600 dark:text-slate-300">{fmtDateTime(s.finishedAt)}</span>}
+                  {s.finishedAt && <span className="text-xs text-slate-600 dark:text-gray-300">{fmtDateTime(s.finishedAt)}</span>}
                   {s.log && <ChevronDown className="h-4 w-4 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />}
                 </summary>
                 {s.log && <pre className="mx-2 mb-2 max-h-60 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{s.log}</pre>}
@@ -352,15 +352,15 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
     <Card className="space-y-3">
       <h2 className="text-sm font-bold text-slate-900 dark:text-white">Overrides</h2>
       {d.overrides.length === 0 ? (
-        <p className="text-sm text-slate-600 dark:text-slate-300">—</p>
+        <p className="text-sm text-slate-600 dark:text-gray-300">—</p>
       ) : (
         <ul className="space-y-1.5">
           {d.overrides.map((o) => {
             const Icon = entIcon(o.key);
             const kind = catalog.find((e) => e.key === o.key)?.kind ?? (o.key.startsWith("limit.") ? "LIMIT" : "FEATURE");
             return (
-              <li key={o.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-2 dark:bg-slate-800">
-                <Icon className="h-4 w-4 shrink-0 text-slate-600 dark:text-slate-300" aria-hidden />
+              <li key={o.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-2 dark:bg-gray-800">
+                <Icon className="h-4 w-4 shrink-0 text-slate-600 dark:text-gray-300" aria-hidden />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                     {labelOf(o.key)}{" "}
@@ -368,7 +368,7 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
                       {kind === "LIMIT" ? (o.value === null ? "∞" : o.value.toLocaleString()) : o.enabled ? "On" : "Off"}
                     </span>
                   </p>
-                  <p className="truncate text-xs text-slate-600 dark:text-slate-300">
+                  <p className="truncate text-xs text-slate-600 dark:text-gray-300">
                     {o.reason}
                     {o.expiresAt && ` · ⏳ ${fmtDate(o.expiresAt)}`}
                     {o.grantedBy && ` · ${o.grantedBy}`}
@@ -395,7 +395,7 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
       )}
       {canEdit && (
         <form
-          className="grid gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 sm:grid-cols-2"
+          className="grid gap-2 border-t border-slate-100 pt-3 dark:border-gray-800 sm:grid-cols-2"
           onSubmit={async (e) => {
             e.preventDefault();
             if (!ent || reason.trim().length < 3) return;
@@ -443,7 +443,7 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
                   type="button"
                   aria-pressed={unlimited}
                   onClick={() => setUnlimited(!unlimited)}
-                  className={cx("flex h-9 w-9 items-center justify-center rounded-full", unlimited ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300")}
+                  className={cx("flex h-9 w-9 items-center justify-center rounded-full", unlimited ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 dark:bg-gray-800 dark:text-gray-300")}
                   title="Unlimited"
                 >
                   <InfinityIcon className="h-4 w-4" aria-hidden />
@@ -497,13 +497,13 @@ const AppsTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => void }
         const Icon = entIcon(appKeyOf(a.name, a.clientId));
         const on = a.status === "ACTIVE";
         return (
-          <li key={a.systemId} className={cx("flex items-center gap-3 rounded-2xl border p-3 shadow-sm transition-colors", on ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/30 dark:bg-emerald-400/5" : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900")}>
-            <span className={cx("flex h-10 w-10 items-center justify-center rounded-xl", on ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300")}>
+          <li key={a.systemId} className={cx("flex items-center gap-3 rounded-2xl border p-3 shadow-sm transition-colors", on ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/30 dark:bg-emerald-400/5" : "border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900")}>
+            <span className={cx("flex h-10 w-10 items-center justify-center rounded-xl", on ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-300")}>
               <Icon className="h-5 w-5" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate font-semibold text-slate-900 dark:text-white">{a.name}</p>
-              <span className={cx("rounded-full px-1.5 text-[11px] font-bold", a.source === "OVERRIDE" ? "bg-violet-100 text-violet-800 dark:bg-violet-400/15 dark:text-violet-200" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200")}>
+              <span className={cx("rounded-full px-1.5 text-[11px] font-bold", a.source === "OVERRIDE" ? "bg-violet-100 text-violet-800 dark:bg-violet-400/15 dark:text-violet-200" : "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-200")}>
                 {a.source === "OVERRIDE" ? "Override" : "Package"}
               </span>
             </div>
@@ -617,14 +617,14 @@ const LifecycleTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => v
                     <span
                       className={cx(
                         "relative flex h-14 w-14 items-center justify-center rounded-full transition-all",
-                        on ? cx(st.fill, "text-white shadow-lg ring-4", st.ring) : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500",
+                        on ? cx(st.fill, "text-white shadow-lg ring-4", st.ring) : "bg-slate-100 text-slate-400 dark:bg-gray-800 dark:text-gray-500",
                       )}
                     >
                       <Icon className="h-7 w-7" aria-hidden />
                     </span>
                   </span>
-                  <span className={cx("text-sm font-semibold", on ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-slate-300")}>{statusLabel(st.s)}</span>
-                  {on && st.s === "GRACE" && t.graceUntil && <span className="text-xs text-slate-600 dark:text-slate-300">→ {fmtDate(t.graceUntil)}</span>}
+                  <span className={cx("text-sm font-semibold", on ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-gray-300")}>{statusLabel(st.s)}</span>
+                  {on && st.s === "GRACE" && t.graceUntil && <span className="text-xs text-slate-600 dark:text-gray-300">→ {fmtDate(t.graceUntil)}</span>}
                 </li>
               </React.Fragment>
             );
@@ -695,23 +695,23 @@ export const AuditList: React.FC<{ entries: TenantDetail["audit"]; schoolName?: 
   const m = useMotion();
   if (!entries.length) return <EmptyState icon={ScrollText} title="No entries" />;
   return (
-    <ol className="relative space-y-3 border-l-2 border-slate-200 pl-5 dark:border-slate-700" aria-label="Audit">
+    <ol className="relative space-y-3 border-l-2 border-slate-200 pl-5 dark:border-gray-700" aria-label="Audit">
       <AnimatePresence initial={false}>
         {entries.map((e) => (
           <motion.li key={e.id} layout {...m("reveal")} className="relative">
-            <span className="absolute -left-[1.6rem] top-1.5 h-3 w-3 rounded-full bg-brand-500 ring-4 ring-white dark:ring-slate-950" aria-hidden />
+            <span className="absolute -left-[1.6rem] top-1.5 h-3 w-3 rounded-full bg-brand-500 ring-4 ring-white dark:ring-gray-950" aria-hidden />
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-slate-900 dark:text-white">{auditLabel(e.action)}</span>
-              {schoolName && e.targetTid !== null && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">{schoolName(e.targetTid) ?? `#${e.targetTid}`}</span>}
-              <time className="text-xs text-slate-600 dark:text-slate-300" dateTime={e.at}>
+              {schoolName && e.targetTid !== null && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-gray-800 dark:text-gray-200">{schoolName(e.targetTid) ?? `#${e.targetTid}`}</span>}
+              <time className="text-xs text-slate-600 dark:text-gray-300" dateTime={e.at}>
                 {fmtDateTime(e.at)}
               </time>
-              {e.actor && <span className="text-xs text-slate-600 dark:text-slate-300">· {e.actor}</span>}
+              {e.actor && <span className="text-xs text-slate-600 dark:text-gray-300">· {e.actor}</span>}
             </div>
             {e.payload !== null && e.payload !== undefined && typeof e.payload === "object" && Object.keys(e.payload as object).length > 0 && (
               <details className="mt-1">
-                <summary className="cursor-pointer text-xs text-slate-600 dark:text-slate-300">Details</summary>
-                <pre className="mt-1 max-h-48 overflow-auto rounded-lg bg-slate-50 p-2 text-xs text-slate-800 dark:bg-slate-800 dark:text-slate-100">{JSON.stringify(e.payload, null, 2)}</pre>
+                <summary className="cursor-pointer text-xs text-slate-600 dark:text-gray-300">Details</summary>
+                <pre className="mt-1 max-h-48 overflow-auto rounded-lg bg-slate-50 p-2 text-xs text-slate-800 dark:bg-gray-800 dark:text-gray-100">{JSON.stringify(e.payload, null, 2)}</pre>
               </details>
             )}
           </motion.li>

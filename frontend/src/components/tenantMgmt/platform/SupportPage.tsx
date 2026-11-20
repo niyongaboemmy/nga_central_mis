@@ -22,7 +22,7 @@ export const TimeLeftRing: React.FC<{ startsAt: string; expiresAt: string; now: 
   return (
     <span className="relative inline-flex" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90" aria-hidden>
-        <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={5} className="fill-none stroke-slate-200 dark:stroke-slate-700" />
+        <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={5} className="fill-none stroke-slate-200 dark:stroke-gray-700" />
         <motion.circle
           cx={size / 2}
           cy={size / 2}
@@ -36,7 +36,7 @@ export const TimeLeftRing: React.FC<{ startsAt: string; expiresAt: string; now: 
           transition={{ duration: reduced ? 0 : 0.6 }}
         />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-slate-800 dark:text-slate-100">
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-slate-800 dark:text-gray-100">
         {fmtLeft(Math.round(left / 1000)).replace(/:\d\d$/, "m")}
       </span>
       <span className="sr-only">{Math.round(left / 60000)} minutes left</span>
@@ -65,12 +65,12 @@ const SupportPage: React.FC = () => {
           const live = s.active && !s.revokedAt && new Date(s.expiresAt).getTime() > now;
           const ModeIcon = s.mode === "WRITE" ? Pencil : Eye;
           return (
-            <motion.li key={s.id} layout {...m("reveal")} className={cx("flex items-center gap-3 rounded-2xl border bg-white p-3 shadow-sm dark:bg-slate-900", live ? "border-violet-200 dark:border-violet-400/30" : "border-slate-200 opacity-75 dark:border-slate-700")}>
-              {live ? <TimeLeftRing startsAt={s.startsAt} expiresAt={s.expiresAt} now={now} /> : <span className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800"><LifeBuoy className="h-5 w-5" aria-hidden /></span>}
+            <motion.li key={s.id} layout {...m("reveal")} className={cx("flex items-center gap-3 rounded-2xl border bg-white p-3 shadow-sm dark:bg-gray-900", live ? "border-violet-200 dark:border-violet-400/30" : "border-slate-200 opacity-75 dark:border-gray-700")}>
+              {live ? <TimeLeftRing startsAt={s.startsAt} expiresAt={s.expiresAt} now={now} /> : <span className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-gray-800"><LifeBuoy className="h-5 w-5" aria-hidden /></span>}
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 truncate font-semibold text-slate-900 dark:text-white">
                   <span
-                    className={cx("inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full", s.mode === "WRITE" ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" : "bg-sky-100 text-sky-800 dark:bg-sky-400/15 dark:text-sky-200")}
+                    className={cx("inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full", s.mode === "WRITE" ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" : "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200")}
                     title={s.mode === "WRITE" ? "Read & write" : "Read only"}
                   >
                     <ModeIcon className="h-3.5 w-3.5" aria-hidden />
@@ -78,7 +78,7 @@ const SupportPage: React.FC = () => {
                   </span>
                   <span className="truncate">{s.schoolName}</span>
                 </p>
-                <p className="truncate text-xs text-slate-600 dark:text-slate-300">
+                <p className="truncate text-xs text-slate-600 dark:text-gray-300">
                   {s.reason ?? "—"}
                   {s.openedBy && ` · ${s.openedBy} ${fmtDateTime(s.openedAt)}`}
                 </p>

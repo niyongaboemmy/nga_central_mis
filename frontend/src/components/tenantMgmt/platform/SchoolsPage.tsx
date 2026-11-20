@@ -29,7 +29,7 @@ export const listMeters = (t: TenantListItem, pkg: PackageInfo | undefined): Usa
 export const PeriodChip: React.FC<{ periodEnd: string | null; graceUntil?: string | null }> = ({ periodEnd, graceUntil }) => {
   const d = daysUntil(graceUntil ?? periodEnd);
   if (d === null) return null;
-  const tone = d < 0 ? "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-200" : d <= 30 ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
+  const tone = d < 0 ? "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-200" : d <= 30 ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" : "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-200";
   return (
     <span
       className={cx("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", tone)}
@@ -52,7 +52,7 @@ const SchoolLogo: React.FC<{ slug: string; name: string; primary: boolean }> = (
     };
   }, [slug]);
   return (
-    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-950">
+    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-950">
       <TenantLogo src={url} name={name} isPrimary={primary} className="h-full w-full" rounded="rounded-lg" />
     </span>
   );
@@ -65,7 +65,7 @@ export const SchoolCard: React.FC<{ t: TenantListItem; pkg: PackageInfo | undefi
     <Link
       to={`/platform/schools/${t.tid}`}
       aria-label={`${t.name}, ${t.status.toLowerCase()}, ${pkg?.name ?? t.pkg} package`}
-      className="group flex h-full flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-500"
+      className="group flex h-full flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-brand-500"
     >
       <div className="flex items-start gap-3">
         <SchoolLogo slug={t.slug} name={t.name} primary={t.isPrimary} />
@@ -73,7 +73,7 @@ export const SchoolCard: React.FC<{ t: TenantListItem; pkg: PackageInfo | undefi
           <p className="line-clamp-2 font-semibold leading-snug text-slate-900 dark:text-white" title={t.name}>
             {t.name}
           </p>
-          <p className="flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+          <p className="flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-gray-400">
             <span className="font-mono">{t.slug}</span>
             {t.isPrimary && (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-50 px-1.5 py-0.5 font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">
@@ -91,11 +91,11 @@ export const SchoolCard: React.FC<{ t: TenantListItem; pkg: PackageInfo | undefi
         ))}
       </div>
 
-      <div className="mt-auto space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
+      <div className="mt-auto space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-600 dark:border-gray-800 dark:text-gray-300">
         <div className="flex items-center gap-2">
           <span className={cx("inline-flex items-center rounded-full px-2 py-0.5 font-semibold", a.soft, a.text)}>{pkg?.name ?? t.pkg}</span>
           {t.isPrimary ? (
-            <span className="text-slate-500 dark:text-slate-400">No renewal</span>
+            <span className="text-slate-500 dark:text-gray-400">No renewal</span>
           ) : (
             <PeriodChip periodEnd={t.periodEnd} graceUntil={t.status === "GRACE" ? t.graceUntil : null} />
           )}
@@ -205,7 +205,7 @@ const SchoolsPage: React.FC = () => {
       {!rows ? (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading schools">
           {[0, 1, 2].map((i) => (
-            <li key={i} className="h-56 animate-pulse rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900" />
+            <li key={i} className="h-56 animate-pulse rounded-2xl border border-slate-200 bg-slate-50 dark:border-gray-800 dark:bg-gray-900" />
           ))}
         </ul>
       ) : shown.length === 0 ? (

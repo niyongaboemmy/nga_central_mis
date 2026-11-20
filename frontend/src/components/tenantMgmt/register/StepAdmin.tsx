@@ -148,7 +148,7 @@ const StepAdmin: React.FC<{
             <BadgeCheck className="h-9 w-9" aria-hidden />
           </motion.span>
           <p className="font-semibold text-slate-900 dark:text-white">{admin.email}</p>
-          <span className="text-sm text-slate-600 dark:text-slate-300">Verified</span>
+          <span className="text-sm text-slate-600 dark:text-gray-300">Verified</span>
         </motion.div>
         <StepFooter onBack={onBack} primary="Next" />
       </form>
@@ -166,13 +166,13 @@ const StepAdmin: React.FC<{
           <MailCheck className="h-8 w-8" aria-hidden />
         </motion.span>
         <div>
-          <p className="text-sm text-slate-600 dark:text-slate-300">Code sent to</p>
+          <p className="text-sm text-slate-600 dark:text-gray-300">Code sent to</p>
           <p className="font-semibold text-slate-900 dark:text-white">{sentTo}</p>
         </div>
         <Shake error={codeError ? String(codeKey) : null}>
           <VerificationCode key={codeKey} length={6} error={codeError} onComplete={(c) => void verify(c)} />
         </Shake>
-        {busy && <span className="text-sm text-slate-600 dark:text-slate-300" role="status">Checking…</span>}
+        {busy && <span className="text-sm text-slate-600 dark:text-gray-300" role="status">Checking…</span>}
         {banner}
         <div className="flex flex-wrap items-center justify-center gap-2">
           <button type="button" className={ghostBtn} onClick={() => setPhase("form")}>
@@ -220,7 +220,7 @@ const StepAdmin: React.FC<{
                   aria-describedby={describedBy}
                   className={`${inputCls(errors.password)} pr-11`}
                 />
-                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-600 dark:text-slate-300" aria-pressed={showPw}>
+                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-600 dark:text-gray-300" aria-pressed={showPw}>
                   {showPw ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
                   <span className="sr-only">{showPw ? "Hide password" : "Show password"}</span>
                 </button>

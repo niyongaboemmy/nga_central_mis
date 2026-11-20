@@ -32,7 +32,7 @@ const SupportSessionLanding: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-slate-950">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-gray-950">
       {bad ? (
         <EmptyState icon={Link2Off} title="Link expired" />
       ) : (
@@ -41,7 +41,7 @@ const SupportSessionLanding: React.FC = () => {
             <LifeBuoy className="h-8 w-8" aria-hidden />
           </span>
           <Loader2 className="h-5 w-5 animate-spin text-violet-600" aria-hidden />
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Support session</span>
+          <span className="text-sm font-semibold text-slate-700 dark:text-gray-200">Support session</span>
         </motion.div>
       )}
     </div>

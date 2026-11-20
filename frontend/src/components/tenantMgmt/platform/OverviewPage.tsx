@@ -66,7 +66,7 @@ const age = (days: number) => (days <= 0 ? "today" : days === 1 ? "1 day" : `${d
 const SectionTitle: React.FC<{ children: React.ReactNode; aside?: React.ReactNode }> = ({ children, aside }) => (
   <div className="mb-3 flex items-baseline justify-between gap-3">
     <h2 className="text-sm font-bold text-slate-900 dark:text-white">{children}</h2>
-    {aside && <span className="text-xs text-slate-500 dark:text-slate-400">{aside}</span>}
+    {aside && <span className="text-xs text-slate-500 dark:text-gray-400">{aside}</span>}
   </div>
 );
 
@@ -110,7 +110,7 @@ const OverviewPage: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Platform at a glance</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
+          <p className="text-sm text-slate-600 dark:text-gray-300">
             {inFlight ? `${inFlight} ${inFlight === 1 ? "school is" : "schools are"} on the way in` : "No applications in progress"}
             {updated ? ` · updated ${updated}` : ""}
           </p>
@@ -119,7 +119,7 @@ const OverviewPage: React.FC = () => {
           type="button"
           onClick={refresh}
           disabled={refreshing}
-          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-brand-500 hover:text-brand-700 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:text-brand-200"
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-brand-500 hover:text-brand-700 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:text-brand-200"
         >
           <RefreshCw className={cx("h-4 w-4", refreshing && "animate-spin")} aria-hidden /> Refresh
         </button>
@@ -133,7 +133,7 @@ const OverviewPage: React.FC = () => {
             <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden /> All clear: no application is waiting on the platform team.
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800" aria-label="Applications waiting on the platform team">
+          <ul className="divide-y divide-slate-100 dark:divide-gray-800" aria-label="Applications waiting on the platform team">
             {attention.map((it, i) => {
               const act = nextAction(it);
               const step = (Object.keys(STEP_STATUSES) as TrackerStep[]).find((s) => STEP_STATUSES[s].includes(it.status)) ?? "submitted";
@@ -150,7 +150,7 @@ const OverviewPage: React.FC = () => {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-slate-900 dark:text-white">{it.schoolName}</span>
-                    <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
+                    <span className="block truncate text-xs text-slate-500 dark:text-gray-400">
                       {[it.ref, statusLabel(it.status), it.pkg ? `${it.pkg[0].toUpperCase()}${it.pkg.slice(1)} package` : null, it.invoiceStatus === "DRAFT" ? "invoice not issued" : null, age(it.ageDays)].filter(Boolean).join(" · ")}
                     </span>
                   </span>
@@ -161,7 +161,7 @@ const OverviewPage: React.FC = () => {
                         ? "bg-red-600 text-white"
                         : act.tone === "brand"
                           ? "bg-brand-600 text-white"
-                          : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+                          : "bg-slate-100 text-slate-600 dark:bg-gray-800 dark:text-gray-300",
                     )}
                   >
                     {act.label} {act.tone !== "muted" && <ArrowRight className="h-3.5 w-3.5" aria-hidden />}
@@ -176,7 +176,7 @@ const OverviewPage: React.FC = () => {
                       type="button"
                       onClick={() => nav(`/platform/applications/${it.applicationId}`)}
                       aria-label={`${it.schoolName}: ${act.label}`}
-                      className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-slate-800/60"
+                      className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-gray-800/60"
                     >
                       {body}
                     </button>
@@ -205,7 +205,7 @@ const OverviewPage: React.FC = () => {
       <Card>
         <SectionTitle aside={`${n("ACTIVE")} live from applications`}>Pipeline</SectionTitle>
         <ol className="relative grid grid-cols-3 gap-y-4 sm:grid-cols-6" aria-label="Applications per step">
-          <span className="absolute left-[8%] right-[8%] top-5 hidden h-0.5 bg-slate-200 dark:bg-slate-700 sm:block" aria-hidden />
+          <span className="absolute left-[8%] right-[8%] top-5 hidden h-0.5 bg-slate-200 dark:bg-gray-700 sm:block" aria-hidden />
           {TRACKER_STEPS.map((s, i) => {
             const Icon = STEP_ICONS[s];
             const c = stepCount(s);
@@ -220,16 +220,16 @@ const OverviewPage: React.FC = () => {
                       ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-200"
                       : active
                         ? "border-brand-600 bg-brand-600 text-white"
-                        : "border-slate-200 bg-white text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500",
+                        : "border-slate-200 bg-white text-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-500",
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden />
                   {active && !failed && <span className="absolute inset-0 animate-ping rounded-full bg-brand-500/30" aria-hidden />}
                 </span>
-                <span className={cx("text-2xl font-extrabold", active ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-500")}>
+                <span className={cx("text-2xl font-extrabold", active ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-gray-500")}>
                   <CountUp value={c} />
                 </span>
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{STEP_LABELS[s]}</span>
+                <span className="text-xs font-medium text-slate-600 dark:text-gray-300">{STEP_LABELS[s]}</span>
               </>
             );
             return (
@@ -239,7 +239,7 @@ const OverviewPage: React.FC = () => {
                     type="button"
                     onClick={() => nav(`/platform/applications?step=${s}`)}
                     aria-label={`${STEP_LABELS[s]}: ${c}`}
-                    className="flex w-full flex-col items-center gap-1 rounded-xl p-2 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-slate-800/60"
+                    className="flex w-full flex-col items-center gap-1 rounded-xl p-2 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-gray-800/60"
                   >
                     {body}
                   </button>
@@ -305,7 +305,7 @@ const OverviewPage: React.FC = () => {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <div className="mt-2 flex justify-center gap-5 text-xs text-slate-600 dark:text-slate-300">
+        <div className="mt-2 flex justify-center gap-5 text-xs text-slate-600 dark:text-gray-300">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: ct.series[0] }} aria-hidden /> Submitted
           </span>

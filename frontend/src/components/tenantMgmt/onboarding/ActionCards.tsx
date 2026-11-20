@@ -75,7 +75,7 @@ const FixChanges: React.FC<Props> = ({ me, reload }) => {
 
   return (
     <ActionCard icon={MessageSquareWarning} title="Changes requested" tone="amber" pulse={!editing}>
-      {note && <blockquote className="rounded-xl border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-slate-800 dark:bg-amber-400/10 dark:text-slate-100">{note}</blockquote>}
+      {note && <blockquote className="rounded-xl border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-slate-800 dark:bg-amber-400/10 dark:text-gray-100">{note}</blockquote>}
       <form onSubmit={resubmit} noValidate className="mt-3">
         {editing && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mb-3 overflow-visible">
@@ -161,7 +161,7 @@ const ReuploadPayment: React.FC<Props> = ({ me, reload }) => {
   const rejected = [...inv.payments].filter((p) => p.status === "REJECTED").sort((a, b) => (b.reviewedAt ?? b.submittedAt).localeCompare(a.reviewedAt ?? a.submittedAt))[0];
   return (
     <ActionCard icon={RotateCcw} title="Payment not accepted" tone="red">
-      {rejected?.reviewNote && <blockquote className="rounded-xl border-l-4 border-red-400 bg-red-50 px-3 py-2 text-slate-800 dark:bg-red-400/10 dark:text-slate-100">{rejected.reviewNote}</blockquote>}
+      {rejected?.reviewNote && <blockquote className="rounded-xl border-l-4 border-red-400 bg-red-50 px-3 py-2 text-slate-800 dark:bg-red-400/10 dark:text-gray-100">{rejected.reviewNote}</blockquote>}
       <div className="mt-3">
         <PaymentProofForm
           invoice={inv}

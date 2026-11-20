@@ -15,9 +15,9 @@ export const ALL_METHODS: PaymentMethod[] = ["MOMO", "AIRTEL_MONEY", "BANK_TRANS
 export const METHOD_INFO: Record<PaymentMethod, { icon: LucideIcon; label: string; tone: string }> = {
   MOMO: { icon: Smartphone, label: "MoMo", tone: "bg-yellow-100 text-yellow-800 dark:bg-yellow-400/15 dark:text-yellow-200" },
   AIRTEL_MONEY: { icon: Smartphone, label: "Airtel", tone: "bg-red-100 text-red-700 dark:bg-red-400/15 dark:text-red-200" },
-  BANK_TRANSFER: { icon: Landmark, label: "Bank", tone: "bg-sky-100 text-sky-800 dark:bg-sky-400/15 dark:text-sky-200" },
+  BANK_TRANSFER: { icon: Landmark, label: "Bank", tone: "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200" },
   CASH: { icon: Banknote, label: "Cash", tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200" },
-  OTHER: { icon: Wallet, label: "Other", tone: "bg-slate-100 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200" },
+  OTHER: { icon: Wallet, label: "Other", tone: "bg-slate-100 text-slate-700 dark:bg-gray-700/60 dark:text-gray-200" },
 };
 
 const DAY = 86_400_000;
@@ -55,7 +55,7 @@ export const CountdownRing: React.FC<{
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={label} data-overdue={overdue || undefined}>
       <svg width={size} height={size} className="-rotate-90" aria-hidden>
-        <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={6} className="fill-none stroke-slate-200 dark:stroke-slate-700" />
+        <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={6} className="fill-none stroke-slate-200 dark:stroke-gray-700" />
         <motion.circle
           cx={size / 2}
           cy={size / 2}
@@ -74,7 +74,7 @@ export const CountdownRing: React.FC<{
         {center ?? (
           <>
             <span className="text-base font-extrabold tabular-nums">{Math.abs(left)}</span>
-            <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">{overdue && left < 0 ? `${unit} late` : unit}</span>
+            <span className="text-[10px] font-semibold text-slate-600 dark:text-gray-300">{overdue && left < 0 ? `${unit} late` : unit}</span>
           </>
         )}
       </span>
@@ -126,7 +126,7 @@ export const CopyButton: React.FC<{ text: string; label: string; className?: str
       }}
       className={cx(
         "inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg px-2 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-        copied ? "bg-emerald-500 text-white" : "bg-white/70 text-slate-700 hover:bg-white dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700",
+        copied ? "bg-emerald-500 text-white" : "bg-white/70 text-slate-700 hover:bg-white dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700",
         className,
       )}
     >
@@ -150,11 +150,11 @@ export const CopyButton: React.FC<{ text: string; label: string; className?: str
 /** Spinner-free primary button style used across the account screens. */
 export const btn = {
   primary:
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900",
+    "inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900",
   ghost:
-    "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
+    "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800",
   danger:
     "inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500",
 };
 
-export const card = "rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900";
+export const card = "rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900";

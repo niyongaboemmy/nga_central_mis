@@ -115,24 +115,24 @@ const SettingsPage: React.FC = () => {
         <ul className="space-y-2">
           {WINDOWS.map((w) => (
             <li key={w.key} className="flex items-center gap-3">
-              <w.icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-300" aria-hidden />
-              <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-100">{w.label}</span>
+              <w.icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-gray-300" aria-hidden />
+              <span className="flex-1 text-sm font-medium text-slate-800 dark:text-gray-100">{w.label}</span>
               <Stepper label={w.label} value={num(w.key)} min={0} max={w.max} onChange={(v) => setDraft((d) => ({ ...d, [w.key]: v }))} />
             </li>
           ))}
         </ul>
-        <ul className="space-y-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+        <ul className="space-y-3 border-t border-slate-100 pt-3 dark:border-gray-800">
           {SWITCHES.map((s) => (
             <li key={s.key} className="flex items-center gap-3">
-              <s.icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-300" aria-hidden />
-              <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-100">{s.label}</span>
+              <s.icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-gray-300" aria-hidden />
+              <span className="flex-1 text-sm font-medium text-slate-800 dark:text-gray-100">{s.label}</span>
               <Switch checked={!!draft[s.key]} onChange={(v) => setDraft((d) => ({ ...d, [s.key]: v }))} label={s.label} />
             </li>
           ))}
         </ul>
-        <div className="border-t border-slate-100 pt-3 dark:border-slate-800">
-          <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-slate-100">
-            <FileText className="h-4 w-4 text-slate-500 dark:text-slate-300" aria-hidden />
+        <div className="border-t border-slate-100 pt-3 dark:border-gray-800">
+          <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-gray-100">
+            <FileText className="h-4 w-4 text-slate-500 dark:text-gray-300" aria-hidden />
             Required documents
           </p>
           <div className="flex flex-wrap gap-2">
@@ -146,7 +146,7 @@ const SettingsPage: React.FC = () => {
                   onClick={() => setDraft((d) => ({ ...d, "documents.required": on ? docs.filter((x) => x !== k.kind) : [...docs, k.kind] }))}
                   className={cx(
                     "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                    on ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200",
+                    on ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-200",
                   )}
                 >
                   {on && <Check className="h-3.5 w-3.5" aria-hidden />}
@@ -197,7 +197,7 @@ const SettingsPage: React.FC = () => {
           <ul className="space-y-3">
             <AnimatePresence initial={false}>
               {items.map((it, i) => (
-                <motion.li key={it._k} layout {...m("reveal")} className={cx("space-y-2 rounded-2xl border p-3", it.isActive ? "border-slate-200 dark:border-slate-700" : "border-dashed border-slate-300 opacity-70 dark:border-slate-600")}>
+                <motion.li key={it._k} layout {...m("reveal")} className={cx("space-y-2 rounded-2xl border p-3", it.isActive ? "border-slate-200 dark:border-gray-700" : "border-dashed border-slate-300 opacity-70 dark:border-gray-600")}>
                   <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={`Method ${i + 1}`}>
                     {METHODS.map((mt) => {
                       const meta = METHOD_META[mt];
@@ -209,7 +209,7 @@ const SettingsPage: React.FC = () => {
                           role="radio"
                           aria-checked={on}
                           onClick={() => setItem(i, { method: mt })}
-                          className={cx("flex flex-col items-center gap-0.5 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold transition-all", on ? cx(meta.tone, "ring-2 ring-brand-500") : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800")}
+                          className={cx("flex flex-col items-center gap-0.5 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold transition-all", on ? cx(meta.tone, "ring-2 ring-brand-500") : "text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800")}
                         >
                           <meta.icon className="h-4 w-4" aria-hidden />
                           {meta.label}

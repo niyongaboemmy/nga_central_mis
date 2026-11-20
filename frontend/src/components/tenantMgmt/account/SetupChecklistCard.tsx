@@ -101,7 +101,7 @@ export const SetupChecklist: React.FC = () => {
                     "relative flex flex-col items-center gap-1 rounded-xl p-2 text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
                     it.done
                       ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300"
-                      : "bg-slate-50 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700",
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700",
                   )}
                 >
                   <Icon className="h-5 w-5" aria-hidden />

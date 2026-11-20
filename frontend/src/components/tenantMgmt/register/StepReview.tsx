@@ -16,7 +16,7 @@ export const DOC_LABELS: Record<DocumentKind, { label: string; icon: LucideIcon 
 };
 
 const SummaryCard: React.FC<{ icon: LucideIcon; title: string; onEdit: () => void; children: React.ReactNode }> = ({ icon: Icon, title, onEdit, children }) => (
-  <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+  <section className="rounded-2xl border border-slate-200 p-4 dark:border-gray-700">
     <div className="flex items-center gap-2">
       <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-100">
         <Icon className="h-4 w-4" aria-hidden />
@@ -27,7 +27,7 @@ const SummaryCard: React.FC<{ icon: LucideIcon; title: string; onEdit: () => voi
         <span className="sr-only">Edit {title}</span>
       </button>
     </div>
-    <div className="mt-2 space-y-0.5 text-sm text-slate-600 dark:text-slate-300">{children}</div>
+    <div className="mt-2 space-y-0.5 text-sm text-slate-600 dark:text-gray-300">{children}</div>
   </section>
 );
 
@@ -161,14 +161,14 @@ const StepReview: React.FC<{
         <div className="mt-5">
           <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
             <FileCheck2 className="h-4 w-4" aria-hidden />
-            Documents <span className="font-normal text-slate-600 dark:text-slate-300">(or later)</span>
+            Documents <span className="font-normal text-slate-600 dark:text-gray-300">(or later)</span>
           </h3>
           <DocumentDrops applicationId={wiz.applicationId} kinds={required} documents={docs} onUploaded={(d) => setDocs((x) => [...x, d])} />
         </div>
       )}
 
       <Shake error={termsError} className="mt-5">
-        <label className={cx("flex items-start gap-3 rounded-2xl border p-3", termsError ? "border-red-500" : "border-slate-200 dark:border-slate-700")}>
+        <label className={cx("flex items-start gap-3 rounded-2xl border p-3", termsError ? "border-red-500" : "border-slate-200 dark:border-gray-700")}>
           <input
             id="register-terms"
             type="checkbox"
@@ -180,7 +180,7 @@ const StepReview: React.FC<{
             aria-invalid={!!termsError}
             className="mt-0.5 h-5 w-5 rounded border-slate-400 text-brand-600 focus:ring-brand-500"
           />
-          <span className="text-sm text-slate-800 dark:text-slate-100">
+          <span className="text-sm text-slate-800 dark:text-gray-100">
             I accept the{" "}
             <a href="/terms/" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-700 underline dark:text-brand-200">
               terms

@@ -18,7 +18,7 @@ const SignedIn: React.FC<{ token: string; initial: OnboardingMe | null; onExpire
   const { me, error, reload, setMe } = useOnboardingMe(token, onExpired, initial);
   if (!me)
     return (
-      <main className="flex min-h-screen items-center justify-center bg-white dark:bg-slate-950">
+      <main className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-950">
         <Loader2 className="h-8 w-8 animate-spin text-brand-500" aria-label="Loading" />
       </main>
     );
