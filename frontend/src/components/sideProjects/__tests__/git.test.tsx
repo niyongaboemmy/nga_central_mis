@@ -25,6 +25,8 @@ const git = vi.hoisted(() => ({
   sync: vi.fn(),
   claimLogin: vi.fn(),
   claimAuthor: vi.fn(),
+  setTeammateLogin: vi.fn(),
+  clearTeammateLogin: vi.fn(),
 }));
 const toast = vi.hoisted(() => vi.fn());
 vi.mock("../../../api/sideProjects", async (orig) => ({ ...(await orig<object>()), gitApi: git }));
@@ -34,6 +36,7 @@ vi.mock("../../../contexts/ConfirmContext", () => ({ useConfirm: () => async () 
 import { CopyField, PrChip, SourceBadge, TaskDevSection } from "../git/GitParts";
 import DraftCard from "../git/DraftCard";
 import GitPanel from "../git/GitPanel";
+import GitTeam from "../git/GitTeam";
 
 const project = { id: 9, title: "Farm Orders Portal", kind: "DELIVERY_STUDIO", rights: { edit: true, owner: true, review: false, manageAny: false, supervisor: false, manage: true } } as unknown as ProjectDetail;
 const plan: PlanData = {
@@ -259,5 +262,58 @@ describe("GitHub tab", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Move tasks from GitHub" }));
     await waitFor(() => expect(git.settings).toHaveBeenCalledWith(9, { automations: false }));
     expect(screen.getByText("Commits from people we couldn't match")).toBeTruthy();
+  });
+});
+
+describe("Team on GitHub", () => {
+  const base = (over: Partial<GitProjectPanel> = {}) =>
+    ({
+      canManage: true,
+      unclaimed: [{ login: "niyongaboemmy", email: null, name: "Niyongabo Emmanuel", commits: 17, last: "" }],
+      team: [
+        { id: 1, name: "Aimee Uwera", role: "OWNER", login: "aimee-uwera", avatarUrl: null, source: "OAUTH", verified: true, commits: 12, lastCommit: null, suggestion: null },
+        { id: 2, name: "Niyongabo Emmanuel", role: "MEMBER", login: null, avatarUrl: null, source: null, verified: null, commits: 0, suggestion: { login: "niyongaboemmy", email: null, name: "Niyongabo Emmanuel", commits: 17 } },
+        { id: 3, name: "Jean Karenzi", role: "MEMBER", login: null, avatarUrl: null, source: null, verified: null, commits: 0, suggestion: null },
+      ],
+      ...over,
+    }) as unknown as GitProjectPanel;
+
+  it("shows progress, links a suggestion in one tap, and types a member's username", async () => {
+    const changed = vi.fn().mockResolvedValue(undefined);
+    git.setTeammateLogin.mockResolvedValue({ login: "niyongaboemmy", avatarUrl: null, verified: true, projects: 1 });
+    render(<GitTeam projectId={9} panel={base()} meId={1} onChanged={changed} />);
+    expect(screen.getByText("1/3 linked")).toBeTruthy();
+    expect(screen.getByText(/Looks like/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Link @niyongaboemmy to Niyongabo Emmanuel" }));
+    await waitFor(() => expect(git.setTeammateLogin).toHaveBeenCalledWith(9, 2, "niyongaboemmy"));
+    expect(toast).toHaveBeenCalledWith(expect.stringMatching(/GitHub is @niyongaboemmy/), "success");
+    expect(changed).toHaveBeenCalled();
+
+    git.setTeammateLogin.mockResolvedValue({ login: "jkarenzi", avatarUrl: null, verified: false, projects: 0 });
+    const input = screen.getByLabelText("GitHub username of Jean Karenzi");
+    fireEvent.change(input, { target: { value: "bad name!" } });
+    fireEvent.submit(input.closest("form")!);
+    expect(await screen.findByText(/Use a GitHub username/)).toBeTruthy();
+    fireEvent.change(input, { target: { value: "https://github.com/jkarenzi" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() => expect(git.setTeammateLogin).toHaveBeenCalledWith(9, 3, "jkarenzi"));
+    expect(toast).toHaveBeenCalledWith(expect.stringMatching(/couldn't confirm/), "info");
+  });
+
+  it("an account someone connected themself can't be changed by the lead; unmatched authors can be assigned", async () => {
+    git.mapAuthor.mockResolvedValue({});
+    render(<GitTeam projectId={9} panel={base()} meId={2} onChanged={vi.fn().mockResolvedValue(undefined)} />);
+    expect(screen.queryByRole("button", { name: "Change Aimee Uwera's GitHub username" })).toBeNull();
+    expect(screen.getByText("Connected by them")).toBeTruthy();
+    fireEvent.change(screen.getAllByLabelText("Who is Niyongabo Emmanuel").find((e) => e.tagName === "SELECT")!, { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: /Assign/ }));
+    await waitFor(() => expect(git.mapAuthor).toHaveBeenCalledWith(9, { login: "niyongaboemmy", email: null, userId: 2 }));
+  });
+
+  it("a member sees no other member's form and no unmatched list", () => {
+    render(<GitTeam projectId={9} panel={base({ canManage: false })} meId={2} onChanged={vi.fn()} />);
+    expect(screen.queryByLabelText("GitHub username of Jean Karenzi")).toBeNull();
+    expect(screen.getByLabelText("GitHub username of Niyongabo Emmanuel")).toBeTruthy();
+    expect(screen.queryByText(/couldn't match/)).toBeNull();
   });
 });

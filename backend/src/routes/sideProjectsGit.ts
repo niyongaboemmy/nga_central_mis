@@ -23,6 +23,43 @@ import * as linkMode from "../services/sideProjects/git/linkMode";
  * Mounted at /side-projects/git (before /side-projects so "git" is never read as a project id).
  * The unsigned side (webhook, install/OAuth callbacks, push actions) is integrations/github.
  */
+
+/** Lower-case name words, accents and punctuation dropped. */
+const words = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\(.*?\)/g, " ")
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 1);
+
+/**
+ * The unmatched author most likely to be this teammate: the same name words (in any order),
+ * or a login made of their names ("niyongaboemmy" for Niyongabo Emmanuel). Null when unsure.
+ */
+export function suggestAuthor(name: string, unclaimed: Array<{ login?: string | null; email?: string | null; name?: string | null; commits?: unknown }>) {
+  const mine = words(name);
+  if (!mine.length) return null;
+  let best: { score: number; u: any } | null = null;
+  for (const u of unclaimed) {
+    const theirs = words(String(u.name ?? ""));
+    const shared = theirs.filter((w) => mine.includes(w)).length;
+    let score = theirs.length && shared === Math.max(theirs.length, mine.length) ? 3 : shared >= 2 ? 2 : 0;
+    const login = String(u.login ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    // A login made of their names: one whole long name ("niyongabo" in "niyongaboemmy"),
+    // or the starts of two of them.
+    if (!score && login.length >= 5) {
+      const whole = mine.some((w) => w.length >= 5 && login.includes(w));
+      const starts = mine.filter((w) => w.length >= 4 && login.includes(w.slice(0, 4))).length;
+      if (whole || starts >= Math.min(2, mine.length)) score = 1;
+    }
+    if (score && (!best || score > best.score)) best = { score, u };
+  }
+  if (!best) return null;
+  return { login: best.u.login || null, email: best.u.email || null, name: best.u.name ?? null, commits: Number(best.u.commits || 0) };
+}
+
 export function sideProjectsGitRouter(auth: express.RequestHandler = authenticate, viewerOf: ViewerResolver = snapshotViewer) {
   const router = express.Router();
   router.use(auth);
@@ -148,10 +185,14 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
       const link = await linkForProject(projectId);
       const key = a.canEdit ? await ensureTaskKey(projectId) : (await one(sql`SELECT task_key FROM SideProject WHERE project_id = ${projectId}`))?.task_key ?? null;
       const team = await many(sql`
-        SELECT u.user_id AS id, ${fullName("pr")} AS name, gi.login, gi.avatar_url FROM (
-          SELECT owner_user_id AS user_id FROM SideProject WHERE project_id = ${projectId}
-          UNION SELECT user_id FROM SideProjectMember WHERE project_id = ${projectId} AND status = 'ACCEPTED') t
-        JOIN User u ON u.user_id = t.user_id LEFT JOIN UserProfile pr ON pr.user_id = u.user_id LEFT JOIN GitIdentity gi ON gi.user_id = u.user_id`);
+        SELECT u.user_id AS id, ${fullName("pr")} AS name, t.role, gi.login, gi.avatar_url, gi.source, gi.github_user_id,
+               (SELECT COUNT(*) FROM GitCommit c WHERE c.project_id = ${projectId} AND c.author_user_id = u.user_id AND c.counted = 1) AS commits,
+               (SELECT ${iso("MAX(c.authored_at)")} FROM GitCommit c WHERE c.project_id = ${projectId} AND c.author_user_id = u.user_id AND c.counted = 1) AS last_commit
+        FROM (
+          SELECT owner_user_id AS user_id, 'OWNER' AS role FROM SideProject WHERE project_id = ${projectId}
+          UNION SELECT user_id, 'MEMBER' FROM SideProjectMember WHERE project_id = ${projectId} AND status = 'ACCEPTED') t
+        JOIN User u ON u.user_id = t.user_id LEFT JOIN UserProfile pr ON pr.user_id = u.user_id LEFT JOIN GitIdentity gi ON gi.user_id = u.user_id
+        ORDER BY t.role = 'OWNER' DESC, name`);
       // Every teammate sees unmatched authors, so they can say "That's me"; managers also assign.
       const unclaimed = a.canEdit
         ? await many(sql`
@@ -182,7 +223,20 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
         // Every repository of the project (migration 142); `link` stays the first one.
         links,
         settings: link?.settings ?? settingsOf(null, a.project.kind),
-        team: team.map((t) => ({ id: Number(t.id), name: t.name, login: t.login ?? null, avatarUrl: t.avatar_url ?? null })),
+        team: team.map((t) => ({
+          id: Number(t.id),
+          name: t.name,
+          role: t.role === "OWNER" ? "OWNER" : "MEMBER",
+          login: t.login ?? null,
+          avatarUrl: t.avatar_url ?? null,
+          // OAUTH: they connected it themself (only they change it); CLAIM: they typed it; LEAD: the lead did.
+          source: t.login ? String(t.source ?? "OAUTH") : null,
+          verified: t.login ? Number(t.github_user_id) > 0 : null,
+          commits: Number(t.commits || 0),
+          lastCommit: t.last_commit ?? null,
+          // An unmatched author whose name looks like theirs: one tap to link it.
+          suggestion: t.login ? null : suggestAuthor(String(t.name ?? ""), unclaimed),
+        })),
         unclaimed: unclaimed.map((u) => ({ login: u.login || null, email: u.email || null, name: u.name, commits: Number(u.commits), last: u.last })),
         prs: prs.map((p) => ({ number: Number(p.number), title: p.title, url: p.url, state: p.state, draft: !!Number(p.draft), reviewState: p.review_state, author: p.author_login, openedAt: p.opened_at, mergedAt: p.merged_at })),
         commits: commits.map((c) => ({ sha: c.sha, title: c.title, url: c.url, at: c.authored_at, taskId: c.task_id ? Number(c.task_id) : null, author: c.person || c.author_login })),
@@ -251,6 +305,21 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
       const out = await linkMode.syncProject(projectId);
       if (out.errors.length && out.errors.length === out.repos) fail(502, "SYNC_FAILED", out.errors[0]);
       return { ok: true, ...out };
+    }),
+  );
+  // A teammate's GitHub username: the project lead sets anyone's, each person their own.
+  router.put(
+    "/projects/:id/team/:userId/github",
+    handle(async (req) => {
+      const a = await teamAccess(req);
+      return linkMode.setTeammateLogin(Number(a.project.project_id), uid(req), num(req.params.userId, "person"), req.body?.login, !!a.canManage);
+    }),
+  );
+  router.delete(
+    "/projects/:id/team/:userId/github",
+    handle(async (req) => {
+      const a = await teamAccess(req);
+      return linkMode.clearTeammateLogin(Number(a.project.project_id), uid(req), num(req.params.userId, "person"), !!a.canManage);
     }),
   );
   router.post(

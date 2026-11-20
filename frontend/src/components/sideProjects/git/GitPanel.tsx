@@ -13,7 +13,6 @@ import {
   RefreshCw,
   Settings2,
   UserCheck,
-  Users,
   Wand2,
   Zap,
 } from "lucide-react";
@@ -24,6 +23,7 @@ import SelectField from "../../ui/SelectField";
 import UserAvatar from "../../ui/UserAvatar";
 import { cardCls, ghostBtn, inputCls, primaryBtn, secondaryBtn, Skeleton, Spinner, StatTile, timeAgo } from "../ui";
 import { CopyField, prMeta } from "./GitParts";
+import GitTeam from "./GitTeam";
 
 /**
  * Project → GitHub (GIT_AUTOMATED_REPORTING_ANALYSIS.md §10.1): connect the repository once
@@ -147,7 +147,6 @@ const GitPanel: React.FC<{ p: ProjectDetail; meId: number }> = ({ p, meId }) => 
   const [prefix, setPrefix] = useState("");
   const [key, setKey] = useState("");
   const [ignored, setIgnored] = useState("");
-  const [assign, setAssign] = useState<Record<string, string>>({});
   const [url, setUrl] = useState("");
   const [urlErr, setUrlErr] = useState<string | null>(null);
   const [token, setToken] = useState("");
@@ -567,63 +566,7 @@ const GitPanel: React.FC<{ p: ProjectDetail; meId: number }> = ({ p, meId }) => 
       )}
 
       {/* Team linking + unclaimed */}
-      {panel.link && (
-        <section className={`${cardCls} p-4`} aria-label="Team on GitHub">
-          <p className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-gray-100">
-            <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden /> Team on GitHub
-          </p>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {panel.team.map((t) => (
-              <li key={t.id} className="flex items-center gap-2.5 rounded-xl border border-slate-900/[0.05] px-3 py-2 dark:border-white/[0.06]">
-                <UserAvatar name={t.name} userId={t.id} size={28} decorative />
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800 dark:text-gray-100">
-                  {t.name}
-                  {t.id === meId ? " (you)" : ""}
-                </span>
-                {t.login ? (
-                  <span className="truncate font-mono text-xs text-blue-700 dark:text-blue-300">@{t.login}</span>
-                ) : (
-                  <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">not linked</span>
-                )}
-              </li>
-            ))}
-          </ul>
-          {panel.canManage && panel.unclaimed.length > 0 && (
-            <div className="mt-4">
-              <p className="mb-2 text-xs font-bold text-slate-700 dark:text-gray-200">Commits from people we couldn't match</p>
-              <ul className="space-y-2">
-                {panel.unclaimed.map((u) => {
-                  const k = `${u.login ?? ""}|${u.email ?? ""}`;
-                  return (
-                    <li key={k} className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-50/70 px-3 py-2 dark:bg-amber-500/10">
-                      <span className="min-w-0 flex-1 text-sm">
-                        <span className="font-semibold text-slate-800 dark:text-gray-100">{u.name || u.login || u.email}</span>{" "}
-                        <span className="text-xs text-slate-500 dark:text-gray-400">
-                          {u.login ? `@${u.login}` : u.email} · {u.commits} {u.commits === 1 ? "commit" : "commits"}
-                        </span>
-                      </span>
-                      <SelectField aria-label={`Who is ${u.name || u.login || u.email}`} value={assign[k] ?? ""} onChange={(e) => setAssign((a) => ({ ...a, [k]: e.target.value }))} className="w-44 rounded-full border border-slate-900/[0.07] bg-white px-2.5 py-1 text-xs dark:border-white/10 dark:bg-gray-900">
-                        <option value="">Teammate…</option>
-                        {panel.team.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name}
-                          </option>
-                        ))}
-                      </SelectField>
-                      <button type="button" className={secondaryBtn} disabled={busy !== null || !assign[k]} onClick={() => run(`map:${k}`, () => gitApi.mapAuthor(p.id, { login: u.login, email: u.email, userId: Number(assign[k]) }), "Commits assigned")}>
-                        Assign
-                      </button>
-                      <button type="button" className={ghostBtn} disabled={busy !== null} onClick={() => run(`ign:${k}`, () => gitApi.mapAuthor(p.id, { login: u.login, email: u.email, ignore: true }), "Author ignored")}>
-                        Ignore
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </section>
-      )}
+      {panel.link && <GitTeam projectId={p.id} panel={panel} meId={meId} onChanged={load} />}
 
       {/* Activity */}
       {panel.link && (panel.prs.length > 0 || panel.commits.length > 0) && (

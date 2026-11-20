@@ -725,11 +725,26 @@ export interface GitProjectPanel {
   /** every connected repository (migration 142); `link` is the first */
   links?: GitLinkInfo[];
   settings: GitSettings;
-  team: Array<{ id: number; name: string; login: string | null; avatarUrl: string | null }>;
+  team: GitTeammate[];
   unclaimed: Array<{ login: string | null; email: string | null; name: string | null; commits: number; last: string }>;
   prs: Array<{ number: number; title: string; url: string; state: string; draft: boolean; reviewState: string | null; author: string | null; openedAt: string; mergedAt: string | null }>;
   commits: Array<{ sha: string; title: string; url: string | null; at: string; taskId: number | null; author: string | null }>;
   stats: { commits: number; tasks: number; last: string | null };
+}
+
+export interface GitTeammate {
+  id: number;
+  name: string;
+  role?: "OWNER" | "MEMBER";
+  login: string | null;
+  avatarUrl: string | null;
+  /** OAUTH: connected by them (only they change it); CLAIM: they typed it; LEAD: the lead typed it. */
+  source?: "OAUTH" | "CLAIM" | "LEAD" | null;
+  /** False while GitHub hasn't confirmed the account (linked from pushed commits during a rate limit). */
+  verified?: boolean | null;
+  commits?: number;
+  lastCommit?: string | null;
+  suggestion?: { login: string | null; email: string | null; name: string | null; commits: number } | null;
 }
 
 export interface GitLinkInfo {
@@ -841,6 +856,10 @@ export const gitApi = {
   /** "My GitHub username is …" */
   claimLogin: (login: string) => api.put<Data<{ login: string; name: string | null; avatarUrl: string | null }>>(`${G}/identity`, { login }).then((r) => r.data.data),
   /** "That's me" on an author the MIS couldn't match */
+  /** The lead sets a teammate's GitHub username (or a person their own). */
+  setTeammateLogin: (id: number, userId: number, login: string) =>
+    api.put<Data<{ login: string; avatarUrl: string | null; verified: boolean; projects: number }>>(`${G}/projects/${id}/team/${userId}/github`, { login }).then((r) => r.data.data),
+  clearTeammateLogin: (id: number, userId: number) => api.delete(`${G}/projects/${id}/team/${userId}/github`),
   claimAuthor: (id: number, body: { login?: string | null; email?: string | null }) => api.post(`${G}/projects/${id}/authors/claim`, body),
   /** Disconnect one repository (linkId) or all of them. */
   unlink: (id: number, linkId?: number) => api.delete(`${G}/projects/${id}/link`, { params: linkId ? { linkId } : {} }),
