@@ -272,7 +272,7 @@ const PackageTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => voi
                 <Btn
                   tone="primary"
                   icon={Check}
-                  disabled={!reason.trim()}
+                  disabled={reason.trim().length < 3}
                   busy={busy}
                   onClick={async () => {
                     setBusy(true);
@@ -398,7 +398,7 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
           className="grid gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 sm:grid-cols-2"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (!ent || !reason.trim()) return;
+            if (!ent || reason.trim().length < 3) return;
             setBusy(true);
             const next = await act(
               () =>
@@ -438,7 +438,7 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
           <div className="flex items-center gap-2">
             {ent?.kind === "LIMIT" ? (
               <>
-                <input aria-label="Value" type="number" min={0} value={value} disabled={unlimited} onChange={(e) => setValue(Number(e.target.value))} className={cx(inputCls, "w-32")} />
+                <input aria-label="Value" type="number" min={0} value={Number.isNaN(value) ? "" : value} disabled={unlimited} onChange={(e) => setValue(e.target.value === "" ? NaN : Number(e.target.value))} className={cx(inputCls, "w-32")} />
                 <button
                   type="button"
                   aria-pressed={unlimited}
@@ -457,7 +457,7 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
           </div>
           <input aria-label="Reason" placeholder="Reason" value={reason} onChange={(e) => setReason(e.target.value)} className={cx(inputCls, "sm:col-span-2")} />
           <div className="flex justify-end sm:col-span-2">
-            <Btn type="submit" tone="primary" icon={Plus} disabled={!ent || !reason.trim()} busy={busy}>
+            <Btn type="submit" tone="primary" icon={Plus} disabled={!ent || reason.trim().length < 3 || (ent.kind === "LIMIT" && !unlimited && !(Number.isInteger(value) && value >= 0))} busy={busy}>
               Add
             </Btn>
           </div>

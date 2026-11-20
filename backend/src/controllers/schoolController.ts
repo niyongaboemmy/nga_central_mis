@@ -7,62 +7,102 @@ import { asc, eq } from "drizzle-orm";
 import path from "path";
 import storageService from "../utils/fileServer";
 
+// ─── Validation shared by create and update ─────────────────────────────────
+// Logos are never taken from these bodies: they are file-server paths written only by
+// POST /schools/:id/logo. (The edit form used to send a placeholder "uploaded" back on
+// Save, which replaced NGA's real logo path and broke the logo everywhere.)
+
+/** Column sizes (schema.ts School). */
+export const SCHOOL_LIMITS: Record<string, number> = {
+  name: 150,
+  school_code: 20,
+  address: 255,
+  district: 100,
+  contact_email: 150,
+  contact_phone: 50,
+  sector: 100,
+  trade: 150,
+  qualification_title: 255,
+  head_teacher_name: 150,
+};
+export const SCHOOL_STATUSES = ["ACTIVE", "INACTIVE", "SUSPENDED"] as const;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_RE = /^\+?[0-9][0-9 ()-]{5,24}$/;
+const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9-]{1,19}$/;
+
+type SchoolValues = Partial<Record<keyof typeof SCHOOL_LIMITS | "status", string | null>>;
+
+/** Trims and checks every known field present in `body`; unknown fields (logos included) are ignored. */
+export function readSchoolBody(body: Record<string, unknown>, creating: boolean): { values: SchoolValues; errors: Record<string, string> } {
+  const values: SchoolValues = {};
+  const errors: Record<string, string> = {};
+  for (const [field, max] of Object.entries(SCHOOL_LIMITS)) {
+    if (!(field in body)) continue;
+    const raw = body[field];
+    if (raw != null && typeof raw !== "string") {
+      errors[field] = "must be text";
+      continue;
+    }
+    const v = (raw ?? "").trim().replace(/\s+/g, " ");
+    if (v.length > max) errors[field] = `is at most ${max} characters`;
+    else if (field === "contact_email" && v && !EMAIL_RE.test(v)) errors[field] = "doesn't look like an email address";
+    else if (field === "contact_phone" && v && (!PHONE_RE.test(v) || v.replace(/\D/g, "").length < 7 || v.replace(/\D/g, "").length > 15))
+      errors[field] = "should be a phone number such as +250 788 000 000";
+    else if (field === "school_code" && v && !CODE_RE.test(v)) errors[field] = "uses 2-20 letters, digits or dashes";
+    values[field as keyof typeof SCHOOL_LIMITS] = v || null;
+  }
+  if (creating || "name" in body) {
+    if (!values.name) errors.name = "is required";
+    else if (values.name.length < 2) errors.name = "is too short";
+  }
+  if ("status" in body) {
+    if (!SCHOOL_STATUSES.includes(body.status as any)) errors.status = `must be one of ${SCHOOL_STATUSES.join(", ")}`;
+    else values.status = body.status as string;
+  }
+  return { values, errors };
+}
+
+const LABELS: Record<string, string> = {
+  name: "School name",
+  school_code: "School code",
+  contact_email: "Contact email",
+  contact_phone: "Contact phone",
+  head_teacher_name: "Head of school",
+  qualification_title: "Qualification title",
+  status: "Status",
+};
+const labelOf = (f: string) => LABELS[f] ?? f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, " ");
+
+const refuseInvalid = (res: Response, errors: Record<string, string>) => {
+  const [field, msg] = Object.entries(errors)[0];
+  return res.status(400).json({ message: `${labelOf(field)} ${msg}`, field, errors });
+};
+
+/** Another school (not `exceptId`) already using this name / code, compared without case. */
+async function clashes(values: SchoolValues, exceptId?: number): Promise<{ field: string; message: string } | null> {
+  const others = (await db.select().from(School)).filter((r: any) => r.school_id !== exceptId);
+  const same = (a?: string | null, b?: string | null) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  if (values.name && others.some((r: any) => same(r.name, values.name))) return { field: "name", message: "Another school already has this name" };
+  if (values.school_code && others.some((r: any) => same(r.school_code, values.school_code)))
+    return { field: "school_code", message: "Another school already uses this school code" };
+  return null;
+}
+
+const activeCount = async (exceptId?: number) =>
+  (await db.select().from(School)).filter((r: any) => r.status === "ACTIVE" && r.school_id !== exceptId).length;
+
+const LAST_ACTIVE =
+  "This is the school's only active record: sign-in, branding and report cards depend on it. Activate or add another school first.";
+
 export const createSchool = async (req: Request, res: Response) => {
   try {
-    const {
-      name,
-      school_code,
-      address,
-      contact_email,
-      contact_phone,
-      logo,
-      sector,
-      trade,
-      qualification_title,
-      documents_logo,
-      district,
-      head_teacher_name,
-    } = req.body;
-
-    const existingSchool = await db
-      .select()
-      .from(School)
-      .where(eq(School.name, name));
-
-    if (existingSchool.length > 0) {
-      return res
-        .status(400)
-        .json({ message: "School with this name already exists" });
-    }
-
-    if (school_code) {
-      const codeCheck = await db
-        .select()
-        .from(School)
-        .where(eq(School.school_code, school_code));
-      if (codeCheck.length > 0) {
-        return res
-          .status(400)
-          .json({ message: "School with this school code already exists" });
-      }
-    }
-
-    await db.insert(School).values({
-      name,
-      school_code,
-      address,
-      contact_email,
-      contact_phone,
-      logo,
-      sector: sector || null,
-      trade: trade || null,
-      qualification_title: qualification_title || null,
-      documents_logo: documents_logo || null,
-      district: district || null,
-      head_teacher_name: head_teacher_name || null,
-    });
-
-    res.status(201).json({ message: "School created successfully" });
+    const { values, errors } = readSchoolBody(req.body ?? {}, true);
+    if (Object.keys(errors).length) return refuseInvalid(res, errors);
+    const clash = await clashes(values);
+    if (clash) return res.status(409).json({ message: clash.message, field: clash.field });
+    const [result]: any = await db.insert(School).values({ ...(values as any), status: values.status ?? "ACTIVE" });
+    const [created] = await db.select().from(School).where(eq(School.school_id, Number(result?.insertId)));
+    res.status(201).json({ message: "School created", data: created ?? null });
   } catch (error) {
     console.error("Error creating school:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -71,8 +111,8 @@ export const createSchool = async (req: Request, res: Response) => {
 
 export const getAllSchools = async (req: Request, res: Response) => {
   try {
-    const schools = await db.select().from(School);
-    res.status(200).json(schools);
+    const schools = await db.select().from(School).orderBy(asc(School.school_id));
+    res.status(200).json(schools.map(withLogoState));
   } catch (error) {
     console.error("Error fetching schools:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -81,17 +121,12 @@ export const getAllSchools = async (req: Request, res: Response) => {
 
 export const getSchoolById = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
     const schools = await db
       .select()
       .from(School)
-      .where(eq(School.school_id, Number(id)));
-
-    if (schools.length === 0) {
-      return res.status(404).json({ message: "School not found" });
-    }
-
-    res.status(200).json(schools[0]);
+      .where(eq(School.school_id, Number(req.params.id)));
+    if (schools.length === 0) return res.status(404).json({ message: "School not found" });
+    res.status(200).json(withLogoState(schools[0]));
   } catch (error) {
     console.error("Error fetching school:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -100,79 +135,19 @@ export const getSchoolById = async (req: Request, res: Response) => {
 
 export const updateSchool = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const {
-      name,
-      school_code,
-      address,
-      contact_email,
-      contact_phone,
-      logo,
-      status,
-      sector,
-      trade,
-      qualification_title,
-      documents_logo,
-      district,
-      head_teacher_name,
-    } = req.body;
-
-    const existingSchool = await db
-      .select()
-      .from(School)
-      .where(eq(School.school_id, Number(id)));
-
-    if (existingSchool.length === 0) {
-      return res.status(404).json({ message: "School not found" });
-    }
-
-    // Check name collision if name is changing
-    if (name && name !== existingSchool[0].name) {
-      const nameCheck = await db
-        .select()
-        .from(School)
-        .where(eq(School.name, name));
-      if (nameCheck.length > 0) {
-        return res
-          .status(400)
-          .json({ message: "School with this name already exists" });
-      }
-    }
-
-    // Check school code collision if it's changing
-    if (school_code && school_code !== existingSchool[0].school_code) {
-      const codeCheck = await db
-        .select()
-        .from(School)
-        .where(eq(School.school_code, school_code));
-      if (codeCheck.length > 0) {
-        return res
-          .status(400)
-          .json({ message: "School with this school code already exists" });
-      }
-    }
-
-    await db
-      .update(School)
-      .set({
-        name,
-        school_code,
-        address,
-        contact_email,
-        contact_phone,
-        logo,
-        status,
-        sector: sector !== undefined ? sector || null : undefined,
-        trade: trade !== undefined ? trade || null : undefined,
-        qualification_title:
-          qualification_title !== undefined ? qualification_title || null : undefined,
-        documents_logo: documents_logo !== undefined ? documents_logo || null : undefined,
-        district: district !== undefined ? district || null : undefined,
-        head_teacher_name: head_teacher_name !== undefined ? head_teacher_name || null : undefined,
-      })
-      .where(eq(School.school_id, Number(id)));
-
-    res.status(200).json({ message: "School updated successfully" });
+    const id = Number(req.params.id);
+    const [existing] = await db.select().from(School).where(eq(School.school_id, id));
+    if (!existing) return res.status(404).json({ message: "School not found" });
+    const { values, errors } = readSchoolBody(req.body ?? {}, false);
+    if (Object.keys(errors).length) return refuseInvalid(res, errors);
+    if (!Object.keys(values).length) return res.status(400).json({ message: "Nothing to update" });
+    const clash = await clashes(values, id);
+    if (clash) return res.status(409).json({ message: clash.message, field: clash.field });
+    if (values.status && values.status !== "ACTIVE" && existing.status === "ACTIVE" && !(await activeCount(id)))
+      return res.status(409).json({ message: LAST_ACTIVE, field: "status" });
+    await db.update(School).set(values as any).where(eq(School.school_id, id));
+    const [fresh] = await db.select().from(School).where(eq(School.school_id, id));
+    res.status(200).json({ message: "School updated", data: withLogoState(fresh) });
   } catch (error) {
     console.error("Error updating school:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -218,8 +193,8 @@ const profileOf = (school: any, req: Request) => {
     trade: school.trade ?? null,
     qualification_title: school.qualification_title ?? null,
     head_teacher_name: school.head_teacher_name ?? null,
-    logo_url: school.logo ? `${base}/schools/${school.school_id}/logo/primary` : null,
-    documents_logo_url: school.documents_logo ? `${base}/schools/${school.school_id}/logo/documents` : null,
+    logo_url: isServableLogo(school.logo) ? `${base}/schools/${school.school_id}/logo/primary` : null,
+    documents_logo_url: isServableLogo(school.documents_logo) ? `${base}/schools/${school.school_id}/logo/documents` : null,
     updated_at: school.updated_at ?? null,
   };
 };
@@ -276,60 +251,108 @@ const LOGO_SLOT_COLUMN: Record<LogoSlot, "logo" | "partner_logo" | "documents_lo
   documents: "documents_logo",
 };
 
-const parseLogoSlot = (value: unknown): LogoSlot =>
-  value === "partner" ? "partner" : value === "documents" ? "documents" : "primary";
+const parseLogoSlot = (value: unknown): LogoSlot | null =>
+  value === undefined || value === "" || value === "primary"
+    ? "primary"
+    : value === "partner" || value === "documents"
+      ? value
+      : null;
+
+/** A stored logo that can really be served: a file-server image path or an http(s) URL. */
+export const isServableLogo = (v: unknown): v is string =>
+  typeof v === "string" && !v.includes("..") && (/^https?:\/\/\S+$/i.test(v) || /^[\w./-]+\.(png|jpe?g|svg|webp)$/i.test(v));
+
+/** A School row as the API returns it: unusable logo values read as "no logo", plus a cache key. */
+export function withLogoState<T extends Record<string, any>>(row: T): T & { logo_version: number | null } {
+  if (!row) return row as any;
+  const out: any = { ...row };
+  for (const col of Object.values(LOGO_SLOT_COLUMN)) if (!isServableLogo(out[col])) out[col] = null;
+  const t = row.updated_at ? new Date(row.updated_at).getTime() : NaN;
+  out.logo_version = Number.isFinite(t) ? t : null;
+  return out;
+}
+
+type ImageKind = { ext: ".png" | ".jpg" | ".webp" | ".svg"; mime: string };
+
+/**
+ * What the uploaded bytes really are (the extension alone is not trusted). SVGs are
+ * text and can carry scripts, so one with scripts, event handlers, external
+ * references or embedded HTML is refused rather than served from the API origin.
+ */
+export function sniffImage(buf: Buffer): ImageKind | { error: string } {
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { ext: ".png", mime: "image/png" };
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { ext: ".jpg", mime: "image/jpeg" };
+  if (buf.length >= 12 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return { ext: ".webp", mime: "image/webp" };
+  const head = buf.toString("utf8", 0, Math.min(buf.length, 4096)).replace(/^\uFEFF/, "").trimStart();
+  if (/^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE svg[^>]*>\s*)?<svg[\s>]/i.test(head)) {
+    const text = buf.toString("utf8");
+    if (/<script|<foreignObject|<iframe|<embed|<object|\son[a-z]+\s*=|javascript:|<!ENTITY|(?:xlink:)?href\s*=\s*["']\s*(?:https?:|\/\/|data:text)/i.test(text))
+      return { error: "This SVG contains scripts or external content. Export it as a plain SVG or a PNG." };
+    return { ext: ".svg", mime: "image/svg+xml" };
+  }
+  return { error: "Only PNG, JPG, WEBP and SVG images are supported" };
+}
 
 /**
  * Uploads a logo image and stores its file-server path on School.logo (`slot: "primary"`, the
  * default), School.partner_logo (`slot: "partner"`), or School.documents_logo
  * (`slot: "documents"`). `logo`/`partner_logo` are the Scheme of Work PDF's two cover-page logo
- * slots; `documents_logo` is the separate mark used in the running header repeated on every page
- * of reports/documents (e.g. the Scheme of Work PDF header) -- schools may want a simplified
- * version there rather than reusing a cover-page logo. Stored as a remote file-server path (same
- * convention as SubjectDocument.file_path elsewhere in the app), not a full URL --
- * schemeReportPdf.ts resolves it at render time.
+ * slots, and `logo` is also the app's logo for everyone signed in to this school;
+ * `documents_logo` is the mark in the running header of reports/documents. Stored as a remote
+ * file-server path (resolved at render time), never a full URL.
  */
 export const uploadSchoolLogo = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
   try {
-    const { id } = req.params;
-    const slot = parseLogoSlot(req.body.slot);
+    const id = Number(req.params.id);
+    const slot = parseLogoSlot(req.body?.slot);
+    if (!slot) return res.status(400).json({ message: "slot must be 'primary', 'partner', or 'documents'" });
+    if (!req.file?.buffer?.length) return res.status(400).json({ message: "Choose an image to upload" });
 
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
+    const [existing] = await db.select().from(School).where(eq(School.school_id, id));
+    if (!existing) return res.status(404).json({ message: "School not found" });
 
-    const existingSchool = await db
-      .select()
-      .from(School)
-      .where(eq(School.school_id, Number(id)));
+    const kind = sniffImage(req.file.buffer);
+    if ("error" in kind) return res.status(400).json({ message: kind.error });
 
-    if (existingSchool.length === 0) {
-      return res.status(404).json({ message: "School not found" });
-    }
-
-    const ext = path.extname(req.file.originalname).toLowerCase() || ".png";
-    const remotePath = `schools/${id}/logo-${slot}-${Date.now()}${ext}`;
-
+    const remotePath = `schools/${id}/logo-${slot}-${Date.now()}${kind.ext}`;
     await storageService.uploadFile(req.file.buffer, remotePath);
-
+    // Bump updated_at explicitly: it is the logo's cache key (logo_version).
     await db
       .update(School)
-      .set({ [LOGO_SLOT_COLUMN[slot]]: remotePath })
-      .where(eq(School.school_id, Number(id)));
-
-    res.status(200).json({ message: "Logo uploaded successfully", path: remotePath, slot });
+      .set({ [LOGO_SLOT_COLUMN[slot]]: remotePath, updated_at: new Date() } as any)
+      .where(eq(School.school_id, id));
+    const [fresh] = await db.select().from(School).where(eq(School.school_id, id));
+    res.status(200).json({ message: "Logo uploaded", path: remotePath, slot, data: withLogoState(fresh) });
   } catch (error) {
     console.error("Error uploading school logo:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
 
+/** DELETE /schools/:id/logo/:slot -- clears the slot (the file itself is kept). */
+export const removeSchoolLogo = async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const slot = parseLogoSlot(req.params.slot);
+    if (!slot) return res.status(400).json({ message: "slot must be 'primary', 'partner', or 'documents'" });
+    const [existing] = await db.select().from(School).where(eq(School.school_id, id));
+    if (!existing) return res.status(404).json({ message: "School not found" });
+    await db
+      .update(School)
+      .set({ [LOGO_SLOT_COLUMN[slot]]: null, updated_at: new Date() } as any)
+      .where(eq(School.school_id, id));
+    const [fresh] = await db.select().from(School).where(eq(School.school_id, id));
+    res.status(200).json({ message: "Logo removed", slot, data: withLogoState(fresh) });
+  } catch (error) {
+    console.error("Error removing school logo:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 /**
  * Public (unauthenticated) image proxy for a school's logo -- lets a plain <img src> tag load it
- * directly (the admin form preview, or anywhere else in the app) without needing to attach a
- * bearer token. Logos are institutional branding, not sensitive data. Streams the bytes from the
- * file-server for a stored remote path; redirects straight through for a plain http(s) URL (the
- * shape School.logo/partner_logo had before the upload endpoint existed).
+ * without a bearer token. Logos are institutional branding, not sensitive data. Streams the bytes
+ * from the file-server for a stored remote path; redirects for a plain http(s) URL.
  */
 export const getSchoolLogo = async (req: Request, res: Response) => {
   // Public: a cookie must not decide which school's logo this is. ?tenant=<slug|tid>
@@ -345,44 +368,38 @@ export const getSchoolLogo = async (req: Request, res: Response) => {
   return serveSchoolLogo(req, res);
 };
 
+const MIME: Record<string, string> = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml", ".webp": "image/webp", ".png": "image/png" };
+
 const serveSchoolLogo = async (req: Request, res: Response) => {
   try {
     const { id, slot } = req.params;
     if (slot !== "primary" && slot !== "partner" && slot !== "documents") {
       return res.status(400).json({ message: "slot must be 'primary', 'partner', or 'documents'" });
     }
-
     const [school] = await db
       .select()
       .from(School)
       .where(eq(School.school_id, Number(id)));
-
-    if (!school) {
-      return res.status(404).json({ message: "School not found" });
-    }
+    if (!school) return res.status(404).json({ message: "School not found" });
 
     const value = school[LOGO_SLOT_COLUMN[slot]];
-    if (!value) {
-      return res.status(404).json({ message: "No logo set for this slot" });
+    if (!isServableLogo(value)) return res.status(404).json({ message: "No logo set for this slot" });
+    if (/^https?:\/\//i.test(value)) return res.redirect(value);
+
+    let buffer: Buffer;
+    try {
+      buffer = await storageService.downloadToBuffer(value);
+    } catch (err: any) {
+      if (/\b404\b/.test(String(err?.message))) return res.status(404).json({ message: "The logo file is missing; upload it again" });
+      throw err;
     }
-
-    if (/^https?:\/\//i.test(value)) {
-      return res.redirect(value);
-    }
-
-    const ext = path.extname(value).toLowerCase();
-    const mime =
-      ext === ".jpg" || ext === ".jpeg"
-        ? "image/jpeg"
-        : ext === ".svg"
-          ? "image/svg+xml"
-          : ext === ".webp"
-            ? "image/webp"
-            : "image/png";
-
-    const buffer = await storageService.downloadToBuffer(value);
-    res.setHeader("Content-Type", mime);
-    res.setHeader("Cache-Control", "public, max-age=300");
+    res.setHeader("Content-Type", MIME[path.extname(value).toLowerCase()] ?? "image/png");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // An SVG opened directly must not run anything, even if an old upload had a script in it.
+    res.setHeader("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    // ?v=<logo_version> changes with every upload, so a versioned URL can be kept longer.
+    res.setHeader("Cache-Control", req.query.v ? "public, max-age=86400" : "public, max-age=300");
     res.send(buffer);
   } catch (error) {
     console.error("Error serving school logo:", error);
@@ -390,22 +407,18 @@ const serveSchoolLogo = async (req: Request, res: Response) => {
   }
 };
 
+/** DELETE /schools/:id -- deactivates (nothing is deleted); never the school's last active record. */
 export const deleteSchool = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-
-    // Soft delete or hard delete? Usually soft delete is better, keeping logic consistent with schema ENUM
-    // Schema has 'INACTIVE' or 'SUSPENDED', no specific 'DELETED' but let's assume we can change status or hard delete if no refs.
-    // For now, let's just set to INACTIVE.
-
-    await db
-      .update(School)
-      .set({ status: "INACTIVE" })
-      .where(eq(School.school_id, Number(id)));
-
-    res.status(200).json({ message: "School deactivated successfully" });
+    const id = Number(req.params.id);
+    const [existing] = await db.select().from(School).where(eq(School.school_id, id));
+    if (!existing) return res.status(404).json({ message: "School not found" });
+    if (existing.status !== "ACTIVE") return res.status(200).json({ message: "School is already inactive" });
+    if (!(await activeCount(id))) return res.status(409).json({ message: LAST_ACTIVE });
+    await db.update(School).set({ status: "INACTIVE" }).where(eq(School.school_id, id));
+    res.status(200).json({ message: "School deactivated" });
   } catch (error) {
-    console.error("Error deleting school:", error);
+    console.error("Error deactivating school:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

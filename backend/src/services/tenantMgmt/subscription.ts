@@ -16,6 +16,7 @@ import { controlPool } from "../../db/platform";
 import { invalidateTenants } from "../../tenancy/registry";
 import { platformAudit } from "../../tenancy/audit";
 import logger from "../../utils/logger";
+import { PRIMARY_TENANT_ID } from "../../vendor/nga-tenancy";
 import { NotFoundError } from "../../errors/CustomError";
 import { invalidateEntitlements } from "./entitlements";
 import { assertTransition } from "./stateMachine";
@@ -219,6 +220,10 @@ export async function onTenantInvoicePaid(invoiceId: number, actorId?: number | 
   if (!inv) throw new NotFoundError("Invoice not found");
   const tid = inv.tenant_id === null ? null : Number(inv.tenant_id);
   if (!tid) return; // an application's NEW invoice: provisioning handles it
+  if (tid === PRIMARY_TENANT_ID) {
+    logger.warn(`[tenantMgmt] invoice ${invoiceId} is for the primary school: its package is left as it is`);
+    return;
+  }
   const kind = String(inv.kind);
   const cycle = (inv.billing_cycle ?? "TERM") as Cycle;
   const today = new Date().toISOString().slice(0, 10);

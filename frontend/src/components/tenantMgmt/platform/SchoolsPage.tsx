@@ -55,8 +55,16 @@ const SchoolsPage: React.FC = () => {
     const t = window.setTimeout(
       () =>
         platformApi.tenants({ q: q.trim() || undefined }).then(
-          (r) => live && setRows(r),
-          (e) => live && setError(errorText(e)),
+          (r) => {
+            if (!live) return;
+            setRows(r);
+            setError(null);
+          },
+          (e) => {
+            if (!live) return;
+            setError(errorText(e));
+            setRows((prev) => prev ?? []); // stop the spinner; the error says why
+          },
         ),
       q ? 250 : 0,
     );

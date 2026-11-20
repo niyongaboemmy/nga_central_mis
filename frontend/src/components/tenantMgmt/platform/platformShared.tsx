@@ -289,7 +289,8 @@ export const ReasonDialog: React.FC<{
   useEffect(() => {
     if (open) setText("");
   }, [open]);
-  const ok = optional || text.trim().length > 0;
+  // The server wants at least 3 characters (lifecycle needReason).
+  const ok = optional || text.trim().length >= 3;
   return (
     <Modal
       isOpen={open}
