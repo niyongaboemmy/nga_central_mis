@@ -87,7 +87,7 @@ const PaymentProofForm: React.FC<PaymentProofFormProps> = ({ invoice, methods, o
   if (done) {
     return (
       <motion.div {...m("reveal")} className="flex flex-col items-center gap-3 py-8 text-center" role="status">
-        <motion.span {...m("check")} className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg">
+        <motion.span {...m("check")} className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white">
           <Check className="h-9 w-9" aria-hidden />
         </motion.span>
         <p className="font-semibold text-slate-900 dark:text-white">Proof sent</p>

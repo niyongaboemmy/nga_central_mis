@@ -180,7 +180,7 @@ const GoToSchool: React.FC<Props> = ({ me }) => {
   const m = useMotion();
   const school = me.school;
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-6 text-center text-white shadow-xl">
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-6 text-center text-white">
       <Burst show />
       <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 15 }} className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
         <PartyPopper className="h-8 w-8" aria-hidden />
@@ -196,7 +196,7 @@ const GoToSchool: React.FC<Props> = ({ me }) => {
           setOnboardingToken(null);
           window.location.assign(school.loginUrl);
         }}
-        className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-base font-bold text-emerald-800 shadow-lg hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/60"
+        className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-base font-bold text-emerald-800 hover:bg-emerald-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/60"
       >
         Go to your school
         <ArrowRight className="h-5 w-5" aria-hidden />

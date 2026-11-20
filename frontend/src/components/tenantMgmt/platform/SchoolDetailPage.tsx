@@ -497,13 +497,13 @@ const AppsTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => void }
         const Icon = entIcon(appKeyOf(a.name, a.clientId));
         const on = a.status === "ACTIVE";
         return (
-          <li key={a.systemId} className={cx("flex items-center gap-3 rounded-2xl border p-3 shadow-sm transition-colors", on ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/30 dark:bg-emerald-400/5" : "border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900")}>
+          <li key={a.systemId} className={cx("flex items-center gap-3 rounded-2xl border p-3 transition-colors", on ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/30 dark:bg-emerald-400/5" : "border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900")}>
             <span className={cx("flex h-10 w-10 items-center justify-center rounded-xl", on ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-300")}>
               <Icon className="h-5 w-5" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate font-semibold text-slate-900 dark:text-white">{a.name}</p>
-              <span className={cx("rounded-full px-1.5 text-[11px] font-bold", a.source === "OVERRIDE" ? "bg-violet-100 text-violet-800 dark:bg-violet-400/15 dark:text-violet-200" : "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-200")}>
+              <span className={cx("rounded-full px-1.5 text-[11px] font-bold", a.source === "OVERRIDE" ? "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200" : "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-200")}>
                 {a.source === "OVERRIDE" ? "Override" : "Package"}
               </span>
             </div>
@@ -617,7 +617,7 @@ const LifecycleTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => v
                     <span
                       className={cx(
                         "relative flex h-14 w-14 items-center justify-center rounded-full transition-all",
-                        on ? cx(st.fill, "text-white shadow-lg ring-4", st.ring) : "bg-slate-100 text-slate-400 dark:bg-gray-800 dark:text-gray-500",
+                        on ? cx(st.fill, "text-white ring-4", st.ring) : "bg-slate-100 text-slate-400 dark:bg-gray-800 dark:text-gray-500",
                       )}
                     >
                       <Icon className="h-7 w-7" aria-hidden />

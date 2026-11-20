@@ -33,7 +33,7 @@ export const WaitIllustration: React.FC<{ status: ApplicationStatus }> = ({ stat
             </motion.span>
           </>
         )}
-        <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-blue-500 text-white shadow">
+        <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-blue-500 text-white">
           <Icon className="h-5 w-5" aria-hidden />
         </span>
       </div>
@@ -65,7 +65,7 @@ export const ProvisioningSteps: React.FC<{ run: ProvisioningRun }> = ({ run }) =
   const done = run.steps.filter((s) => s.status === "DONE" || s.status === "SKIPPED").length;
   const pct = run.steps.length ? Math.round((done / run.steps.length) * 100) : 0;
   return (
-    <section aria-labelledby="prov-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+    <section aria-labelledby="prov-title" className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
       <div className="mb-3 flex items-center gap-2">
         <Rocket className="h-5 w-5 text-brand-600 dark:text-brand-200" aria-hidden />
         <h3 id="prov-title" className="flex-1 font-semibold text-slate-900 dark:text-white">

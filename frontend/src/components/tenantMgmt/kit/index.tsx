@@ -60,7 +60,7 @@ export const JourneyStepper: React.FC<{ current: TrackerStep; failed?: boolean; 
     <ol className="relative flex items-start justify-between gap-1" aria-label="Progress">
       <div className="absolute left-5 right-5 top-5 h-1 rounded-full bg-slate-200 dark:bg-gray-700" aria-hidden />
       <motion.div
-        className={cx("absolute left-5 top-5 h-1 rounded-full", failed ? "bg-red-500" : "bg-gradient-to-r from-brand-500 to-emerald-500")}
+        className={cx("absolute left-5 top-5 h-1 rounded-full", failed ? "bg-red-500" : "bg-brand-600")}
         initial={{ width: 0 }}
         animate={{ width: `calc((100% - 2.5rem) * ${Math.max(0, idx) / (TRACKER_STEPS.length - 1)})` }}
         transition={{ duration: reduced ? 0 : 0.9, ease: "easeOut" }}
@@ -74,7 +74,7 @@ export const JourneyStepper: React.FC<{ current: TrackerStep; failed?: boolean; 
           <li key={s} className="relative z-10 flex flex-1 flex-col items-center gap-1.5" aria-current={active ? "step" : undefined}>
             <motion.span
               className={cx(
-                "flex h-10 w-10 items-center justify-center rounded-full border-2 shadow-sm",
+                "flex h-10 w-10 items-center justify-center rounded-full border-2",
                 done && "border-emerald-500 bg-emerald-500 text-white",
                 active && !failed && "border-brand-500 bg-white text-brand-600 dark:bg-gray-900 dark:text-brand-200",
                 active && failed && "border-red-500 bg-white text-red-600 dark:bg-gray-900",
@@ -139,7 +139,7 @@ const TONES: Record<string, { pill: string; dot: string }> = {
   slate: { pill: "bg-slate-100 text-slate-700 dark:bg-gray-700/60 dark:text-gray-200", dot: "bg-slate-400" },
   sky: { pill: "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200", dot: "bg-blue-500" },
   amber: { pill: "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200", dot: "bg-amber-500" },
-  violet: { pill: "bg-violet-100 text-violet-800 dark:bg-violet-400/15 dark:text-violet-200", dot: "bg-violet-500" },
+  violet: { pill: "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200", dot: "bg-blue-500" },
   emerald: { pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200", dot: "bg-emerald-500" },
   red: { pill: "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-200", dot: "bg-red-500" },
 };
@@ -271,7 +271,7 @@ export const EntitlementIcons: React.FC<{ entitlements: Entitlement[]; all?: Ent
             className={cx(
               "relative flex items-center justify-center rounded-lg",
               box,
-              on ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300" : "bg-slate-100 text-slate-400 dark:bg-gray-800 dark:text-gray-500",
+              on ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200" : "bg-slate-100 text-slate-400 dark:bg-gray-800 dark:text-gray-500",
             )}
           >
             <Icon className="h-4 w-4" aria-hidden />
@@ -311,11 +311,10 @@ export const PackageCard: React.FC<{
       {...m("tap")}
       whileHover={{ y: -4 }}
       className={cx(
-        "relative flex w-full flex-col gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 dark:bg-gray-900",
-        selected ? cx("ring-2 shadow-lg", a.ring, "border-transparent") : "border-slate-200 hover:shadow-md dark:border-gray-700",
+        "relative flex w-full flex-col gap-3 rounded-2xl border bg-white p-4 text-left transition-shadow focus:outline-none focus-visible:ring-2 dark:bg-gray-900",
+        selected ? cx("ring-2", a.ring, "border-transparent") : "border-slate-200 hover:border-brand-500 dark:border-gray-700 dark:hover:border-brand-500",
       )}
     >
-      <div className={cx("absolute inset-x-0 top-0 h-1.5 rounded-t-2xl bg-gradient-to-r", a.grad)} aria-hidden />
       <div className="flex items-center justify-between gap-2">
         <span className={cx("text-lg font-bold", a.text)}>{pkg.name}</span>
         <AnimatePresence>
@@ -327,7 +326,7 @@ export const PackageCard: React.FC<{
         </AnimatePresence>
       </div>
       {(recommended || current) && (
-        <span className={cx("absolute -top-3 right-4 rounded-full px-2 py-0.5 text-[11px] font-bold text-white shadow", current ? "bg-slate-700" : a.bg)}>
+        <span className={cx("absolute -top-3 right-4 rounded-full px-2 py-0.5 text-[11px] font-bold text-white", current ? "bg-slate-700" : a.bg)}>
           {current ? "Current" : "★ Best fit"}
         </span>
       )}
@@ -400,17 +399,18 @@ export const ActionCard: React.FC<{
   const m = useMotion();
   const reduced = useReducedMotion();
   const tones = {
-    brand: "from-brand-500 to-blue-500",
-    amber: "from-amber-400 to-orange-500",
-    red: "from-red-500 to-rose-500",
-    emerald: "from-emerald-500 to-teal-500",
-    violet: "from-violet-500 to-fuchsia-500",
+    // Flat, platform palette: blue for actions, green / amber / red only for status.
+    brand: "bg-brand-600",
+    amber: "bg-amber-500",
+    red: "bg-red-600",
+    emerald: "bg-emerald-600",
+    violet: "bg-brand-700",
   };
   return (
-    <motion.section {...m("reveal")} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+    <motion.section {...m("reveal")} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900">
       <div className="flex items-start gap-3 p-4">
         <motion.span
-          className={cx("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow", tones[tone])}
+          className={cx("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white", tones[tone])}
           animate={pulse && !reduced ? { rotate: [0, -8, 8, -4, 0] } : undefined}
           transition={pulse ? { duration: 0.8, repeat: Infinity, repeatDelay: 3 } : undefined}
         >
@@ -553,7 +553,7 @@ export const EmptyState: React.FC<{ icon: LucideIcon; title: string; children?: 
 export const Burst: React.FC<{ show: boolean }> = ({ show }) => {
   const reduced = useReducedMotion();
   if (!show || reduced) return null;
-  const colors = ["bg-brand-500", "bg-emerald-500", "bg-amber-400", "bg-violet-500", "bg-rose-500"];
+  const colors = ["bg-brand-500", "bg-blue-300", "bg-amber-400", "bg-blue-700", "bg-emerald-500"];
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       {Array.from({ length: 28 }).map((_, i) => (
@@ -585,7 +585,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
             onClick={() => onChange(o.value)}
             className={cx("relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors", on ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-gray-300")}
           >
-            {on && <motion.span layoutId={`seg-${label}`} className="absolute inset-0 -z-10 rounded-full bg-white shadow dark:bg-gray-700" transition={{ type: "spring", stiffness: 500, damping: 35 }} />}
+            {on && <motion.span layoutId={`seg-${label}`} className="absolute inset-0 -z-10 rounded-full bg-white dark:bg-gray-700" transition={{ type: "spring", stiffness: 500, damping: 35 }} />}
             {Icon && <Icon className="h-4 w-4" aria-hidden />}
             {o.label}
           </button>

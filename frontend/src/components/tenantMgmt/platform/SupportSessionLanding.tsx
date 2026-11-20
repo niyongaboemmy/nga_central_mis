@@ -37,10 +37,10 @@ const SupportSessionLanding: React.FC = () => {
         <EmptyState icon={Link2Off} title="Link expired" />
       ) : (
         <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex flex-col items-center gap-3" role="status">
-          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg">
+          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-white">
             <LifeBuoy className="h-8 w-8" aria-hidden />
           </span>
-          <Loader2 className="h-5 w-5 animate-spin text-violet-600" aria-hidden />
+          <Loader2 className="h-5 w-5 animate-spin text-blue-600" aria-hidden />
           <span className="text-sm font-semibold text-slate-700 dark:text-gray-200">Support session</span>
         </motion.div>
       )}

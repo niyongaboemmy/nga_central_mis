@@ -76,7 +76,7 @@ const MessagesThread: React.FC<{ applicationId: number; refreshKey: unknown; onR
                 <motion.li key={x.id} {...m("reveal")} className={cx("flex", x.author === "APPLICANT" ? "justify-end" : "justify-start")}>
                   <div
                     className={cx(
-                      "max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm",
+                      "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
                       x.author === "APPLICANT" ? "rounded-br-md bg-brand-600 text-white" : "rounded-bl-md bg-slate-100 text-slate-900 dark:bg-gray-800 dark:text-gray-100",
                     )}
                   >

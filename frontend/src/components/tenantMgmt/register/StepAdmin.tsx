@@ -144,7 +144,7 @@ const StepAdmin: React.FC<{
         }}
       >
         <motion.div {...m("reveal")} className="flex flex-col items-center gap-3 py-8 text-center">
-          <motion.span {...m("check")} className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg">
+          <motion.span {...m("check")} className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white">
             <BadgeCheck className="h-9 w-9" aria-hidden />
           </motion.span>
           <p className="font-semibold text-slate-900 dark:text-white">{admin.email}</p>

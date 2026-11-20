@@ -144,7 +144,7 @@ const AppRow: React.FC<{ row: ApplicationListItem; accent: string; pkgName: stri
     <motion.li layout {...m("reveal")}>
       <Link
         to={`/platform/applications/${r.id}`}
-        className="relative flex flex-col gap-2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 pl-4 shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 md:grid md:grid-cols-[1fr_auto_auto_auto_auto] md:items-center md:gap-4"
+        className="relative flex flex-col gap-2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 pl-4 transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 md:grid md:grid-cols-[1fr_auto_auto_auto_auto] md:items-center md:gap-4"
       >
         <span className={cx("absolute inset-y-0 left-0 w-1", accent)} aria-hidden />
         <span className="min-w-0">

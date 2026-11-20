@@ -289,7 +289,7 @@ const SubscriptionPage: React.FC = () => {
       )}
 
       {/* Hero: the current package */}
-      <motion.section {...m("reveal")} className={cx("relative overflow-hidden rounded-3xl bg-gradient-to-br p-5 text-white shadow-lg", a.grad)} aria-label="Current package">
+      <motion.section {...m("reveal")} className={cx("relative overflow-hidden rounded-3xl bg-gradient-to-br p-5 text-white", a.grad)} aria-label="Current package">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-white/90">{tenant.name}</div>

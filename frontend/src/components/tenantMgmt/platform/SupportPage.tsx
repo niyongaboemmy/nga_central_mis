@@ -65,7 +65,7 @@ const SupportPage: React.FC = () => {
           const live = s.active && !s.revokedAt && new Date(s.expiresAt).getTime() > now;
           const ModeIcon = s.mode === "WRITE" ? Pencil : Eye;
           return (
-            <motion.li key={s.id} layout {...m("reveal")} className={cx("flex items-center gap-3 rounded-2xl border bg-white p-3 shadow-sm dark:bg-gray-900", live ? "border-violet-200 dark:border-violet-400/30" : "border-slate-200 opacity-75 dark:border-gray-700")}>
+            <motion.li key={s.id} layout {...m("reveal")} className={cx("flex items-center gap-3 rounded-2xl border bg-white p-3 dark:bg-gray-900", live ? "border-blue-200 dark:border-blue-400/30" : "border-slate-200 opacity-75 dark:border-gray-700")}>
               {live ? <TimeLeftRing startsAt={s.startsAt} expiresAt={s.expiresAt} now={now} /> : <span className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-gray-800"><LifeBuoy className="h-5 w-5" aria-hidden /></span>}
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 truncate font-semibold text-slate-900 dark:text-white">
