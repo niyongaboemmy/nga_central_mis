@@ -163,10 +163,33 @@ export async function syncLink(linkId: number, now = new Date()) {
   try {
     const token = tokenOf(projectId, l!.token_sealed);
     const repo = repoId;
+    // First sync: what is already there is the starting point. Only the default branch and the
+    // branches of recently updated pull requests are read, so a repository with hundreds of
+    // branches connects within GitHub's 60-an-hour limit; later syncs read what moved.
+    const firstPulls = first ? await get<any[]>(`/repos/${full}/pulls?state=all&sort=updated&direction=desc&per_page=30`, token) : null;
+    const active = new Set<string>(
+      (Array.isArray(firstPulls?.data) ? firstPulls!.data : []).filter((pr: any) => new Date(pr.updated_at).toISOString() >= since).map((pr: any) => String(pr.head?.ref ?? "")),
+    );
+    if (first) {
+      // Branches pushed to lately, from the repository's recent events (one request).
+      const ev = await restGet<any[]>(`/repos/${full}/events?per_page=100`, { token }).catch(() => null);
+      for (const e of Array.isArray(ev?.data) ? ev!.data : []) {
+        if (!e?.created_at || new Date(e.created_at).toISOString() < since) continue;
+        if (e.type === "PushEvent" && typeof e.payload?.ref === "string") active.add(e.payload.ref.replace(/^refs\/heads\//, ""));
+        if (e.type === "CreateEvent" && e.payload?.ref_type === "branch" && e.payload?.ref) active.add(String(e.payload.ref));
+      }
+    }
     const b = await get<any[]>(`/repos/${full}/branches?per_page=100`, token, state.etags.branches);
     if (b.status === 200 && Array.isArray(b.data)) {
       state.etags.branches = b.etag ?? undefined;
-      const heads = new Map<string, string>(b.data.map((x: any) => [String(x.name), String(x.commit?.sha ?? "")]));
+      const list: any[] = [...b.data];
+      // More than 100 branches: the next pages (up to 500 branches).
+      for (let page = 2; page <= 5 && list.length === (page - 1) * 100; page++) {
+        const more = await get<any[]>(`/repos/${full}/branches?per_page=100&page=${page}`, token);
+        if (Array.isArray(more.data)) list.push(...more.data);
+      }
+      const heads = new Map<string, string>(list.map((x: any) => [String(x.name), String(x.commit?.sha ?? "")]));
+      if (first) for (const [name, sha] of heads) if (name !== defaultBranch && !active.has(name)) state.branches[name] = sha;
       const changed = [...heads.entries()].filter(([name, sha]) => state.branches[name] !== sha).sort(([a], [z]) => (a === defaultBranch ? 1 : z === defaultBranch ? -1 : 0));
       let lookups = FILE_LOOKUPS_PER_SYNC;
       for (const [name, sha] of changed) {
@@ -211,7 +234,7 @@ export async function syncLink(linkId: number, now = new Date()) {
       }
     }
 
-    const p = await get<any[]>(`/repos/${full}/pulls?state=all&sort=updated&direction=desc&per_page=30`, token, state.etags.pulls);
+    const p = firstPulls ?? (await get<any[]>(`/repos/${full}/pulls?state=all&sort=updated&direction=desc&per_page=30`, token, state.etags.pulls));
     if (p.status === 200 && Array.isArray(p.data)) {
       state.etags.pulls = p.etag ?? undefined;
       for (const pr of [...p.data].reverse()) {
