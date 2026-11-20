@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, CalendarClock, Inbox, Search, ShieldCheck } from "lucide-react";
+import { Activity, CalendarClock, ChevronRight, Inbox, Search, ShieldCheck, Users } from "lucide-react";
 import { EmptyState, MeterBar, Segmented, StatusPill, accentOf } from "../kit";
+import TenantLogo from "../../brand/TenantLogo";
+import { loadBranding } from "../../../hooks/useTenantBranding";
 import { platformApi, type PackageInfo, type TenantLifecycle, type TenantListItem, type UsageMeter } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
-import { Spinner, ago, cx, daysUntil, errorText, inputCls } from "./platformShared";
+import { ago, cx, daysUntil, errorText, inputCls } from "./platformShared";
 
 type Filter = "all" | TenantLifecycle;
 
@@ -29,11 +31,87 @@ export const PeriodChip: React.FC<{ periodEnd: string | null; graceUntil?: strin
   if (d === null) return null;
   const tone = d < 0 ? "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-200" : d <= 30 ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
   return (
-    <span className={cx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", tone)} title={graceUntil ? "Grace ends" : "Period ends"}>
+    <span
+      className={cx("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", tone)}
+      title={`${graceUntil ? "Grace ends" : "Period ends"} ${new Date(graceUntil ?? periodEnd!).toLocaleDateString()}`}
+    >
       <CalendarClock className="h-3.5 w-3.5" aria-hidden />
-      {d < 0 ? `${-d}d ago` : `${d}d`}
-      <span className="sr-only">{graceUntil ? " until grace ends" : " until the period ends"}</span>
+      {graceUntil ? (d < 0 ? `Grace ended ${-d}d ago` : `Grace ends in ${d}d`) : d < 0 ? `Expired ${-d}d ago` : `Renews in ${d}d`}
     </span>
+  );
+};
+
+/** The school's own logo (public branding), initials while it loads or when there is none. */
+const SchoolLogo: React.FC<{ slug: string; name: string; primary: boolean }> = ({ slug, name, primary }) => {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadBranding(slug).then((b) => live && setUrl(b?.logo_url ?? null));
+    return () => {
+      live = false;
+    };
+  }, [slug]);
+  return (
+    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-950">
+      <TenantLogo src={url} name={name} isPrimary={primary} className="h-full w-full" rounded="rounded-lg" />
+    </span>
+  );
+};
+
+/** One school: identity, status, labelled usage, package, renewal and activity. */
+export const SchoolCard: React.FC<{ t: TenantListItem; pkg: PackageInfo | undefined }> = ({ t, pkg }) => {
+  const a = accentOf(pkg?.accent);
+  return (
+    <Link
+      to={`/platform/schools/${t.tid}`}
+      aria-label={`${t.name}, ${t.status.toLowerCase()}, ${pkg?.name ?? t.pkg} package`}
+      className="group flex h-full flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-500"
+    >
+      <div className="flex items-start gap-3">
+        <SchoolLogo slug={t.slug} name={t.name} primary={t.isPrimary} />
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 font-semibold leading-snug text-slate-900 dark:text-white" title={t.name}>
+            {t.name}
+          </p>
+          <p className="flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+            <span className="font-mono">{t.slug}</span>
+            {t.isPrimary && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-50 px-1.5 py-0.5 font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">
+                <ShieldCheck className="h-3 w-3" aria-hidden /> Primary
+              </span>
+            )}
+          </p>
+        </div>
+        <StatusPill status={t.status} />
+      </div>
+
+      <div className="space-y-2">
+        {listMeters(t, pkg).map((mt) => (
+          <MeterBar key={mt.key} meter={mt} showLabel />
+        ))}
+      </div>
+
+      <div className="mt-auto space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
+        <div className="flex items-center gap-2">
+          <span className={cx("inline-flex items-center rounded-full px-2 py-0.5 font-semibold", a.soft, a.text)}>{pkg?.name ?? t.pkg}</span>
+          {t.isPrimary ? (
+            <span className="text-slate-500 dark:text-slate-400">No renewal</span>
+          ) : (
+            <PeriodChip periodEnd={t.periodEnd} graceUntil={t.status === "GRACE" ? t.graceUntil : null} />
+          )}
+          <ChevronRight className="ml-auto h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600" aria-hidden />
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1" title="People who signed in during the last 7 days">
+            <Users className="h-3.5 w-3.5" aria-hidden /> {t.activeUsers7d} active this week
+          </span>
+          <span className="inline-flex items-center gap-1" title={t.lastActivityAt ? `Last activity ${new Date(t.lastActivityAt).toLocaleString()}` : "No activity yet"}>
+            <Activity className="h-3.5 w-3.5" aria-hidden />
+            {!t.lastActivityAt ? "No activity yet" : ago(t.lastActivityAt) === "now" ? "Active now" : `Active ${ago(t.lastActivityAt)} ago`}
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 };
 
@@ -125,50 +203,21 @@ const SchoolsPage: React.FC = () => {
       </div>
       {error && <p className="text-sm text-red-600 dark:text-red-300">{error}</p>}
       {!rows ? (
-        <Spinner />
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading schools">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="h-56 animate-pulse rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900" />
+          ))}
+        </ul>
       ) : shown.length === 0 ? (
         <EmptyState icon={Inbox} title="No schools" />
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Schools">
           <AnimatePresence initial={false}>
-            {shown.map((t) => {
-              const pkg = pkgOf(t.pkg);
-              const a = accentOf(pkg?.accent);
-              return (
-                <motion.li key={t.tid} layout {...m("reveal")}>
-                  <Link
-                    to={`/platform/schools/${t.tid}`}
-                    className="relative flex h-full flex-col gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 pt-5 shadow-sm transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900"
-                  >
-                    <span className={cx("absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r", a.grad)} aria-hidden />
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="flex items-center gap-1.5 truncate font-semibold text-slate-900 dark:text-white">
-                          {t.isPrimary && <ShieldCheck className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-200" aria-label="Primary school" />}
-                          {t.name}
-                        </p>
-                        <p className="truncate font-mono text-xs text-slate-600 dark:text-slate-300">{t.slug}</p>
-                      </div>
-                      <StatusPill status={t.status} />
-                    </div>
-                    <div className="space-y-1.5">
-                      {listMeters(t, pkg).map((mt) => (
-                        <MeterBar key={mt.key} meter={mt} />
-                      ))}
-                    </div>
-                    <div className="mt-auto flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300">
-                      <span className={cx("font-bold", a.text)}>{pkg?.name ?? t.pkg}</span>
-                      <PeriodChip periodEnd={t.periodEnd} graceUntil={t.status === "GRACE" ? t.graceUntil : null} />
-                      <span className="inline-flex items-center gap-1" title="Last activity">
-                        <Activity className="h-3.5 w-3.5" aria-hidden />
-                        {ago(t.lastActivityAt)}
-                        <span className="sr-only"> since last activity</span>
-                      </span>
-                    </div>
-                  </Link>
-                </motion.li>
-              );
-            })}
+            {shown.map((t) => (
+              <motion.li key={t.tid} layout {...m("reveal")}>
+                <SchoolCard t={t} pkg={pkgOf(t.pkg)} />
+              </motion.li>
+            ))}
           </AnimatePresence>
         </ul>
       )}
