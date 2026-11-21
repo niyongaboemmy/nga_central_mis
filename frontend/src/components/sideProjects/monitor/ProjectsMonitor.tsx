@@ -111,6 +111,14 @@ export const Pager: React.FC<{ page: number; size: number; total: number; onPage
   );
 };
 
+/** "SPES Year 1 A" -> "SPES Y1 A": a class fits on one line in the table (full name on hover). */
+export const shortClass = (name: string) => name.replace(/\bYear\s*(\d+)/gi, "Y$1").replace(/\bLevel\s*(\d+)/gi, "L$1").replace(/\s+/g, " ").trim();
+/** "2026 - 2027" -> "2026/27". */
+export const shortYear = (name: string) => {
+  const m = /^(\d{4})\s*[-/–]\s*(\d{2})(\d{2})$/.exec(name.trim());
+  return m ? `${m[1]}/${m[3]}` : name;
+};
+
 const ProjectsMonitor: React.FC = () => {
   const dark = useIsDark();
   const { user } = useUser();
@@ -430,7 +438,16 @@ const ProjectsMonitor: React.FC = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-gray-300">{r.class ? <><p className="font-semibold">{r.class.name}</p><p className="text-[11px] text-slate-600 dark:text-gray-300">{r.year?.name}</p></> : "—"}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-xs text-slate-600 dark:text-gray-300" title={r.class ? [r.class.name, r.year?.name].filter(Boolean).join(" · ") : undefined}>
+                          {r.class ? (
+                            <span className="inline-flex items-center gap-1">
+                              <span className="font-semibold text-slate-800 dark:text-gray-100">{shortClass(r.class.name)}</span>
+                              {r.year?.name && <span className="text-[11px] text-slate-500 dark:text-gray-400">· {shortYear(r.year.name)}</span>}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         <td className="max-w-[18rem] px-3 py-2.5">
                           <p className="flex items-center gap-2 truncate font-semibold text-slate-800 dark:text-white">
                             <ProjectLogo logoAssetId={r.logoAssetId} category={r.category} accent={r.category?.color ?? statusColor(pathStage(r.status, r.pausedFrom), dark)} size={24} rounded="rounded-lg" />
