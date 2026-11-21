@@ -45,7 +45,7 @@ import { MoveDialog } from "./MoveDialog";
 import StageTrack, { StageList } from "./StageTrack";
 import WorkPanel from "./work/WorkPanel";
 import TeamPanel from "./work/TeamPanel";
-import { CustomerLogo } from "./customers/CustomerParts";
+import { CustomerChip } from "./customers/CustomerParts";
 import { AddCoverButton, CoverBand, EditableLogo } from "./Branding";
 import {
   CATEGORY_ICON,
@@ -297,9 +297,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
         </span>
       )}
       {p.customerDetail && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-slate-700 dark:bg-gray-800 dark:text-gray-200" title={`For ${p.customerDetail.name}`}>
-          <CustomerLogo c={p.customerDetail} size={16} className="!rounded-full" /> {p.customerDetail.name}
-        </span>
+        <CustomerChip c={p.customerDetail} />
       )}
       <ReviewBadge state={p.reviewState} />
       {p.archivedAt && (

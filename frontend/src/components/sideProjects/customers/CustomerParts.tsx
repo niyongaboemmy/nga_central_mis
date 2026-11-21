@@ -23,6 +23,39 @@ const initials = (name: string) =>
     .map((w) => w[0]?.toUpperCase())
     .join("");
 
+/**
+ * A customer's name short enough for one line: the acronym when the name carries one in
+ * brackets ("Rwanda Information Society Authority (RISA)" -> "RISA"), else the name itself
+ * (the chip truncates it). The full name goes in the tooltip.
+ */
+export const customerShortName = (name: string): string => {
+  const m = /\(([A-Z][A-Za-z0-9&.-]{1,11})\)\s*$/.exec(name.trim());
+  return m ? m[1] : name.trim();
+};
+
+/** One-line customer chip: logo (or the customer kind's icon), short name, full name on hover. */
+export const CustomerChip: React.FC<{ c: { id: number; name: string; logoAssetId: number | null; kind?: CustomerKind | null }; className?: string }> = ({ c, className = "" }) => {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [c.logoAssetId]);
+  const Kind = (c.kind && CUSTOMER_KIND_META[c.kind]?.icon) || Building2;
+  return (
+    <span
+      className={`inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 py-0.5 pl-0.5 pr-2.5 text-[11px] font-semibold text-slate-700 dark:bg-gray-800 dark:text-gray-200 ${className}`}
+      title={`For ${c.name}`}
+    >
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-brand-700 dark:bg-gray-900 dark:text-brand-200" aria-hidden>
+        {c.logoAssetId && !broken ? (
+          <img src={sideProjectsApi.customerLogoUrl(c.id, c.logoAssetId)} alt="" onError={() => setBroken(true)} className="h-full w-full object-contain p-0.5" />
+        ) : (
+          <Kind className="h-3 w-3" />
+        )}
+      </span>
+      <span className="truncate">{customerShortName(c.name)}</span>
+      <span className="sr-only">{c.name}</span>
+    </span>
+  );
+};
+
 /** The customer's logo, or their initials on a soft tile. */
 export const CustomerLogo: React.FC<{ c: { id: number; name: string; logoAssetId: number | null }; size?: number; className?: string }> = ({ c, size = 36, className = "" }) => {
   const [broken, setBroken] = useState(false);
