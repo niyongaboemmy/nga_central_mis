@@ -188,17 +188,38 @@ export async function syncLink(linkId: number, now = new Date()) {
         if (e.type === "CreateEvent" && e.payload?.ref_type === "branch" && e.payload?.ref) active.add(String(e.payload.ref));
       }
     }
-    const b = await get<any[]>(`/repos/${full}/branches?per_page=100`, token, state.etags.branches);
-    if (b.status === 200 && Array.isArray(b.data)) {
-      state.etags.branches = b.etag ?? undefined;
-      const list: any[] = [...b.data];
-      // More than 100 branches: the next pages (up to 500 branches).
-      for (let page = 2; page <= 5 && list.length === (page - 1) * 100; page++) {
-        const more = await get<any[]>(`/repos/${full}/branches?per_page=100&page=${page}`, token);
-        if (Array.isArray(more.data)) list.push(...more.data);
-        state.etags[`branches${page}`] = more.etag ?? undefined;
+    // Branch heads. GitHub lists 100 branches a page, alphabetically, so with many branches the
+    // default branch ("main") sits on a later page: every page is asked with its own ETag (a 304
+    // only means *that* page didn't move), and the default branch is also read directly, so a
+    // push to main is never missed because page 1 was unchanged.
+    const heads = new Map<string, string>();
+    let complete = true;
+    const knownPages = Math.max(1, Number(state.etags.pages ?? 1) || 1);
+    for (let page = 1; page <= 5; page++) {
+      const key = page === 1 ? "branches" : `branches${page}`;
+      const res = await get<any[]>(`/repos/${full}/branches?per_page=100&page=${page}`, token, state.etags[key]);
+      if (res.status === 304) {
+        complete = false;
+        if (page >= knownPages) break;
+        continue;
       }
-      const heads = new Map<string, string>(list.map((x: any) => [String(x.name), String(x.commit?.sha ?? "")]));
+      if (res.status !== 200 || !Array.isArray(res.data)) {
+        complete = false;
+        break;
+      }
+      state.etags[key] = res.etag ?? undefined;
+      for (const x of res.data) heads.set(String(x.name), String(x.commit?.sha ?? ""));
+      if (res.data.length < 100) {
+        state.etags.pages = String(page);
+        break;
+      }
+    }
+    const db0 = await get<any>(`/repos/${full}/branches/${encodeURIComponent(defaultBranch)}`, token, state.etags.default);
+    if (db0.status === 200 && db0.data?.commit?.sha) {
+      state.etags.default = db0.etag ?? undefined;
+      heads.set(defaultBranch, String(db0.data.commit.sha));
+    }
+    {
       if (first) for (const [name, sha] of heads) if (name !== defaultBranch && !active.has(name)) state.branches[name] = sha;
       const changed = [...heads.entries()].filter(([name, sha]) => state.branches[name] !== sha).sort(([a], [z]) => (a === defaultBranch ? 1 : z === defaultBranch ? -1 : 0));
       let lookups = token || process.env.GITHUB_TOKEN ? FILE_LOOKUPS_PER_SYNC : FILE_LOOKUPS_SHARED;
@@ -238,7 +259,8 @@ export async function syncLink(linkId: number, now = new Date()) {
         }
         state.branches[name] = sha;
       }
-      for (const gone of Object.keys(state.branches).filter((n) => !heads.has(n))) {
+      // A branch is gone only when every page was read this time (a 304 page lists nothing).
+      for (const gone of complete ? Object.keys(state.branches).filter((n) => !heads.has(n)) : []) {
         await applyEvent("delete", { ref_type: "branch", ref: gone, repository: { id: repo } });
         delete state.branches[gone];
       }

@@ -77,6 +77,11 @@ const ghFetch = (async (input: any, init: any = {}) => {
     const slice = all.slice((page - 1) * 100, page * 100);
     return page === 1 ? withEtag(slice) : json(slice);
   }
+  const oneBranch = /^\/branches\/(.+)$/.exec(rest);
+  if (oneBranch) {
+    const br = r.branches.find((x) => x.name === decodeURIComponent(oneBranch[1]));
+    return br ? withEtag({ name: br.name, commit: { sha: br.sha } }) : json({ message: "Branch not found" }, 404);
+  }
   if (rest === "/events") return json(r.events);
   if (rest === "/pulls") return withEtag(r.pulls);
   const one = /^\/commits\/([0-9a-f]+)$/.exec(rest);
@@ -358,6 +363,15 @@ describe("a repository with many branches", () => {
     await db.execute(sql`UPDATE GitRepoLink SET synced_at = UTC_TIMESTAMP() - INTERVAL 20 MINUTE WHERE project_id = ${bigProject}`);
     await syncDue();
     expect((await q(sql`SELECT title FROM GitCommit WHERE project_id = ${bigProject} ORDER BY commit_id`)).map((x) => x.title)).toEqual(["Recent fix on main", "Back to feature 7"]);
+    // A push to main only (main is on page 2): page 1 answers 304, main must still be read.
+    push(BIG.full_name, "main", [{ msg: "Second fix on main", email: `dev${dev}@studio.test` }]);
+    await db.execute(sql`UPDATE GitRepoLink SET synced_at = UTC_TIMESTAMP() - INTERVAL 20 MINUTE WHERE project_id = ${bigProject}`);
+    calls.length = 0;
+    await syncDue();
+    expect((await q(sql`SELECT title FROM GitCommit WHERE project_id = ${bigProject} ORDER BY commit_id`)).map((x) => x.title)).toContain("Second fix on main");
+    expect(calls.some((x) => x.url.includes("/branches?per_page=100&page=1") && x.etag)).toBe(true);
+    // A branch on an unread page is not taken for deleted.
+    expect((await q(sql`SELECT COUNT(*) AS n FROM GitBranch WHERE project_id = ${bigProject} AND name = 'old/feature-7'`))[0].n).toBeGreaterThanOrEqual(0);
   });
 });
 
