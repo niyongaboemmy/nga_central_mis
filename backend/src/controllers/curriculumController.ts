@@ -33,6 +33,7 @@ import path from "path";
 import fs from "fs/promises";
 import { Permissions } from "../utils/permissions";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
+import { enrollmentInTaughtClass } from "../services/activeUsers";
 
 // ======================
 // SUBJECT ACCESS CONTROL
@@ -194,6 +195,8 @@ export const getMyEnrolledSubjects = asyncHandler(
         and(
           eq(StudentSubjectEnrollment.user_id, userId),
           eq(StudentSubjectEnrollment.status, "ACTIVE"),
+          // Same rule as the subject roster: taught to the student's class.
+          enrollmentInTaughtClass,
           ...(yearFilter ? [yearFilter] : []),
         ),
       )

@@ -11,6 +11,7 @@ import {
   createTeacherSubjectAssignment,
   createProgramGradeClassGroup,
   createStudentSubjectEnrollment,
+  createStudentClassGroup,
 } from "../test/fixtures";
 
 // Students previously had no way to see their own enrolled subjects at all —
@@ -52,6 +53,12 @@ describe("GET /curriculum/my-enrolled-subjects", () => {
     await createStudentSubjectEnrollment({
       userId: enrolledStudentId,
       subjectId,
+      academicYearId,
+    });
+    // A subject is "mine" only when it is taught to my class this year.
+    await createStudentClassGroup({
+      userId: enrolledStudentId,
+      classGroupId,
       academicYearId,
     });
 
