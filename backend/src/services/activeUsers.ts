@@ -16,6 +16,7 @@ import {
   StudentSubjectEnrollment,
   UserRole,
   Role,
+  TeacherSubjectAssignment,
 } from "../db/schema";
 import { ValidationError } from "../errors/CustomError";
 
@@ -50,6 +51,32 @@ export const activeEnrollment = (yearId?: number | null): SQL =>
         eq(StudentSubjectEnrollment.academic_year_id, yearId),
       )
     : eq(StudentSubjectEnrollment.status, "ACTIVE")) as SQL;
+
+/** The enrollment row counts only when the subject is taught, that year, to
+ *  the class group the student actively sits in -- or when the subject has no
+ *  teaching assignment that year yet (then the enrollment alone decides, so an
+ *  unassigned subject does not vanish). A stale enrollment left behind when a
+ *  student moved class must not show them the subject's work (2026-11-22: ten
+ *  SPES Year 2 A students kept GENEG302, a Year 1 A subject, and saw its
+ *  assignments on their dashboard). Needs `StudentSubjectEnrollment` in the
+ *  query; correlated EXISTS, so it never multiplies rows. */
+export const enrollmentInTaughtClass: SQL = sql`(
+  NOT EXISTS (
+    SELECT 1 FROM ${TeacherSubjectAssignment} tsa_any
+    WHERE tsa_any.subject_id = ${StudentSubjectEnrollment.subject_id}
+      AND tsa_any.academic_year_id = ${StudentSubjectEnrollment.academic_year_id}
+  )
+  OR EXISTS (
+    SELECT 1 FROM ${TeacherSubjectAssignment} tsa_cls
+    JOIN ${StudentClassGroup} scg_cls
+      ON scg_cls.class_group_id = tsa_cls.class_group_id
+     AND scg_cls.academic_year_id = tsa_cls.academic_year_id
+     AND scg_cls.status = 'ACTIVE'
+    WHERE tsa_cls.subject_id = ${StudentSubjectEnrollment.subject_id}
+      AND tsa_cls.academic_year_id = ${StudentSubjectEnrollment.academic_year_id}
+      AND scg_cls.user_id = ${StudentSubjectEnrollment.user_id}
+  )
+)`;
 
 /** A real student: the profile says STUDENT, or they hold the STUDENT role.
  *  Needs `User` and `UserProfile` in the query. EXISTS rather than a join so a

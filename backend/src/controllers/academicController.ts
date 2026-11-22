@@ -51,6 +51,7 @@ import {
   activeUser,
   activeUserJoin,
   activeEnrollment,
+  enrollmentInTaughtClass,
   activeStudentPlacement,
   parseStatusFilter,
   wantsInactive,
@@ -3976,9 +3977,14 @@ export const getStudentEnrolledSubjects = asyncHandler(
         eq(StudentSubjectEnrollment.academic_year_id, AcademicYear.academic_year_id),
       )
       .where(
-        whereCondition
-          ? and(whereCondition, eq(StudentSubjectEnrollment.status, "ACTIVE"))
-          : eq(StudentSubjectEnrollment.status, "ACTIVE"),
+        and(
+          whereCondition,
+          eq(StudentSubjectEnrollment.status, "ACTIVE"),
+          // Only subjects taught to the student's class -- the same rule as
+          // the subject roster. Task Mentor, report cards and the student
+          // dashboards decide "my subjects" from this list.
+          enrollmentInTaughtClass,
+        ),
       )
       .orderBy(desc(AcademicYear.academic_year_id), Subject.name);
 
