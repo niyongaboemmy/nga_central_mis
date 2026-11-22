@@ -3462,6 +3462,34 @@ export const getMyAssignedSubjects = asyncHandler(
   },
 );
 
+/**
+ * Roster rule for a subject in one academic year: on top of an ACTIVE
+ * enrollment, the student must sit in a class group the subject is taught to
+ * (TeacherSubjectAssignment). An enrollment row alone is not enough -- a
+ * student moved to another class can keep a stale enrollment (2026-11-22: ten
+ * SPES Year 2 A students kept GENEG302, a Year 1 A subject, and showed up on
+ * its assignments and marks). Returns undefined when the subject has no
+ * teaching assignment that year, so an unassigned subject falls back to
+ * enrollment only instead of showing an empty roster. Needs StudentClassGroup
+ * joined (ACTIVE, same year) in the calling query.
+ */
+async function taughtClassGroupFilter(
+  subjectId: number,
+  yearId: number,
+): Promise<SQL | undefined> {
+  const rows = await db
+    .selectDistinct({ class_group_id: TeacherSubjectAssignment.class_group_id })
+    .from(TeacherSubjectAssignment)
+    .where(
+      and(
+        eq(TeacherSubjectAssignment.subject_id, subjectId),
+        eq(TeacherSubjectAssignment.academic_year_id, yearId),
+      ),
+    );
+  const ids = rows.map((r) => r.class_group_id);
+  return ids.length ? inArray(StudentClassGroup.class_group_id, ids) : undefined;
+}
+
 // Get students enrolled in a specific subject for a teacher
 export const getSubjectEnrolledStudents = asyncHandler(
   async (req: any, res: any) => {
@@ -3550,6 +3578,7 @@ export const getSubjectEnrolledStudents = asyncHandler(
         and(
           eq(StudentSubjectEnrollment.subject_id, subjId),
           activeEnrollment(yearId),
+          await taughtClassGroupFilter(subjId, yearId),
         ),
       )
       .orderBy(UserProfile.first_name, UserProfile.last_name);
@@ -3627,6 +3656,7 @@ export const getSubjectEnrolledStudentsByTerm = asyncHandler(
         and(
           eq(StudentSubjectEnrollment.subject_id, subjId),
           activeEnrollment(term.academic_year_id),
+          await taughtClassGroupFilter(subjId, term.academic_year_id),
         ),
       )
       .orderBy(UserProfile.first_name, UserProfile.last_name);
