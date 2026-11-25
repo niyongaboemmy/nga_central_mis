@@ -78,7 +78,7 @@ describe("Navbar", () => {
 
   it("shows only a person icon for the logged-in user in the collapsed bar, not initials, name or email", () => {
     renderNavbar();
-    const accountButton = screen.getByRole("button", { name: /account menu/i });
+    const accountButton = screen.getAllByRole("button", { name: /account menu/i })[0]; // desktop bar (the phone bar has its own)
     expect(accountButton).toBeInTheDocument();
     // Without a photo, your own avatar is a person icon (initials are for lists).
     expect(accountButton.querySelector('[data-fallback="person"]')).not.toBeNull();
@@ -96,7 +96,7 @@ describe("Navbar", () => {
   it("reveals the user's name and email inside the dropdown after clicking the account icon", async () => {
     const user = userEvent.setup();
     renderNavbar();
-    const accountButton = screen.getByRole("button", { name: /account menu/i });
+    const accountButton = screen.getAllByRole("button", { name: /account menu/i })[0]; // desktop bar (the phone bar has its own)
     const desktopAccountContainer = accountButton.closest(".relative") as HTMLElement;
     await user.click(accountButton);
     expect(within(desktopAccountContainer).getByText("Jane Doe")).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe("Navbar", () => {
     try {
       const user = userEvent.setup();
       renderNavbar();
-      const accountButton = screen.getByRole("button", { name: /account menu/i });
+      const accountButton = screen.getAllByRole("button", { name: /account menu/i })[0]; // desktop bar (the phone bar has its own)
       const img = within(accountButton).getByRole("img", { name: "Jane Doe" });
       expect(img.getAttribute("src")).toBe(mockUser.avatar.sm);
       expect(accountButton.textContent).not.toContain("JD");
