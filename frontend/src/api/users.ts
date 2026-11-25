@@ -1151,7 +1151,7 @@ export const importUserFromSchool = async (body: { identifier: string; sourceTid
 export const bulkCreateUsers = async (
   file: File,
   roleId?: number,
-): Promise<{ success: number; failed: number; errors: string[] }> => {
+): Promise<{ success: number; failed: number; without_email?: number; errors: string[] }> => {
   const formData = new FormData();
   formData.append("file", file);
   if (roleId) {
@@ -1163,6 +1163,7 @@ export const bulkCreateUsers = async (
       BackendResponse<{
         success: number;
         failed: number;
+        without_email?: number;
         errors: string[];
       }>
     >("/users/bulk", formData, {

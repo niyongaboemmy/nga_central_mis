@@ -45,6 +45,7 @@ import {
   AcademicYear,
 } from "../api/academics";
 import { useToast } from "../contexts/ToastContext";
+import { useConfirm } from "../contexts/ConfirmContext";
 import { usePermissions } from "../hooks/usePermissions";
 import { Permissions } from "../constants/permissions";
 import TeacherSubjectAssignment from "./academics/TeacherSubjectAssignment";
@@ -75,6 +76,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   isSwitchingUser,
 }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const { hasPermission } = usePermissions();
   // Local copy so a picture changed here shows at once; the list refreshes on its own.
   const [avatar, setAvatar] = React.useState<Avatar | null>(user?.avatar ?? null);
@@ -234,8 +236,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
     if (canManageUsers) {
       if (!editedInfo.username?.trim()) errors.username = "Username is required";
-      if (!editedInfo.email?.trim()) errors.email = "Email is required";
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedInfo.email))
+      // Students may have no e-mail (they then can't sign in); everyone else needs one.
+      if (!editedInfo.email?.trim()) {
+        if (user?.profile?.user_type !== "STUDENT")
+          errors.email = "Email is required (only students may have none)";
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedInfo.email))
         errors.email = "Enter a valid email address";
     }
     return errors;
@@ -270,14 +275,36 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         const original = buildEditedInfo(user);
         const userChanges: Record<string, string> = {};
         if (username !== original.username) userChanges.username = username!;
-        if (email !== original.email) userChanges.email = email!;
+        const newEmail = (email ?? "").trim();
+        if (newEmail !== original.email) userChanges.email = newEmail;
         if (status !== original.status) userChanges.status = status!;
+        const removingEmail = !!original.email && !newEmail;
+        if (
+          removingEmail &&
+          !(await confirm({
+            title: "Remove this email?",
+            message: `${user.profile?.first_name || user.user.username} will no longer be able to sign in.`,
+            details: ["Their password is removed and every session ends.", "Add an email later to let them sign in again."],
+            confirmText: "Remove email",
+            tone: "danger",
+          }))
+        ) {
+          setIsSavingInfo(false);
+          return;
+        }
         if (Object.keys(userChanges).length > 0) {
           await updateUser(user.user.user_id, userChanges);
         }
+        if (removingEmail) {
+          showToast("Email removed: they can no longer sign in", "info");
+        } else if (!original.email && newEmail) {
+          showToast("Email added: a temporary password was emailed, so they can sign in now", "success");
+        } else {
+          showToast("Profile updated successfully", "success");
+        }
+      } else {
+        showToast("Profile updated successfully", "success");
       }
-
-      showToast("Profile updated successfully", "success");
       setIsEditingInfo(false);
       // Refresh user data using parent's onViewUser
       if (onViewUser) {

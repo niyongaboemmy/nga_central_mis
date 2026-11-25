@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -36,6 +36,8 @@ interface PreviewUser {
   _rowNum: number;
   _errors: string[];
   _isValid: boolean;
+  /** A student row without an e-mail: saved, but the account can't sign in. */
+  _noEmail?: boolean;
 }
 
 type UploadStep = "upload" | "preview" | "processing" | "complete";
@@ -112,10 +114,13 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
-  const [preview, setPreview] = useState<PreviewUser[]>([]);
+  // Rows as read from the sheet; checked again whenever the role changes, because
+  // students (and only students) may be uploaded without an e-mail.
+  const [rawRows, setRawRows] = useState<any[]>([]);
   const [uploadStatus, setUploadStatus] = useState<{
     success: number;
     failed: number;
+    without_email?: number;
     errors: string[];
   } | null>(null);
   const [step, setStep] = useState<UploadStep>("upload");
@@ -144,7 +149,8 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
 
   const validateRow = (
     row: any,
-    rowNum: number
+    rowNum: number,
+    emailOptional: boolean
   ): { data: PreviewUser; errors: string[] } => {
     const errors: string[] = [];
     const data: PreviewUser = {
@@ -166,7 +172,8 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
     const email = row.email?.toString().trim();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) {
-      errors.push("Email required");
+      if (emailOptional) data._noEmail = true;
+      else errors.push("Email required (only students may be uploaded without one)");
     } else if (!emailRegex.test(email)) {
       errors.push("Invalid email");
     }
@@ -232,14 +239,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
           return;
         }
 
-        const validatedData: PreviewUser[] = jsonData.map(
-          (row: any, index: number) => {
-            const { data } = validateRow(row, index + 2);
-            return data;
-          }
-        );
-
-        setPreview(validatedData);
+        setRawRows(jsonData as any[]);
         setStep("preview");
       } catch (err) {
         setError("Failed to parse file");
@@ -286,6 +286,15 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
       setStep("complete");
       if (result.success > 0) {
         onSuccess();
+        const noEmail = result.without_email
+          ? ` (${result.without_email} without an e-mail: they can't sign in)`
+          : "";
+        showToast(
+          `${result.success} user${result.success === 1 ? "" : "s"} created${noEmail}${result.failed ? `, ${result.failed} failed` : ""}`,
+          result.failed ? "warning" : "success",
+        );
+      } else {
+        showToast("No users were created", "error");
       }
     } catch (err: any) {
       const status: number | undefined = err.response?.status;
@@ -312,6 +321,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
         setError(`Upload failed${status ? ` (${status})` : ""}.`);
       }
       setStep("preview");
+      showToast("Upload failed", "error");
     } finally {
       setLoading(false);
     }
@@ -329,6 +339,18 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
           last_name: "Doe",
           gender: "MALE",
           date_of_birth: "2010-01-15",
+          address: "Kigali, Rwanda",
+          user_type: "STUDENT",
+        },
+        {
+          // A young student without an e-mail: saved, but can't sign in.
+          username: "amani_k_003",
+          email: "",
+          phone_number: "",
+          first_name: "Amani",
+          last_name: "Keza",
+          gender: "FEMALE",
+          date_of_birth: "2016-02-11",
           address: "Kigali, Rwanda",
           user_type: "STUDENT",
         },
@@ -369,7 +391,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
 
   const resetForm = () => {
     setFile(null);
-    setPreview([]);
+    setRawRows([]);
     setError(null);
     setWarning(null);
     setUploadStatus(null);
@@ -405,8 +427,17 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
     onClose();
   };
 
+  const studentRoleSelected =
+    // The select hands back the id as a string, whatever its declared type.
+    roles.find((r) => String(r.role_id) === String(selectedRole))?.name?.toUpperCase() === "STUDENT";
+  const preview: PreviewUser[] = useMemo(
+    () => rawRows.map((row, index) => validateRow(row, index + 2, studentRoleSelected).data),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rawRows, studentRoleSelected]
+  );
   const validCount = preview.filter((p) => p._isValid).length;
   const invalidCount = preview.filter((p) => !p._isValid).length;
+  const noEmailCount = preview.filter((p) => p._isValid && p._noEmail).length;
 
   return (
     <AnimatePresence>
@@ -601,6 +632,11 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                       username, email
                     </p>
                     <p className="text-gray-600 dark:text-gray-400 text-xs mt-1">
+                      Students may be uploaded without an email (leave it
+                      blank): their accounts are saved but can't sign in until
+                      an email is added.
+                    </p>
+                    <p className="text-gray-600 dark:text-gray-400 text-xs mt-1">
                       Optional: phone_number, first_name, last_name, gender,
                       date_of_birth, address, user_type
                     </p>
@@ -633,7 +669,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                     <button
                       onClick={() => {
                         setFile(null);
-                        setPreview([]);
+                        setRawRows([]);
                         setStep("upload");
                       }}
                       className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full transition-colors"
@@ -701,6 +737,23 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                     </div>
                   </div>
 
+                  {noEmailCount > 0 && (
+                    <p className="rounded-xl border border-gray-200 px-3 py-2 text-xs text-gray-600 dark:border-gray-700 dark:text-gray-300">
+                      {noEmailCount} student{noEmailCount === 1 ? " has" : "s have"} no
+                      email: {noEmailCount === 1 ? "the account" : "their accounts"} will
+                      be saved but can't sign in until an email is added.
+                    </p>
+                  )}
+                  {!studentRoleSelected &&
+                    preview.some((p) => !p.email) &&
+                    selectedRole !== "" && (
+                      <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                        Only students may be uploaded without an email. Fill in
+                        the missing emails, or press Change and upload the file
+                        under the Student role.
+                      </p>
+                    )}
+
                   {/* Preview Table */}
                   <div className="border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden">
                     <div className="overflow-x-auto max-h-64">
@@ -746,7 +799,15 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                                 </span>
                               </td>
                               <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
-                                {row.email || "(missing)"}
+                                {row.email ? (
+                                  row.email
+                                ) : row._noEmail ? (
+                                  <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700/60 dark:text-gray-300">
+                                    No email · can't sign in
+                                  </span>
+                                ) : (
+                                  <span className="text-red-500">(missing)</span>
+                                )}
                               </td>
                               <td className="px-3 py-2">
                                 {row._isValid ? (
@@ -851,6 +912,12 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                   <p className="text-sm text-gray-500 mt-1">
                     {uploadStatus.success} created, {uploadStatus.failed} failed
                   </p>
+                  {!!uploadStatus.without_email && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {uploadStatus.without_email} without an email: they can't
+                      sign in until an email is added.
+                    </p>
+                  )}
 
                   {uploadStatus.errors.length > 0 && (
                     <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-left max-h-32 overflow-y-auto">
@@ -895,7 +962,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                   <button
                     onClick={() => {
                       setFile(null);
-                      setPreview([]);
+                      setRawRows([]);
                       setStep("upload");
                     }}
                     className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full transition-colors flex items-center gap-2"

@@ -156,8 +156,18 @@ const InfoTab: React.FC<InfoTabProps> = ({
                 value={editedInfo.email || ""}
                 disabled={!canManageUsers}
                 onChange={(e) => set({ email: e.target.value })}
+                placeholder={user.profile?.user_type === "STUDENT" ? "No email: can't sign in" : undefined}
                 className={`${inputBase} ${errors.email ? inputErr : inputOk} ${!canManageUsers ? inputDisabled : ""}`}
               />
+              {canManageUsers && user.profile?.user_type === "STUDENT" && !errors.email && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {editedInfo.email?.trim()
+                    ? user.user.email
+                      ? "Clearing it stops this student from signing in."
+                      : "Adding an email emails them a temporary password so they can sign in."
+                    : "Without an email this student can't sign in."}
+                </p>
+              )}
             </Field>
             <Field label="Account Status" icon={Activity} index={2}>
               <SelectField
@@ -326,7 +336,7 @@ const InfoTab: React.FC<InfoTabProps> = ({
           <InfoItem
             icon={Mail}
             label="Email Address"
-            value={user.user.email}
+            value={user.user.email || "No email · can't sign in"}
             highlight
           />
           <InfoItem

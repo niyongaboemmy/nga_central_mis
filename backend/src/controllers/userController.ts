@@ -91,6 +91,31 @@ const endSessionsForDeactivation = async (userId: number) => {
   // And their NGA connector in Claude / ChatGPT (services/mcp).
   await revokeUserTokens(userId);
 };
+/**
+ * Accounts without an e-mail (migration 148). Young students often have none: they are
+ * registered for school records but can't sign in -- they get no password, and sign-in
+ * needs an e-mailed code. Only students may be saved without an e-mail.
+ */
+export const EMAIL_REQUIRED_MESSAGE =
+  "An e-mail is required for everyone except students. A student without an e-mail is saved but can't sign in.";
+
+/** Give an account a temporary password (changed at first sign-in) and e-mail it. */
+const grantSignIn = async (
+  userId: number,
+  email: string,
+  username: string,
+  credential?: { password: string; hash: string },
+) => {
+  const password = credential?.password ?? crypto.randomBytes(8).toString("hex");
+  const hash = credential?.hash ?? (await bcrypt.hash(password, 12));
+  await db.insert(AuthCredential).values({ user_id: userId, password_hash: hash, force_password_change: 1 });
+  try {
+    emailService.sendAccountCreation(email, username, password);
+  } catch (emailError) {
+    logger.warn("Failed to send account creation email", { emailError, userId });
+  }
+};
+
 import {
   generateStudentRegistrationNumber,
   getSchoolCode,
@@ -899,11 +924,33 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
   const sanitizedAddress = address ? sanitizeString(address) : undefined;
 
   // Validate inputs
-  if (!sanitizedUsername || !sanitizedEmail) {
-    throw new ValidationError("Username and email are required");
+  if (!sanitizedUsername) {
+    throw new ValidationError("Username is required");
   }
 
-  if (!validateEmail(sanitizedEmail)) {
+  // The person's type is that of their first role (see the profile below).
+  const validUserTypes = ["STUDENT", "TEACHER", "ADMIN", "PARENT", "STAFF"];
+  let userType: "STUDENT" | "TEACHER" | "ADMIN" | "PARENT" | "STAFF" | null =
+    null;
+  if (roles && Array.isArray(roles) && roles.length > 0) {
+    const roleResult = await db
+      .select({ name: Role.name })
+      .from(Role)
+      .where(eq(Role.role_id, roles[0]))
+      .limit(1);
+    if (roleResult.length > 0) {
+      const roleName = roleResult[0].name?.toUpperCase();
+      userType = validUserTypes.includes(roleName)
+        ? (roleName as "STUDENT" | "TEACHER" | "ADMIN" | "PARENT" | "STAFF")
+        : "STAFF"; // Default for unknown roles
+    }
+  }
+
+  if (!sanitizedEmail && userType !== "STUDENT") {
+    throw new ValidationError(EMAIL_REQUIRED_MESSAGE);
+  }
+
+  if (sanitizedEmail && !validateEmail(sanitizedEmail)) {
     throw new ValidationError("Invalid email format");
   }
 
@@ -918,14 +965,16 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
     throw new ConflictError("Username already exists");
   }
 
-  const existingEmail = await db
-    .select()
-    .from(User)
-    .where(eq(User.email, sanitizedEmail))
-    .limit(1);
+  if (sanitizedEmail) {
+    const existingEmail = await db
+      .select()
+      .from(User)
+      .where(eq(User.email, sanitizedEmail))
+      .limit(1);
 
-  if (existingEmail.length > 0) {
-    throw new ConflictError("Email already exists");
+    if (existingEmail.length > 0) {
+      throw new ConflictError("Email already exists");
+    }
   }
 
   logger.info("Creating new user", {
@@ -937,19 +986,14 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
   // Package head-count limit (tenant management §3.3): the new person's type
   // is that of their first role, as the profile below records it.
   if ((status || "ACTIVE") === "ACTIVE") {
-    let intendedType: string | null = null;
-    if (roles && Array.isArray(roles) && roles.length > 0) {
-      const [firstRole] = await db.select({ name: Role.name }).from(Role).where(eq(Role.role_id, roles[0])).limit(1);
-      intendedType = firstRole?.name?.toUpperCase() ?? null;
-    }
-    const limit = await checkPeopleLimit(intendedType);
+    const limit = await checkPeopleLimit(userType);
     if (!limit.ok) return res.status(403).json(limitRefusal(limit));
   }
 
   // Insert user
   await db.insert(User).values({
     username: sanitizedUsername,
-    email: sanitizedEmail,
+    email: sanitizedEmail || null,
     phone_number: sanitizedPhone,
     status: status || "ACTIVE",
   });
@@ -963,32 +1007,9 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
   const newUserId = newUserResult[0]?.user_id;
   if (newUserId) queueDirectorySync(newUserId);
 
-  // Generate random password
-  const randomPassword = crypto.randomBytes(8).toString("hex");
-
-  // Hash the password
-  const salt = await bcrypt.genSalt(12);
-  const passwordHash = await bcrypt.hash(randomPassword, salt);
-
-  // Insert auth credentials with force password change
-  await db.insert(AuthCredential).values({
-    user_id: newUserId,
-    password_hash: passwordHash,
-    force_password_change: 1,
-  });
-
-  // Send email with credentials (don't await to avoid blocking)
-  try {
-    emailService.sendAccountCreation(
-      sanitizedEmail,
-      sanitizedUsername,
-      randomPassword,
-    );
-  } catch (emailError) {
-    logger.warn("Failed to send account creation email", {
-      emailError,
-      userId: newUserId,
-    });
+  // Sign-in: a temporary password by e-mail. No e-mail = no password = no sign-in.
+  if (sanitizedEmail && newUserId) {
+    await grantSignIn(newUserId, sanitizedEmail, sanitizedUsername);
   }
 
   // Validate gender
@@ -996,33 +1017,6 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
 
   // Format date
   const formattedDateOfBirth = formatDateForMySQL(date_of_birth);
-
-  // Get user_type from the first selected role (if roles are provided)
-  // Map role names to valid user_type values
-  const validUserTypes = ["STUDENT", "TEACHER", "ADMIN", "PARENT", "STAFF"];
-  let userType: "STUDENT" | "TEACHER" | "ADMIN" | "PARENT" | "STAFF" | null =
-    null;
-  if (roles && Array.isArray(roles) && roles.length > 0) {
-    const firstRoleId = roles[0];
-    const roleResult = await db
-      .select({ name: Role.name })
-      .from(Role)
-      .where(eq(Role.role_id, firstRoleId))
-      .limit(1);
-    if (roleResult.length > 0) {
-      const roleName = roleResult[0].name?.toUpperCase();
-      if (validUserTypes.includes(roleName)) {
-        userType = roleName as
-          | "STUDENT"
-          | "TEACHER"
-          | "ADMIN"
-          | "PARENT"
-          | "STAFF";
-      } else {
-        userType = "STAFF"; // Default for unknown roles
-      }
-    }
-  }
 
   // Create profile if any profile data is provided
   if (
@@ -1069,12 +1063,19 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
       `Created user: ${sanitizedUsername}`,
       "User",
       newUserId,
-      { username: sanitizedUsername, email: sanitizedEmail, roles },
+      { username: sanitizedUsername, email: sanitizedEmail || null, roles },
       req.user.userId,
     );
   }
 
-  successResponse(res, "User created successfully", null, 201);
+  successResponse(
+    res,
+    sanitizedEmail
+      ? "User created successfully"
+      : "Student created without an e-mail: they can't sign in until an e-mail is added",
+    { user_id: newUserId, can_sign_in: !!sanitizedEmail },
+    201,
+  );
 });
 
 export const updateUser = asyncHandler(async (req: any, res: any) => {
@@ -1088,7 +1089,11 @@ export const updateUser = asyncHandler(async (req: any, res: any) => {
 
   // Sanitize inputs
   const sanitizedUsername = username ? sanitizeString(username) : undefined;
-  const sanitizedEmail = email ? sanitizeString(email) : undefined;
+  const sanitizedEmail = email ? sanitizeString(email) || undefined : undefined;
+  // `email: null` or "" removes the e-mail (students only): the account then can't sign in.
+  const clearEmail =
+    Object.prototype.hasOwnProperty.call(req.body, "email") &&
+    (email === null || (typeof email === "string" && email.trim() === ""));
   const sanitizedPhone = phone_number
     ? sanitizeString(phone_number)
     : undefined;
@@ -1107,6 +1112,21 @@ export const updateUser = asyncHandler(async (req: any, res: any) => {
 
   if (existingUser.length === 0) {
     throw new NotFoundError("User not found");
+  }
+
+  const removingEmail = clearEmail && !!existingUser[0].email;
+  if (removingEmail) {
+    if (req.user?.userId === userId) {
+      throw new ValidationError("You can't remove your own e-mail: you would no longer be able to sign in");
+    }
+    const [profile] = await db
+      .select({ user_type: UserProfile.user_type })
+      .from(UserProfile)
+      .where(eq(UserProfile.user_id, userId))
+      .limit(1);
+    if (profile?.user_type !== "STUDENT") {
+      throw new ValidationError(EMAIL_REQUIRED_MESSAGE);
+    }
   }
 
   // Check for conflicts if username or email is being changed
@@ -1137,6 +1157,7 @@ export const updateUser = asyncHandler(async (req: any, res: any) => {
   const updateData: any = {};
   if (sanitizedUsername) updateData.username = sanitizedUsername;
   if (sanitizedEmail) updateData.email = sanitizedEmail;
+  if (removingEmail) updateData.email = null;
   if (sanitizedPhone !== undefined) updateData.phone_number = sanitizedPhone;
   let deactivated = false;
   if (status !== undefined && status !== null && status !== "") {
@@ -1174,6 +1195,25 @@ export const updateUser = asyncHandler(async (req: any, res: any) => {
   }
   if (deactivated) await endSessionsForDeactivation(userId);
 
+  // No e-mail = no sign-in: the password goes and every session ends.
+  if (removingEmail) {
+    await db.delete(AuthCredential).where(eq(AuthCredential.user_id, userId));
+    if (!deactivated) await endSessionsForDeactivation(userId);
+  }
+  // An e-mail added to an account that never had a password: it can sign in now.
+  let signInGranted = false;
+  if (sanitizedEmail && !existingUser[0].email) {
+    const [cred] = await db
+      .select({ user_id: AuthCredential.user_id })
+      .from(AuthCredential)
+      .where(eq(AuthCredential.user_id, userId))
+      .limit(1);
+    if (!cred) {
+      await grantSignIn(userId, sanitizedEmail, sanitizedUsername || existingUser[0].username);
+      signInGranted = true;
+    }
+  }
+
   // Record activity
   if (req.user?.userId) {
     await recordActivity(
@@ -1187,7 +1227,15 @@ export const updateUser = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  successResponse(res, "User updated successfully");
+  successResponse(
+    res,
+    removingEmail
+      ? "User updated: without an e-mail they can no longer sign in"
+      : signInGranted
+        ? "User updated: a temporary password was e-mailed, so they can sign in now"
+        : "User updated successfully",
+    { can_sign_in: removingEmail ? false : !!(sanitizedEmail || existingUser[0].email) },
+  );
 });
 
 export const deleteUser = asyncHandler(async (req: any, res: any) => {
@@ -1326,8 +1374,13 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
   // bcrypt (cost 12) is CPU work on libuv's thread pool: hashing every temporary password
   // up front, several at once, instead of one per row inside the loop, keeps a 30-row
   // file well inside the request timeout (it took ~12 s and the browser gave up at 10 s).
-  const credentials = await temporaryCredentials(data.length);
+  // Only rows with an e-mail get a password: students without one can't sign in.
+  const hasEmail = (data as any[]).map((r) => !!r?.email?.toString().trim());
+  const hashed = await temporaryCredentials(hasEmail.filter(Boolean).length);
+  let nextCredential = 0;
+  const credentials = hasEmail.map((h) => (h ? hashed[nextCredential++] : null));
   const createdIds: number[] = [];
+  let withoutEmail = 0;
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i] as any;
@@ -1338,13 +1391,21 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
       const username = row.username?.toString().trim();
       const email = row.email?.toString().trim();
 
-      if (!username || !email) {
-        errors.push(`Row ${rowNum}: Missing required fields (username, email)`);
+      if (!username) {
+        errors.push(`Row ${rowNum}: Missing required field (username)`);
         failedCount++;
         continue;
       }
 
-      if (!validateEmail(email)) {
+      // Only an upload under the Student role may leave e-mails out (a custom or missing
+      // role also lands on the STUDENT type above, but isn't known to be students).
+      if (!email && selectedRoleName?.toUpperCase() !== "STUDENT") {
+        errors.push(`Row ${rowNum}: Missing e-mail. ${EMAIL_REQUIRED_MESSAGE}`);
+        failedCount++;
+        continue;
+      }
+
+      if (email && !validateEmail(email)) {
         errors.push(`Row ${rowNum}: Invalid email format for ${email}`);
         failedCount++;
         continue;
@@ -1363,16 +1424,18 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
         continue;
       }
 
-      const existingEmail = await db
-        .select()
-        .from(User)
-        .where(eq(User.email, sanitizeString(email)))
-        .limit(1);
+      if (email) {
+        const existingEmail = await db
+          .select()
+          .from(User)
+          .where(eq(User.email, sanitizeString(email)))
+          .limit(1);
 
-      if (existingEmail.length > 0) {
-        errors.push(`Row ${rowNum}: Email "${email}" already exists`);
-        failedCount++;
-        continue;
+        if (existingEmail.length > 0) {
+          errors.push(`Row ${rowNum}: Email "${email}" already exists`);
+          failedCount++;
+          continue;
+        }
       }
 
       // Sanitize optional fields
@@ -1408,7 +1471,7 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
       // Insert user
       await db.insert(User).values({
         username: sanitizeString(username),
-        email: sanitizeString(email),
+        email: email ? sanitizeString(email) : null,
         phone_number: phoneNumber,
         status: "ACTIVE",
       });
@@ -1422,28 +1485,10 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
       const newUserId = newUserResult[0]?.user_id;
       if (newUserId) queueDirectorySync(newUserId);
 
-      // Temporary password, hashed before the loop
-      const { password: randomPassword, hash: passwordHash } = credentials[i];
-
-      // Insert auth credentials with force password change
-      await db.insert(AuthCredential).values({
-        user_id: newUserId,
-        password_hash: passwordHash,
-        force_password_change: 1,
-      });
-
-      // Send email with credentials (don't await to avoid blocking)
-      try {
-        emailService.sendAccountCreation(
-          sanitizeString(email),
-          sanitizeString(username),
-          randomPassword,
-        );
-      } catch (emailError) {
-        logger.warn("Failed to send account creation email for bulk user", {
-          emailError,
-          userId: newUserId,
-        });
+      // Temporary password (hashed before the loop) by e-mail; none without an e-mail.
+      const credential = credentials[i];
+      if (email && credential && newUserId) {
+        await grantSignIn(newUserId, sanitizeString(email), sanitizeString(username), credential);
       }
 
       // Insert profile if any profile data (or a role/user_type) is provided
@@ -1477,6 +1522,7 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
       if (newUserId) createdIds.push(Number(newUserId));
 
       successCount++;
+      if (!email) withoutEmail++;
     } catch (error: any) {
       errors.push(`Row ${rowNum}: ${error.message}`);
       failedCount++;
@@ -1509,15 +1555,16 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
       `Bulk created ${successCount} users via Excel upload`,
       "User",
       undefined,
-      { successCount, failedCount, totalRows: data.length, roleId: role_id },
+      { successCount, failedCount, withoutEmail, totalRows: data.length, roleId: role_id },
       req.user.userId,
     );
   }
 
   successResponse(
     res,
-    `Bulk upload complete: ${successCount} created, ${failedCount} failed`,
-    { success: successCount, failed: failedCount, errors: errors.slice(0, 10) },
+    `Bulk upload complete: ${successCount} created, ${failedCount} failed` +
+      (withoutEmail ? ` (${withoutEmail} without an e-mail: they can't sign in)` : ""),
+    { success: successCount, failed: failedCount, without_email: withoutEmail, errors: errors.slice(0, 10) },
   );
 });
 
@@ -1618,6 +1665,18 @@ export const downloadTemplate = asyncHandler(async (req: any, res: any) => {
       last_name: "Doe",
       gender: "MALE",
       date_of_birth: "2010-01-15",
+      address: "Kigali, Rwanda",
+      user_type: "STUDENT",
+    },
+    {
+      // Young students may have no e-mail: the account is created, but it can't sign in.
+      username: "amani_k_003",
+      email: "",
+      phone_number: "",
+      first_name: "Amani",
+      last_name: "Keza",
+      gender: "FEMALE",
+      date_of_birth: "2016-02-11",
       address: "Kigali, Rwanda",
       user_type: "STUDENT",
     },

@@ -9,6 +9,16 @@ import {
 } from "lucide-react";
 import { UserWithProfile, UserRole } from "../api/users";
 
+/** A student saved without an e-mail: the account can't sign in. */
+const NoEmail: React.FC = () => (
+  <span
+    className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600 dark:bg-gray-700/60 dark:text-gray-300"
+    title="No email: this account can't sign in until an email is added"
+  >
+    No email · can't sign in
+  </span>
+);
+
 // Status badge with icon
 const StatusBadge = ({ status }: { status: string }) => {
   const config: Record<string, { color: string; icon: React.ElementType }> = {
@@ -129,7 +139,7 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
                 {user.profile.registration_number}
               </span>
             )}
-            {user.user.email}
+            {user.user.email || <NoEmail />}
           </p>
         </div>
 
@@ -179,7 +189,7 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
                   {user.profile.registration_number}
                 </p>
               )}
-              <p className="text-gray-500 truncate">{user.user.email}</p>
+              <p className="text-gray-500 truncate">{user.user.email || <NoEmail />}</p>
               <p className="text-gray-500">
                 {user.user.phone_number || "No phone"}
               </p>
