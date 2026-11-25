@@ -77,9 +77,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         userData = await getCurrentUser();
       } else {
         // No local token, check for global session cookie
+        // The shared .amashuri.com session cookie (amashuri.com, or a tab with no
+        // saved token): /auth/session answers in the same shape as /users/me
+        // ({ user, profile, permissions, ... }). Keeping only `.user` here left
+        // `user.user` undefined and crashed the page (ThemeContext), blank.
         const sessionData = await checkSession();
-        if (sessionData) {
-          userData = sessionData.user;
+        if (sessionData && (sessionData as any).user?.user_id) {
+          userData = sessionData as any;
         }
       }
 
