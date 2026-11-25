@@ -41,6 +41,14 @@ import {
 } from "../controllers/userScopeController";
 import { getUserActivities } from "../controllers/activityController";
 import {
+  staffIdentity,
+  getMyAttendanceGoogle,
+  linkMyAttendanceGoogle,
+  unlinkMyAttendanceGoogle,
+  getUserAttendanceGoogle,
+  setUserAttendanceGoogle,
+} from "../controllers/staffIdentityController";
+import {
   avatarUpload,
   getMyAvatar,
   uploadMyAvatar,
@@ -107,6 +115,14 @@ router.put("/me/cover", authenticate, coverUpload, uploadMyCover);
 router.delete("/me/cover", authenticate, deleteMyCover);
 // Sibling apps (client credentials): everyone's current picture + cover in one call.
 router.post("/profile-media/lookup", requireServiceToken("profiles:read"), lookupProfileMedia);
+// Staff attendance clock (Tendo /c/<school>): which account a verified Google account is.
+router.post("/service/staff-identity", requireServiceToken("profiles:read"), staffIdentity);
+// The Google account a person checks in with (their own, or set by an admin).
+router.get("/me/attendance-google", authenticate, getMyAttendanceGoogle);
+router.post("/me/attendance-google", authenticate, linkMyAttendanceGoogle);
+router.delete("/me/attendance-google", authenticate, unlinkMyAttendanceGoogle);
+router.get("/:id/attendance-google", authenticate, authorize("MANAGE_USERS"), getUserAttendanceGoogle);
+router.put("/:id/attendance-google", authenticate, authorize("MANAGE_USERS"), setUserAttendanceGoogle);
 // Signed-in users: photos for the people on the page they are looking at.
 router.post("/avatars/lookup", authenticate, lookupAvatars);
 router.get("/", authenticate, authorize("MANAGE_USERS"), getUsers);
