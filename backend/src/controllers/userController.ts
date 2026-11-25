@@ -1239,6 +1239,21 @@ export const deleteUser = asyncHandler(async (req: any, res: any) => {
 });
 
 // Bulk create users from Excel
+/** `n` random temporary passwords with their bcrypt (12) hashes, hashed `concurrency` at a time. */
+async function temporaryCredentials(n: number, concurrency = 4): Promise<Array<{ password: string; hash: string }>> {
+  const out: Array<{ password: string; hash: string }> = new Array(n);
+  let next = 0;
+  const worker = async () => {
+    while (next < n) {
+      const i = next++;
+      const password = crypto.randomBytes(8).toString("hex");
+      out[i] = { password, hash: await bcrypt.hash(password, 12) };
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, n) }, worker));
+  return out;
+}
+
 export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
   if (!req.file) {
     throw new ValidationError("No file uploaded");
@@ -1307,6 +1322,12 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
   // even one more person fits; otherwise rows past the limit fail one by one.
   const headCount = await checkPeopleLimit(validatedUserType);
   if (!headCount.ok) return res.status(403).json(limitRefusal(headCount));
+
+  // bcrypt (cost 12) is CPU work on libuv's thread pool: hashing every temporary password
+  // up front, several at once, instead of one per row inside the loop, keeps a 30-row
+  // file well inside the request timeout (it took ~12 s and the browser gave up at 10 s).
+  const credentials = await temporaryCredentials(data.length);
+  const createdIds: number[] = [];
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i] as any;
@@ -1400,14 +1421,9 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
         .limit(1);
       const newUserId = newUserResult[0]?.user_id;
       if (newUserId) queueDirectorySync(newUserId);
-  if (newUserId) queueDirectorySync(newUserId);
 
-      // Generate random password
-      const randomPassword = crypto.randomBytes(8).toString("hex");
-
-      // Hash the password
-      const salt = await bcrypt.genSalt(12);
-      const passwordHash = await bcrypt.hash(randomPassword, salt);
+      // Temporary password, hashed before the loop
+      const { password: randomPassword, hash: passwordHash } = credentials[i];
 
       // Insert auth credentials with force password change
       await db.insert(AuthCredential).values({
@@ -1458,12 +1474,22 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
           role_id: parseInt(role_id),
         });
       }
-      await applyPlacementChange([newUserId], req.user?.userId);
+      if (newUserId) createdIds.push(Number(newUserId));
 
       successCount++;
     } catch (error: any) {
       errors.push(`Row ${rowNum}: ${error.message}`);
       failedCount++;
+    }
+  }
+
+  // Automatic access (role rules) for everyone created, in one pass instead of one per row.
+  if (createdIds.length) {
+    try {
+      await applyPlacementChange(createdIds, req.user?.userId);
+    } catch (error: any) {
+      logger.error("Bulk user upload: applying access rules failed", { error, count: createdIds.length });
+      errors.push(`Accounts were created, but their automatic access could not be set up yet: ${error.message}`);
     }
   }
 
