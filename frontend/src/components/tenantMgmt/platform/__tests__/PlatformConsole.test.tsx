@@ -31,6 +31,11 @@ const api = vi.hoisted(() => ({
   tenantRoles: vi.fn(),
   assignPerson: vi.fn(),
   updateDetails: vi.fn(),
+  settings: vi.fn(),
+  saveSettings: vi.fn(),
+  paymentInstructions: vi.fn(),
+  savePaymentInstructions: vi.fn(),
+  tenants: vi.fn(),
 }));
 
 vi.mock("../../../../api/tenantMgmt", async (orig) => {
@@ -62,6 +67,7 @@ import ApplicationDetailPage from "../ApplicationDetailPage";
 import BillingPage from "../BillingPage";
 import SchoolDetailPage from "../SchoolDetailPage";
 import PackagesPage from "../PackagesPage";
+import SettingsPage from "../SettingsPage";
 import { PlatformProvider } from "../platformShared";
 
 const ALL_CAPS = [
@@ -130,10 +136,55 @@ beforeEach(() => {
   api.entitlementCatalog.mockResolvedValue(CATALOG);
   api.applications.mockResolvedValue([]);
   api.invoices.mockResolvedValue([]);
+  api.tenants.mockResolvedValue([]);
   api.slugAvailable.mockImplementation(async (slug: string) => ({ slug, available: true, suggestion: null }));
 });
 
 // ---------------------------------------------------------------------------
+
+describe("dashboard", () => {
+  const school = (tid: number, name: string, pkg: string, students: number, status = "ACTIVE", activeUsers7d = 10) => ({
+    tid, slug: `s${tid}`, name, status, isPrimary: false, pkg, students, staff: 5, storageMb: 100, activeUsers7d,
+    periodEnd: null, graceUntil: null, lastActivityAt: null, createdAt: "2026-01-01T00:00:00Z",
+  });
+
+  it("totals live schools, flags the ones near a limit and counts schools per plan", async () => {
+    api.tenants.mockResolvedValue([
+      school(2, "Full House Academy", "starter", 290, "ACTIVE", 50),
+      school(3, "Roomy School", "gold", 100, "ACTIVE", 80),
+      school(4, "Gone School", "starter", 10, "SUSPENDED"),
+    ]);
+    render(
+      <MemoryRouter initialEntries={["/platform/dashboard"]}>
+        <Routes>
+          <Route path="/platform/*" element={<PlatformConsole />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const near = await screen.findByRole("list", { name: "Schools near their limits" });
+    expect(within(near).getByText("Full House Academy")).toBeInTheDocument();
+    expect(within(near).queryByText("Roomy School")).toBeNull();
+    const plans = screen.getByRole("list", { name: "Live schools per plan" });
+    expect(within(plans).getByRole("button", { name: /Starter/ })).toHaveTextContent("1");
+    expect(within(plans).getByRole("button", { name: /Gold/ })).toHaveTextContent("1");
+    // students across live schools only (the suspended one is left out)
+    expect(within(screen.getByRole("button", { name: /across live schools/ })).getByText("390")).toBeInTheDocument();
+    const busiest = screen.getByRole("list", { name: "Most active schools this week" });
+    expect(within(busiest).getAllByRole("button")[0]).toHaveTextContent("Roomy School");
+  });
+
+  it("the old /platform/overview address opens the dashboard", async () => {
+    api.tenants.mockResolvedValue([]);
+    render(
+      <MemoryRouter initialEntries={["/platform/overview"]}>
+        <Routes>
+          <Route path="/platform/*" element={<PlatformConsole />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("tab", { name: /Dashboard/, selected: true })).toBeInTheDocument();
+  });
+});
 
 describe("overview", () => {
   it("renders counts and every tab with all caps", async () => {
@@ -148,7 +199,7 @@ describe("overview", () => {
     expect(within(toReview).getByText("7")).toBeInTheDocument();
     expect(within(screen.getByRole("button", { name: /to confirm/i })).getByText("5")).toBeInTheDocument();
     expect(screen.getByText("1,500,000 RWF")).toBeInTheDocument();
-    for (const t of ["Overview", "Applications", "Billing", "Schools", "Packages", "Settings", "Audit", "Support"]) expect(screen.getByRole("tab", { name: new RegExp(t) })).toBeInTheDocument();
+    for (const t of ["Dashboard", "Schools", "Applications", "Billing", "Packages", "Support", "Audit", "Settings"]) expect(screen.getByRole("tab", { name: new RegExp(t) })).toBeInTheDocument();
   });
 
   it("lists what needs the team now with the next action, and counts approved applications as awaiting pay", async () => {
@@ -445,8 +496,9 @@ describe("school details", () => {
   it("hides the edit button without the lifecycle capability", async () => {
     api.tenant.mockResolvedValue(tenantDetail({ status: "ACTIVE", allowed: [] }));
     inProvider(<SchoolDetailPage />, "/platform/schools/:tid", "/platform/schools/5");
-    await screen.findByText("Details");
+    await screen.findByRole("heading", { name: /Green Hills Academy/ });
     expect(screen.queryByRole("button", { name: /Edit details/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Change the logo|Add a logo/ })).toBeNull();
   });
 });
 
@@ -590,13 +642,13 @@ describe("package matrix", () => {
     inProvider(<PackagesPage />, "/platform/packages", "/platform/packages");
     const sw = await screen.findByRole("switch", { name: "Gold: AI Lesson Studio" });
     expect(sw).toHaveAttribute("aria-checked", "false");
-    const save = screen.getByRole("button", { name: "Save Gold" });
-    expect(save).toBeDisabled();
+    // nothing changed: no save bar
+    expect(screen.queryByRole("button", { name: /Save changes/ })).toBeNull();
     await user.click(sw);
     expect(sw).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("dirty-gold")).toHaveTextContent("1");
     expect(screen.queryByTestId("dirty-starter")).toBeNull();
-    await user.click(save);
+    await user.click(screen.getByRole("button", { name: /Save changes/ }));
     await waitFor(() =>
       expect(api.savePackageEntitlements).toHaveBeenCalledWith("gold", [
         { key: "app.mis", value: null },
@@ -609,13 +661,83 @@ describe("package matrix", () => {
     await waitFor(() => expect(screen.queryByTestId("dirty-gold")).toBeNull());
   });
 
+  it("plan cards: toggling Public goes into the save bar; Discard restores it", async () => {
+    const user = userEvent.setup();
+    inProvider(<PackagesPage />, "/platform/packages", "/platform/packages");
+    const chip = await screen.findByRole("switch", { name: "Gold public" });
+    expect(chip).toHaveAttribute("aria-checked", "true");
+    await user.click(chip);
+    expect(chip).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByTestId("dirty-gold")).toHaveTextContent("1");
+    await user.click(screen.getByRole("button", { name: /Discard/ }));
+    expect(screen.getByRole("switch", { name: "Gold public" })).toHaveAttribute("aria-checked", "true");
+    await waitFor(() => expect(screen.queryByTestId("dirty-gold")).toBeNull());
+    expect(api.savePackage).not.toHaveBeenCalled();
+  });
+
+  it("the edit dialog changes the price, then Save sends only the changed details", async () => {
+    api.savePackage.mockImplementation(async (_code: string, body: any) => ({ ...PACKAGES[1], ...body }));
+    const user = userEvent.setup();
+    inProvider(<PackagesPage />, "/platform/packages", "/platform/packages");
+    await user.click(await screen.findByRole("button", { name: "Edit Gold" }));
+    const dialog = await screen.findByRole("dialog");
+    const term = within(dialog).getByLabelText("Per term");
+    await user.clear(term);
+    await user.type(term, "150000");
+    await user.click(within(dialog).getByRole("button", { name: /Apply/ }));
+    await user.click(screen.getByRole("button", { name: /Save changes/ }));
+    await waitFor(() => expect(api.savePackage).toHaveBeenCalledWith("gold", { priceTerm: 150000 }));
+    expect(api.savePackageEntitlements).not.toHaveBeenCalled();
+  });
+
   it("an ∞ limit saves as null", async () => {
     api.savePackageEntitlements.mockResolvedValue(PACKAGES[0]);
     const user = userEvent.setup();
     inProvider(<PackagesPage />, "/platform/packages", "/platform/packages");
     await user.click(await screen.findByRole("button", { name: "Starter: Students: unlimited" }));
-    await user.click(screen.getByRole("button", { name: "Save Starter" }));
+    await user.click(screen.getByRole("button", { name: /Save changes/ }));
     await waitFor(() => expect(api.savePackageEntitlements).toHaveBeenCalledWith("starter", [{ key: "app.mis", value: null }, { key: "limit.students", value: null }]));
   });
 });
 
+describe("settings", () => {
+  const SETTINGS = {
+    "application.draft_expiry_days": 14,
+    "review.sla_days": 3,
+    "application.payment_expiry_days": 30,
+    "invoice.due_days": 14,
+    "grace.days": 14,
+    "archive.retention_days": 180,
+    "billing.auto_issue_on_approval": false,
+    "billing.separation_of_duties": false,
+    "documents.required": ["REGISTRATION_CERT"],
+  };
+  beforeEach(() => {
+    api.settings.mockResolvedValue({ ...SETTINGS });
+    api.paymentInstructions.mockResolvedValue([{ id: 1, method: "MOMO", label: "MoMo Pay", details: "*182#", sortOrder: 0, isActive: true }]);
+  });
+
+  it("a timeline change shows the save bar and saves only that window", async () => {
+    api.saveSettings.mockImplementation(async (patch: any) => ({ ...SETTINGS, ...patch }));
+    const user = userEvent.setup();
+    inProvider(<SettingsPage />, "/platform/settings", "/platform/settings");
+    await user.click(await screen.findByRole("button", { name: "Grace: more" }));
+    expect(screen.getByTestId("settings-dirty")).toHaveTextContent("1");
+    await user.click(screen.getByRole("button", { name: /Save changes/ }));
+    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith({ "grace.days": 15 }));
+    expect(api.savePaymentInstructions).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByTestId("settings-dirty")).toBeNull());
+  });
+
+  it("required documents toggle, and Discard puts everything back", async () => {
+    const user = userEvent.setup();
+    inProvider(<SettingsPage />, "/platform/settings", "/platform/settings");
+    const logo = await screen.findByRole("button", { name: /Logo/ });
+    expect(logo).toHaveAttribute("aria-pressed", "false");
+    await user.click(logo);
+    expect(logo).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: /Discard/ }));
+    expect(screen.getByRole("button", { name: /Logo/ })).toHaveAttribute("aria-pressed", "false");
+    expect(api.saveSettings).not.toHaveBeenCalled();
+  });
+});

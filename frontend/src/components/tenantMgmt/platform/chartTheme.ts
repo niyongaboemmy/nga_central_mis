@@ -11,6 +11,6 @@ export const useChartTheme = () => {
     surface: dark ? "#111827" : "#ffffff",
     tooltip: { background: dark ? "#111827" : "#ffffff", border: `1px solid ${dark ? "rgba(55,65,81,0.4)" : "#e5e7eb"}`, borderRadius: 12, fontSize: 12, color: dark ? "#f3f4f6" : "#111827" },
     // Blue first (platform palette: blue only, green/amber for status), AA on the card surface.
-    series: [dark ? "#60a5fa" : "#2563eb", dark ? "#6ee7b7" : "#059669", dark ? "#bfdbfe" : "#1e40af", dark ? "#fcd34d" : "#d97706"],
+    series: [dark ? "#3b82f6" : "#2563eb", dark ? "#059669" : "#059669", dark ? "#bfdbfe" : "#1e40af", dark ? "#fcd34d" : "#d97706"],
   };
 };
