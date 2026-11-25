@@ -486,7 +486,7 @@ export interface PersonElsewhere {
 }
 
 export interface TenantDetail {
-  tenant: TenantListItem & { legalName?: string | null; timezone: string; country: string | null; activatedAt: string | null; suspendedAt: string | null; statusReason: string | null };
+  tenant: TenantListItem & { legalName?: string | null; logoUrl?: string | null; timezone: string; country: string | null; activatedAt: string | null; suspendedAt: string | null; statusReason: string | null };
   entitlements: EffectiveEntitlements;
   overrides: Array<{ id: number; key: string; value: number | null; enabled: boolean; reason: string; expiresAt: string | null; grantedBy: string | null }>;
   apps: Array<{ systemId: number; name: string; clientId: string | null; status: "ACTIVE" | "DISABLED"; source: "PACKAGE" | "OVERRIDE"; /** entitlement key ("app.tupo"), null when unmapped */ key?: string | null }>;
@@ -591,6 +591,14 @@ export const platformApi = {
   /** name, legal name (invoices), timezone, country; the slug is fixed */
   updateDetails: (tid: number, body: { name?: string; legalName?: string; timezone?: string; country?: string; reason: string }) =>
     unwrap<TenantDetail>(api.put(`/platform/tenants/${tid}/details`, body)),
+  /** the school's logo: same storage and checks as the school's own upload (5 MB, PNG/JPG/SVG/WEBP) */
+  setLogo: (tid: number, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    // the shared client defaults to JSON, which would turn FormData into JSON
+    return unwrap<TenantDetail>(api.post(`/platform/tenants/${tid}/logo`, fd, { headers: { "Content-Type": "multipart/form-data" } }));
+  },
+  removeLogo: (tid: number) => unwrap<TenantDetail>(api.delete(`/platform/tenants/${tid}/logo`)),
   suspend: (tid: number, reason: string) => unwrap<TenantDetail>(api.post(`/platform/tenants/${tid}/suspend`, { reason })),
   reactivate: (tid: number, reason: string) => unwrap<TenantDetail>(api.post(`/platform/tenants/${tid}/reactivate`, { reason })),
   extendGrace: (tid: number, days: number, reason: string) => unwrap<TenantDetail>(api.post(`/platform/tenants/${tid}/extend-grace`, { days, reason })),

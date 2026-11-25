@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import ConfirmDialog from "../../ui/ConfirmDialog";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { Building2, CreditCard, FileStack, Gauge, LifeBuoy, Package, RefreshCw, ScrollText, School, Settings2, ShieldOff, type LucideIcon } from "lucide-react";
+import { Building2, CreditCard, FileStack, LayoutDashboard, LifeBuoy, Package, RefreshCw, ScrollText, School, Settings2, ShieldOff, type LucideIcon } from "lucide-react";
 import PageHeader, { HeaderTabs } from "../../ui/PageHeader";
 import { TRACKER_STEPS } from "../../../api/tenantMgmt";
 import { EmptyState } from "../kit";
 import { Btn, PlatformProvider, Skeleton, SkeletonGrid, cx, surface, toast, usePlatform, type PCapName } from "./platformShared";
-import OverviewPage, { STEP_STATUSES } from "./OverviewPage";
+import { STEP_STATUSES } from "./OverviewPage";
+import DashboardPage from "./DashboardPage";
 import ApplicationsPage from "./ApplicationsPage";
 import ApplicationDetailPage from "./ApplicationDetailPage";
 import BillingPage from "./BillingPage";
@@ -19,31 +20,32 @@ import SupportPage from "./SupportPage";
 
 /** Primary-tenant console, /platform/* (MULTI_TENANCY_TENANT_MANAGEMENT_PLAN.md §6.3-6.8, §8). */
 
-type TabKey = "overview" | "applications" | "billing" | "schools" | "packages" | "settings" | "audit" | "support";
+type TabKey = "dashboard" | "schools" | "applications" | "billing" | "packages" | "support" | "audit" | "settings";
 
+// Workflow order: see the platform, then the schools, then the pipeline that brings new ones in,
+// then money, catalogue, help and history; settings last.
 export const CONSOLE_TABS: Array<{ key: TabKey; label: string; icon: LucideIcon; caps: PCapName[] }> = [
-  { key: "overview", label: "Overview", icon: Gauge, caps: ["view", "review", "decide", "invoice", "confirm", "lifecycle", "packages", "audit", "support"] },
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, caps: ["view", "review", "decide", "invoice", "confirm", "lifecycle", "packages", "audit", "support"] },
+  { key: "schools", label: "Schools", icon: School, caps: ["view", "lifecycle", "entitlements"] },
   { key: "applications", label: "Applications", icon: FileStack, caps: ["review", "decide"] },
   { key: "billing", label: "Billing", icon: CreditCard, caps: ["invoice", "confirm", "waive"] },
-  { key: "schools", label: "Schools", icon: School, caps: ["view", "lifecycle", "entitlements"] },
   { key: "packages", label: "Packages", icon: Package, caps: ["packages"] },
-  { key: "settings", label: "Settings", icon: Settings2, caps: ["packages"] },
-  { key: "audit", label: "Audit", icon: ScrollText, caps: ["audit"] },
   { key: "support", label: "Support", icon: LifeBuoy, caps: ["support"] },
+  { key: "audit", label: "Audit", icon: ScrollText, caps: ["audit"] },
+  { key: "settings", label: "Settings", icon: Settings2, caps: ["packages"] },
 ];
 
 const PAGES: Record<TabKey, React.ReactNode> = {
-  overview: <OverviewPage />,
+  dashboard: <DashboardPage />,
+  schools: <SchoolsPage />,
   applications: <ApplicationsPage />,
   billing: <BillingPage />,
-  schools: <SchoolsPage />,
   packages: <PackagesPage />,
-  settings: <SettingsPage />,
-  audit: <AuditPage />,
   support: <SupportPage />,
+  audit: <AuditPage />,
+  settings: <SettingsPage />,
 };
 
-/** The console while the overview loads: header skeleton + cards. */
 const ShellSkeleton: React.FC = () => (
   <div className="mx-auto max-w-7xl space-y-4 px-4 py-4 sm:px-6" role="status" aria-busy="true" aria-label="Loading the platform console">
     <div className={cx(surface.card, "space-y-4 p-4 sm:p-5")}>
@@ -124,6 +126,8 @@ const Shell: React.FC = () => {
       )}
       <Routes>
         <Route index element={<Navigate to={tabs[0].key} replace />} />
+        {/* the old name of the first tab */}
+        <Route path="overview" element={<Navigate to="/platform/dashboard" replace />} />
         {tabs.map((t) => (
           <Route key={t.key} path={t.key} element={PAGES[t.key]} />
         ))}

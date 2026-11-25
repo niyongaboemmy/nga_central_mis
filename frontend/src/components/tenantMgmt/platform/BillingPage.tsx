@@ -1,8 +1,13 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  AlertTriangle,
   Ban,
+  CalendarCheck,
+  Clock,
+  HandCoins,
+  Siren,
   Banknote,
   Check,
   CheckCircle2,
@@ -22,11 +27,14 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Modal from "../../ui/Modal";
 import api from "../../../services/api";
 import { EmptyState, Segmented, StatusPill } from "../kit";
 import { formatMoney, platformApi, type Invoice, type InvoiceLine, type Payment, type PaymentMethod } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
+import { Panel, SegmentBar, StatTile } from "../viz";
+import { useChartTheme } from "./chartTheme";
 import { Btn, Card, IconBtn, Lightbox, ReasonDialog, Skeleton, SkeletonGrid, act, cx, fmtDate, inputCls, isPdf, surface, toast, usePlatform } from "./platformShared";
 
 export const METHOD_META: Record<PaymentMethod, { label: string; icon: LucideIcon; tone: string }> = {
@@ -379,6 +387,111 @@ const EditInvoiceDialog: React.FC<{ inv: Invoice; onClose: () => void; onSaved: 
 };
 
 // ---------------------------------------------------------------------------
+// Insights: money at a glance (tiles, collected per month, overdue ageing)
+// ---------------------------------------------------------------------------
+
+const DAY = 86_400_000;
+const monthKey = (iso: string) => iso.slice(0, 7);
+const monthLabel = (key: string) => {
+  const d = new Date(`${key}-01T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? key : d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
+};
+
+const BillingInsights: React.FC<{ onOpen: (pane: "confirm" | "invoices", status?: InvFilter) => void }> = ({ onOpen }) => {
+  const { overview, can } = usePlatform();
+  const ct = useChartTheme();
+  const [all, setAll] = useState<Invoice[] | null>(null);
+  useEffect(() => {
+    platformApi.invoices({}).then(setAll, () => setAll([]));
+  }, []);
+  const currency = overview?.currency ?? all?.[0]?.currency ?? "RWF";
+  const money = (n: number) => formatMoney(n, currency);
+  const data = useMemo(() => {
+    const list = all ?? [];
+    const now = Date.now();
+    const open = list.filter((i) => i.status === "ISSUED" || i.status === "OVERDUE");
+    const pastDue = (i: Invoice) => (i.dueAt ? Math.floor((now - new Date(i.dueAt).getTime()) / DAY) : -1);
+    const overdue = open.filter((i) => i.status === "OVERDUE" || pastDue(i) > 0);
+    // last 6 months of money collected (paid invoices by paid date)
+    const months: string[] = [];
+    const d = new Date();
+    for (let k = 5; k >= 0; k--) months.push(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - k, 1)).toISOString().slice(0, 7));
+    const paid = new Map(months.map((m) => [m, 0]));
+    for (const i of list) if (i.status === "PAID" && i.paidAt && paid.has(monthKey(i.paidAt))) paid.set(monthKey(i.paidAt), paid.get(monthKey(i.paidAt))! + (Number(i.amount) || 0));
+    return {
+      outstanding: open.reduce((t, i) => t + (Number(i.amount) || 0), 0),
+      overdueCount: overdue.length,
+      monthly: months.map((m) => ({ month: m, collected: paid.get(m) ?? 0 })),
+      ageing: {
+        notDue: open.filter((i) => pastDue(i) <= 0 && i.status !== "OVERDUE").length,
+        d30: overdue.filter((i) => pastDue(i) <= 30).length,
+        d60: overdue.filter((i) => pastDue(i) > 30 && pastDue(i) <= 60).length,
+        d61: overdue.filter((i) => pastDue(i) > 60).length,
+      },
+    };
+  }, [all]);
+
+  if (!all)
+    return (
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" role="status" aria-busy="true" aria-label="Loading billing">
+        {[0, 1, 2, 3].map((k) => (
+          <div key={k} className={cx(surface.card, "h-[7.5rem] animate-pulse")} />
+        ))}
+      </div>
+    );
+  const collectedTotal = data.monthly.reduce((t, m) => t + m.collected, 0);
+  const openCount = data.ageing.notDue + data.ageing.d30 + data.ageing.d60 + data.ageing.d61;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {can("confirm") && <StatTile icon={Wallet} label="Payments to confirm" value={overview?.paymentsToConfirm ?? 0} attention onClick={() => onOpen("confirm")} />}
+        <StatTile icon={HandCoins} label="Outstanding" value={data.outstanding} format={money} hint={`${openCount} open`} onClick={() => onOpen("invoices", "ISSUED")} />
+        <StatTile icon={AlertTriangle} label="Overdue" value={data.overdueCount} attention onClick={() => onOpen("invoices", "OVERDUE")} />
+        <StatTile icon={CircleDollarSign} label="Collected this term" value={overview?.revenueThisTerm ?? 0} format={money} tone="emerald" onClick={() => onOpen("invoices", "PAID")} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-5">
+        <Panel title="Collected" aside="last 6 months" icon={CircleDollarSign} className="lg:col-span-3">
+          <div className="h-44" role="img" aria-label={`Money collected per month, last 6 months: ${data.monthly.map((m) => `${monthLabel(m.month)} ${money(m.collected)}`).join(", ")}`}>
+            {collectedTotal === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">No payments in the last 6 months</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.monthly} margin={{ left: 0, right: 4, top: 6, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke={ct.grid} />
+                  <XAxis dataKey="month" tickFormatter={monthLabel} tick={{ fontSize: 11, fill: ct.tick }} tickLine={false} axisLine={false} />
+                  <YAxis width={44} tick={{ fontSize: 11, fill: ct.tick }} tickLine={false} axisLine={false} tickFormatter={(v) => (v >= 1_000_000 ? `${Math.round(v / 100_000) / 10}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))} />
+                  <Tooltip contentStyle={ct.tooltip} labelFormatter={(v) => monthLabel(String(v))} formatter={(v: any) => [money(Number(v)), "Collected"]} cursor={{ fill: ct.grid, opacity: 0.4 }} />
+                  <Bar dataKey="collected" name="Collected" fill={ct.series[0]} radius={[4, 4, 0, 0]} maxBarSize={36} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Panel>
+        <Panel title="Open invoices" aside="by days past due" icon={Clock} className="lg:col-span-2">
+          {openCount === 0 ? (
+            <div className="flex h-full min-h-[8rem] flex-col items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              Nothing open
+            </div>
+          ) : (
+            <SegmentBar
+              columns={2}
+              label="Open invoices by days past due"
+              segments={[
+                { key: "notDue", label: "Not due yet", value: data.ageing.notDue, tone: "blue", icon: CalendarCheck, onClick: () => onOpen("invoices", "ISSUED") },
+                { key: "d30", label: "1–30 days late", value: data.ageing.d30, tone: "amber", icon: Clock, onClick: () => onOpen("invoices", "OVERDUE") },
+                { key: "d60", label: "31–60 days late", value: data.ageing.d60, tone: "red", icon: AlertTriangle, onClick: () => onOpen("invoices", "OVERDUE") },
+                { key: "d61", label: "61+ days late", value: data.ageing.d61, tone: "red", icon: Siren, onClick: () => onOpen("invoices", "OVERDUE") },
+              ]}
+            />
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -415,6 +528,12 @@ const BillingPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <BillingInsights
+        onOpen={(p, st) => {
+          setPane(p);
+          if (st) setStatus(st);
+        }}
+      />
       {panes.length > 1 && (
         <Segmented label="Billing" value={pane} onChange={setPane} options={panes.map((p) => ({ value: p.value, icon: p.icon, label: p.badge ? `${p.label} ${p.badge}` : p.label }))} />
       )}

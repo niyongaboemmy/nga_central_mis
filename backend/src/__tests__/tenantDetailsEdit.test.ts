@@ -2,7 +2,8 @@
  * Platform console: edit a school's details (name, legal name, timezone, country).
  * PUT /platform/tenants/:id/details — PLATFORM_TENANTS_LIFECYCLE, reason required, slug fixed.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import storageService from "../utils/fileServer";
 import request from "supertest";
 import app from "../app";
 import { controlPool } from "../db/platform";
@@ -92,5 +93,42 @@ describe("edit school details", () => {
     const slug = (await row(school.tid)).slug;
     await put(school.tid, owner.token, { name: "Riverside Hills Intl", slug: "hijack", reason: "slug probe" });
     expect((await row(school.tid)).slug).toBe(slug);
+  });
+});
+
+describe("school logo from the console", () => {
+  // 1x1 transparent PNG
+  const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+  const uploaded = new Map<string, Buffer>();
+  beforeAll(() => {
+    vi.spyOn(storageService, "uploadFile").mockImplementation(async (buffer: any, remotePath: string) => void uploaded.set(remotePath, Buffer.from(buffer)));
+  });
+
+  it("uploads into the school's own storage, sets School.logo and returns a logoUrl", async () => {
+    const res = await request(app).post(`/platform/tenants/${school.tid}/logo`).set(auth(owner.token)).attach("file", PNG, "logo.png");
+    expect(res.status).toBe(200);
+    expect(res.body.data.tenant.logoUrl).toMatch(/\/schools\/\d+\/logo\/primary\?/);
+    const [[s]]: any = await poolFor(school.tid).query("SELECT logo FROM School WHERE status = 'ACTIVE' ORDER BY school_id LIMIT 1");
+    expect(s.logo).toMatch(/^schools\/\d+\/logo-primary-\d+\.png$/);
+    expect(uploaded.has(s.logo)).toBe(true);
+    const [audit] = await controlPool().query<any[]>("SELECT * FROM PlatformAudit WHERE action = 'tenant.logo' AND target_tid = ?", [school.tid]);
+    expect(audit.length).toBeGreaterThan(0);
+  });
+
+  it("refuses a file that isn't an image and needs the lifecycle capability", async () => {
+    const bad = await request(app).post(`/platform/tenants/${school.tid}/logo`).set(auth(owner.token)).attach("file", Buffer.from("<html>nope</html>"), "logo.png");
+    expect(bad.status).toBe(400);
+    const none = await request(app).post(`/platform/tenants/${school.tid}/logo`).set(auth(owner.token));
+    expect(none.status).toBe(400);
+    const viewerRes = await request(app).post(`/platform/tenants/${school.tid}/logo`).set(auth(viewer.token)).attach("file", PNG, "logo.png");
+    expect(viewerRes.status).toBe(403);
+  });
+
+  it("removes the logo", async () => {
+    const res = await request(app).delete(`/platform/tenants/${school.tid}/logo`).set(auth(owner.token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.tenant.logoUrl).toBeNull();
+    const [[s]]: any = await poolFor(school.tid).query("SELECT logo FROM School WHERE status = 'ACTIVE' ORDER BY school_id LIMIT 1");
+    expect(s.logo).toBeNull();
   });
 });

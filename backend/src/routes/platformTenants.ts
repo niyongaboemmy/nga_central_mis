@@ -1,4 +1,5 @@
 import express from "express";
+import multer from "multer";
 import { RowDataPacket } from "mysql2/promise";
 import { controlPool } from "../db/platform";
 import { primaryDb } from "../db";
@@ -27,6 +28,9 @@ import { retryRun, runForTenant, serializeRun } from "../services/tenantMgmt/pro
 import { listActiveSessions, openSession } from "../services/tenantMgmt/support";
 import { assignableRoles, copyPersonInto, searchEverySchool } from "../services/tenantMgmt/crossSchool";
 import { createTenantAdmin, listTenantAdmins, removeTenantAdmin, resetTenantAdminPassword } from "../services/tenantMgmt/tenantAdmins";
+import { clearTenantLogo, setTenantLogo } from "../services/tenantMgmt/tenantLogo";
+import { brandingFor } from "./tenantBranding";
+import { getTenant } from "../tenancy/registry";
 
 /**
  * Tenant directory, lifecycle, provisioning and support access of the primary
@@ -114,6 +118,16 @@ async function systemsById(): Promise<Map<number, { name: string; clientId: stri
   return out;
 }
 
+/** The school's primary logo URL (same as GET /tenant/branding), or null. Cosmetic: never throws. */
+async function logoUrlOf(tid: number): Promise<string | null> {
+  try {
+    const tenant = await getTenant(tid);
+    return tenant ? (await brandingFor(tenant)).logoUrl : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function tenantDetail(tid: number, can: (cap: string) => boolean) {
   const [item] = await listItems("WHERE t.tenant_id = ?", [tid]);
   if (!item) throw new NotFoundError("School not found");
@@ -148,6 +162,7 @@ export async function tenantDetail(tid: number, can: (cap: string) => boolean) {
     tenant: {
       ...publicItem(item),
       legalName: r.legal_name ?? null,
+      logoUrl: await logoUrlOf(tid),
       timezone: String(r.timezone),
       country: r.country ?? null,
       activatedAt: iso(r.activated_at),
@@ -224,6 +239,36 @@ router.put(
     const tid = idParam(req.params.id);
     const b = req.body ?? {};
     await updateTenantDetails(tid, { name: b.name, legalName: b.legalName, timezone: b.timezone, country: b.country, reason: b.reason }, platformActor(req));
+    ok(res, await detailFor(req, tid));
+  }),
+);
+
+// The school's logo (same storage and checks as the school's own upload; 5 MB, PNG/JPG/SVG/WEBP).
+const logoMulter = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
+const takeLogo = (req: any, res: any, next: any) =>
+  logoMulter.single("file")(req, res, (err: any) => {
+    if (!err) return next();
+    const big = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE";
+    return res.status(400).json({ success: false, message: big ? "The image is larger than 5 MB" : "That upload couldn't be read" });
+  });
+
+router.post(
+  "/tenants/:id/logo",
+  ...LIFECYCLE,
+  takeLogo,
+  wrap(async (req, res) => {
+    const tid = idParam(req.params.id);
+    await setTenantLogo(tid, (req as any).file, platformActor(req));
+    ok(res, await detailFor(req, tid));
+  }),
+);
+
+router.delete(
+  "/tenants/:id/logo",
+  ...LIFECYCLE,
+  wrap(async (req, res) => {
+    const tid = idParam(req.params.id);
+    await clearTenantLogo(tid, platformActor(req));
     ok(res, await detailFor(req, tid));
   }),
 );

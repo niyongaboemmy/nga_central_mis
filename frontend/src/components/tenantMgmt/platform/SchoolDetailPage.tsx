@@ -2,20 +2,33 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
+  Activity,
   Archive,
   ArrowLeft,
   ArrowRight,
-  BarChart3,
+  CalendarClock,
   Check,
+  CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Clock,
-  Gauge,
+  Code2,
+  Crown,
+  Globe2,
+  GraduationCap,
+  HardDrive,
+  Image as ImageIcon,
   Infinity as InfinityIcon,
+  KeyRound,
+  LayoutDashboard,
   LayoutGrid,
   Loader2,
+  Lock,
+  MapPin,
   Minus,
   Package as PackageIcon,
   PauseCircle,
+  Pencil,
   PlayCircle,
   Plus,
   Receipt,
@@ -23,158 +36,413 @@ import {
   ScrollText,
   ShieldCheck,
   SkipForward,
+  Sparkles,
   Timer,
   Trash2,
   TriangleAlert,
+  UserCog,
   Users,
+  Wallet,
   X,
   type LucideIcon,
-  Pencil,
 } from "lucide-react";
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import ConfirmDialog from "../../ui/ConfirmDialog";
-import { EmptyState, Meter, PackageCard, StatusPill, entIcon, isLiveStatus, statusLabel } from "../kit";
+import { EmptyState, PackageCard, Pill, StatusPill, entIcon, formatMb, isLiveStatus, statusLabel } from "../kit";
 import SelectField from "../../ui/SelectField";
-import { platformApi, type Entitlement, type PackageInfo, type ProvisioningRun, type StepStatus, type TenantDetail, type TenantLifecycle } from "../../../api/tenantMgmt";
+import { formatMoney, platformApi, type Entitlement, type PackageInfo, type ProvisioningRun, type StepStatus, type TenantAdmin, type TenantDetail, type TenantLifecycle } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
-import { Btn, Card, IconBtn, ReasonDialog, SkeletonGrid, SkeletonPage, Stepper, Switch, TabBar, act, cx, errorText, fmtDate, fmtDateTime, inputCls, sectionTitle, surface, usePlatform } from "./platformShared";
+import { Btn, Card, IconBtn, ReasonDialog, Skeleton, SkeletonGrid, SkeletonPage, Stepper, Switch, TabBar, act, ago, cx, daysUntil, errorText, fmtDate, fmtDateTime, initials, inputCls, sectionTitle, surface, usePlatform } from "./platformShared";
+import { DailyBars, DaysRing, IconTile, Panel, StatTile, TONE, limitTone } from "../viz";
 import { InvoiceList } from "./BillingPage";
-import { PeriodChip } from "./SchoolsPage";
-import { useChartTheme } from "./chartTheme";
 import SchoolAdminsTab from "./SchoolAdminsTab";
-import EditSchoolDetailsDialog from "./EditSchoolDetailsDialog";
+import EditSchoolDetailsDialog, { LogoEditor } from "./EditSchoolDetailsDialog";
 
-type Tab = "overview" | "admins" | "package" | "apps" | "usage" | "billing" | "lifecycle" | "audit";
+type Tab = "dashboard" | "admins" | "plan" | "billing" | "lifecycle" | "audit";
 type LAction = TenantDetail["allowedActions"][number];
 
 const SchoolDetailPage: React.FC = () => {
   const tid = Number(useParams().tid);
   const [d, setD] = useState<TenantDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("dashboard");
   const [deleted, setDeleted] = useState(false);
+  const [editing, setEditing] = useState(false);
   useEffect(() => {
     platformApi.tenant(tid).then(setD, (e) => setError(errorText(e)));
   }, [tid]);
   if (deleted) return <EmptyState icon={Trash2} title="Deleted"><Link to="/platform/schools" className="text-blue-700 underline dark:text-blue-400">Schools</Link></EmptyState>;
   if (error) return <EmptyState icon={TriangleAlert} title={error} />;
   if (!d) return <SkeletonPage label="Loading the school" />;
-  const t = d.tenant;
+  const canEdit = d.allowedActions.includes("edit_details");
+  const overdue = d.invoices.filter((i) => i.status === "OVERDUE").length;
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          to="/platform/schools"
-          className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 py-1.5 pl-2.5 pr-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-gray-800/70 dark:text-gray-200 dark:hover:bg-gray-800"
-          aria-label="Back to schools"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          <span aria-hidden>Schools</span>
-        </Link>
-        <h1 className="flex min-w-[12rem] flex-1 items-center gap-2 truncate text-xl font-bold text-gray-900 dark:text-white">
-          {t.isPrimary && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
-              <ShieldCheck className="h-4 w-4" aria-hidden />
-              Primary
-            </span>
-          )}
-          <span className="truncate">{t.name}</span>
-        </h1>
-        <StatusPill status={t.status} live={isLiveStatus(t.status)} />
-        <PeriodChip periodEnd={t.periodEnd} graceUntil={t.status === "GRACE" ? t.graceUntil : null} />
-      </div>
+      <IdentityHero d={d} canEdit={canEdit} onChange={setD} onEdit={() => setEditing(true)} />
       <TabBar
         id="school"
         label="School"
-        visible={5}
+        visible={6}
         visibleSm={2}
         value={tab}
         onChange={setTab}
         tabs={[
-          { value: "overview", label: "Overview", icon: Gauge, badge: d.provisioning?.status === "FAILED" ? 1 : 0 },
+          { value: "dashboard", label: "Dashboard", icon: LayoutDashboard, badge: d.provisioning?.status === "FAILED" ? 1 : 0 },
           { value: "admins", label: "Admins", icon: Users },
-          { value: "package", label: "Package", icon: PackageIcon },
-          { value: "apps", label: "Apps", icon: LayoutGrid },
-          { value: "usage", label: "Usage", icon: BarChart3 },
-          { value: "billing", label: "Billing", icon: Receipt },
+          { value: "plan", label: "Plan & apps", icon: PackageIcon },
+          { value: "billing", label: "Billing", icon: Receipt, badge: overdue },
           { value: "lifecycle", label: "Lifecycle", icon: Timer },
           { value: "audit", label: "Audit", icon: ScrollText },
         ]}
       />
       <div role="tabpanel">
-        {tab === "overview" && <OverviewTab d={d} onChange={setD} onRun={(run) => setD({ ...d, provisioning: run })} />}
+        {tab === "dashboard" && <DashboardTab d={d} onRun={(run) => setD({ ...d, provisioning: run })} go={setTab} />}
         {tab === "admins" && <SchoolAdminsTab d={d} />}
-        {tab === "package" && <PackageTab d={d} onChange={setD} />}
-        {tab === "apps" && <AppsTab d={d} onChange={setD} />}
-        {tab === "usage" && <UsageTab d={d} />}
+        {tab === "plan" && <PackageTab d={d} onChange={setD} apps={<AppsTab d={d} onChange={setD} />} />}
         {tab === "billing" && <InvoiceList invoices={d.invoices} onChange={(inv) => setD({ ...d, invoices: d.invoices.map((x) => (x.id === inv.id ? inv : x)) })} />}
         {tab === "lifecycle" && <LifecycleTab d={d} onChange={setD} onDeleted={() => setDeleted(true)} />}
         {tab === "audit" && <AuditList entries={d.audit} />}
       </div>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Overview + provisioning
-// ---------------------------------------------------------------------------
-
-const OverviewTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => void; onRun: (r: ProvisioningRun) => void }> = ({ d, onChange, onRun }) => {
-  const t = d.tenant;
-  const [editing, setEditing] = useState(false);
-  const canEdit = d.allowedActions.includes("edit_details");
-  const facts: Array<[string, React.ReactNode]> = [
-    ["School name", t.name],
-    ["Legal name", t.legalName || <span className="font-normal text-gray-500 dark:text-gray-400">Same as the name</span>],
-    ["Web address", <span className="font-mono">{t.slug}</span>],
-    ["Package", d.subscription ? `${d.subscription.packageCode} · ${d.subscription.billingCycle === "YEAR" ? "Year" : "Term"}` : t.pkg],
-    ["Period", d.subscription ? `${fmtDate(d.subscription.periodStart)} → ${fmtDate(d.subscription.periodEnd)}` : "—"],
-    ["Active 7d", t.activeUsers7d.toLocaleString()],
-    ["Since", fmtDate(t.activatedAt ?? t.createdAt)],
-    ["Timezone", t.timezone.replace(/_/g, " ")],
-    ["Country", t.country ?? "—"],
-  ];
-  return (
-    <div className="space-y-4">
-      <Card className="space-y-4">
-        <div className="flex flex-wrap justify-around gap-4">
-          {d.usage.meters.map((m) => (
-            <Meter key={m.key} meter={m} />
-          ))}
-        </div>
-        <div className={cx(surface.inset, "p-3")}>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Details</h2>
-            {canEdit && (
-              <Btn size="sm" icon={Pencil} onClick={() => setEditing(true)}>
-                Edit details
-              </Btn>
-            )}
-          </div>
-          <dl className="grid gap-3 sm:grid-cols-3">
-            {facts.map(([k, v]) => (
-              <div key={k} className="min-w-0">
-                <dt className="text-xs text-gray-600 dark:text-gray-300">{k}</dt>
-                <dd className="truncate text-sm font-semibold text-gray-900 dark:text-white">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-        {t.statusReason && <p className="rounded-xl bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-400/10 dark:text-amber-100">{t.statusReason}</p>}
-      </Card>
-      {d.provisioning && <ProvisioningPanel run={d.provisioning} onRun={onRun} />}
       {canEdit && (
         <EditSchoolDetailsDialog
           d={d}
           open={editing}
           onClose={() => setEditing(false)}
+          onLogo={setD}
           onSaved={(next) => {
             setEditing(false);
-            onChange(next);
+            setD(next);
           }}
         />
       )}
     </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Identity hero: logo (click / drop to change), name, address, status, plan, renewal
+// ---------------------------------------------------------------------------
+
+const Chip: React.FC<{ icon?: LucideIcon; children: React.ReactNode; mono?: boolean; title?: string }> = ({ icon: Icon, children, mono, title }) => (
+  <span title={title} className={cx("inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800/70 dark:text-gray-200", mono && "font-mono")}>
+    {Icon && <Icon className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" aria-hidden />}
+    {children}
+  </span>
+);
+
+const IdentityHero: React.FC<{ d: TenantDetail; canEdit: boolean; onChange: (d: TenantDetail) => void; onEdit: () => void }> = ({ d, canEdit, onChange, onEdit }) => {
+  const t = d.tenant;
+  const grace = t.status === "GRACE" && t.graceUntil;
+  const days = t.isPrimary ? null : daysUntil(grace ? t.graceUntil : (d.subscription?.periodEnd ?? t.periodEnd));
+  const pkgName = d.subscription?.packageCode ?? t.pkg;
+  return (
+    <section className={cx(surface.card, "p-4 sm:p-5")}>
+      <Link
+        to="/platform/schools"
+        className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-gray-100 py-1 pl-2 pr-3 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-gray-800/70 dark:text-gray-300 dark:hover:bg-gray-800"
+        aria-label="Back to schools"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+        <span aria-hidden>Schools</span>
+      </Link>
+      <div className="flex flex-wrap items-center gap-4">
+        <LogoEditor d={d} canEdit={canEdit} onChange={onChange} />
+        <div className="min-w-[12rem] flex-1">
+          <h1 className="line-clamp-2 break-words text-xl font-bold tracking-tight text-gray-900 dark:text-white sm:truncate sm:text-2xl" title={t.name}>{t.name}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <StatusPill status={t.status} live={isLiveStatus(t.status)} />
+            {t.isPrimary && (
+              <Pill tone="blue" icon={ShieldCheck}>
+                Primary
+              </Pill>
+            )}
+            <Chip icon={Globe2} mono title="Web address">
+              {t.slug}
+            </Chip>
+            <Chip icon={PackageIcon} title="Package">
+              <span className="capitalize">{pkgName}</span>
+              {d.subscription && <span className="text-gray-400 dark:text-gray-500">· {d.subscription.billingCycle === "YEAR" ? "year" : "term"}</span>}
+            </Chip>
+            {t.country && <Chip icon={MapPin}>{t.country}</Chip>}
+            <Chip icon={Clock}>{t.timezone.replace(/_/g, " ")}</Chip>
+          </div>
+          {t.statusReason && <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900 dark:bg-amber-400/10 dark:text-amber-100"><TriangleAlert className="h-3.5 w-3.5" aria-hidden />{t.statusReason}</p>}
+        </div>
+        <div className="flex items-center gap-4">
+          {!t.isPrimary && (
+            <div className="flex items-center gap-2">
+              <DaysRing days={days} size={60} />
+              <div className="text-xs leading-tight">
+                <p className="font-semibold text-gray-900 dark:text-white">{grace ? "Grace" : days !== null && days < 0 ? "Expired" : "Renews"}</p>
+                <p className="text-gray-500 dark:text-gray-400">{fmtDate(grace ? t.graceUntil : (d.subscription?.periodEnd ?? t.periodEnd))}</p>
+              </div>
+            </div>
+          )}
+          {canEdit && (
+            <Btn tone="primary" icon={Pencil} onClick={onEdit}>
+              Edit details
+            </Btn>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Dashboard: usage, activity, apps, money, people, history
+// ---------------------------------------------------------------------------
+
+const LimitHint: React.FC<{ used: number; limit: number | null; ratio: number | null; fmt: (n: number) => string }> = ({ used, limit, ratio, fmt }) =>
+  limit === null ? (
+    <span className="inline-flex items-center gap-1">
+      <InfinityIcon className="h-3.5 w-3.5" aria-hidden /> Unlimited
+    </span>
+  ) : (
+    <span className="block">
+      <span className="mb-1 block h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800" role="meter" aria-valuemin={0} aria-valuemax={limit} aria-valuenow={used} aria-label={`${fmt(used)} of ${fmt(limit)}`}>
+        <span className={cx("block h-full rounded-full", TONE[limitTone(ratio)].solid)} style={{ width: `${Math.max(2, Math.min(100, (ratio ?? 0) * 100))}%` }} />
+      </span>
+      of {fmt(limit)}
+    </span>
+  );
+
+const auditIcon = (action: string): LucideIcon => {
+  if (action.includes("logo")) return ImageIcon;
+  if (action.includes("details")) return Pencil;
+  if (action.includes("suspend")) return PauseCircle;
+  if (action.includes("reactivate")) return PlayCircle;
+  if (action.includes("archive")) return Archive;
+  if (action.includes("delete")) return Trash2;
+  if (action.includes("package")) return PackageIcon;
+  if (action.includes("override") || action.includes("app")) return LayoutGrid;
+  if (action.includes("admin") || action.includes("person")) return UserCog;
+  if (action.includes("invoice") || action.includes("payment")) return Receipt;
+  if (action.includes("grace")) return Timer;
+  return Activity;
+};
+
+const DashboardTab: React.FC<{ d: TenantDetail; onRun: (r: ProvisioningRun) => void; go: (t: Tab) => void }> = ({ d, onRun, go }) => {
+  const t = d.tenant;
+  const meter = (k: string) => d.usage.meters.find((m) => m.key === k);
+  const daily = d.usage.daily;
+  const sum = (k: "aiRequests" | "codeRuns") => daily.reduce((n, x) => n + (x[k] ?? 0), 0);
+  const peak = daily.reduce((n, x) => Math.max(n, x.activeUsers), 0);
+  const tiles: Array<{ key: string; icon: LucideIcon; label: string; fmt: (n: number) => string; fallback: number }> = [
+    { key: "limit.students", icon: GraduationCap, label: "Students", fmt: (n) => n.toLocaleString(), fallback: t.students },
+    { key: "limit.staff", icon: Users, label: "Staff", fmt: (n) => n.toLocaleString(), fallback: t.staff },
+    { key: "limit.storage_gb", icon: HardDrive, label: "Storage", fmt: formatMb, fallback: t.storageMb },
+  ];
+  return (
+    <div className="space-y-4">
+      {d.provisioning && <ProvisioningPanel run={d.provisioning} onRun={onRun} />}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {tiles.map((x) => {
+          const m = meter(x.key);
+          const used = m?.used ?? x.fallback;
+          return (
+            <StatTile
+              key={x.key}
+              icon={x.icon}
+              label={x.label}
+              value={used}
+              format={x.fmt}
+              tone={limitTone(m?.ratio ?? null)}
+              hint={m ? <LimitHint used={used} limit={m.limit} ratio={m.ratio} fmt={x.fmt} /> : undefined}
+            />
+          );
+        })}
+        <StatTile icon={Activity} label="Active this week" value={t.activeUsers7d} spark={daily.map((x) => x.activeUsers)} hint={t.lastActivityAt ? `last seen ${ago(t.lastActivityAt)} ago` : "no activity yet"} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Panel title="Activity" icon={Activity} aside="30 days" className="lg:col-span-2">
+          {daily.length ? (
+            <>
+              <DailyBars data={daily} x="day" y="activeUsers" name="Active people" label="Active people per day, last 30 days" />
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {[
+                  { icon: Users, label: "Busiest day", value: peak },
+                  { icon: Sparkles, label: "AI requests", value: sum("aiRequests") },
+                  { icon: Code2, label: "Code runs", value: sum("codeRuns") },
+                ].map((s) => (
+                  <div key={s.label} className={cx(surface.inset, "flex items-center gap-2 px-3 py-2")}>
+                    <s.icon className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">{s.value.toLocaleString()}</p>
+                      <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">{s.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <EmptyState icon={Activity} title="No activity yet" />
+          )}
+        </Panel>
+        <Panel
+          title="Apps"
+          icon={LayoutGrid}
+          aside={`${d.apps.filter((a) => a.status === "ACTIVE").length} on`}
+          action={<LinkBtn onClick={() => go("plan")} label="Plan & apps" />}
+        >
+          {d.apps.length ? (
+            <ul className="grid grid-cols-3 gap-2" aria-label="Apps">
+              {d.apps.map((a) => {
+                const Icon = entIcon(appKeyOf(a.name, a.clientId));
+                const on = a.status === "ACTIVE";
+                return (
+                  <li key={a.systemId} title={`${a.name}: ${on ? "on" : "off"}`} className="flex flex-col items-center gap-1.5 rounded-xl p-2 text-center">
+                    <span className={cx("relative flex h-11 w-11 items-center justify-center rounded-xl", on ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-400 dark:bg-gray-800/70 dark:text-gray-500")}>
+                      <Icon className="h-5 w-5" aria-hidden />
+                      {!on && <Lock className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-white p-0.5 text-gray-500 dark:bg-gray-900" aria-hidden />}
+                    </span>
+                    <span className={cx("w-full truncate text-[11px] font-medium", on ? "text-gray-800 dark:text-gray-100" : "text-gray-400 dark:text-gray-500")}>{a.name}</span>
+                    <span className="sr-only">{on ? "on" : "off"}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <EmptyState icon={LayoutGrid} title="No apps" />
+          )}
+        </Panel>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <BillingSnapshot d={d} go={go} />
+        <AdminsSnapshot tid={t.tid} go={go} />
+        <Panel title="Recent activity" icon={ScrollText} action={d.audit.length > 5 ? <LinkBtn onClick={() => go("audit")} label="All" /> : undefined}>
+          {d.audit.length ? (
+            <ol className="space-y-3" aria-label="Recent activity">
+              {d.audit.slice(0, 5).map((e) => {
+                const Icon = auditIcon(e.action);
+                return (
+                  <li key={e.id} className="flex items-start gap-3">
+                    <IconTile icon={Icon} tone="gray" size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-800 dark:text-gray-100">{auditLabel(e.action)}</p>
+                      <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                        {e.actor ?? "System"} · {ago(e.at)}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <EmptyState icon={ScrollText} title="Nothing recorded yet" />
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+};
+
+const LinkBtn: React.FC<{ onClick: () => void; label: string }> = ({ onClick, label }) => (
+  <button type="button" onClick={onClick} className="inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-blue-400 dark:hover:bg-blue-500/10">
+    {label}
+    <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+  </button>
+);
+
+const BillingSnapshot: React.FC<{ d: TenantDetail; go: (t: Tab) => void }> = ({ d, go }) => {
+  const open = d.invoices.filter((i) => i.status === "ISSUED" || i.status === "OVERDUE");
+  const overdue = open.filter((i) => i.status === "OVERDUE");
+  const owed = open.reduce((n, i) => n + i.amount, 0);
+  const currency = open[0]?.currency ?? d.invoices[0]?.currency ?? "RWF";
+  const nextDue = open.map((i) => i.dueAt).filter(Boolean).sort()[0] ?? null;
+  const lastPaid = d.invoices.filter((i) => i.status === "PAID" && i.paidAt).sort((a, b) => String(b.paidAt).localeCompare(String(a.paidAt)))[0];
+  return (
+    <Panel title="Billing" icon={Wallet} action={<LinkBtn onClick={() => go("billing")} label="Invoices" />}>
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <IconTile icon={owed > 0 ? (overdue.length ? TriangleAlert : Receipt) : CheckCircle2} tone={overdue.length ? "red" : owed > 0 ? "amber" : "emerald"} />
+          <div>
+            <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-white">{formatMoney(owed, currency)}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{owed > 0 ? `outstanding · ${open.length} open${overdue.length ? ` · ${overdue.length} overdue` : ""}` : "nothing owed"}</p>
+          </div>
+        </div>
+        <dl className="grid grid-cols-2 gap-2">
+          <div className={cx(surface.inset, "px-3 py-2")}>
+            <dt className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
+              <CalendarClock className="h-3.5 w-3.5" aria-hidden /> Next due
+            </dt>
+            <dd className="text-sm font-semibold text-gray-900 dark:text-white">{nextDue ? fmtDate(nextDue) : "—"}</dd>
+          </div>
+          <div className={cx(surface.inset, "px-3 py-2")}>
+            <dt className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
+              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Last paid
+            </dt>
+            <dd className="text-sm font-semibold text-gray-900 dark:text-white">{lastPaid ? fmtDate(lastPaid.paidAt) : "—"}</dd>
+          </div>
+        </dl>
+      </div>
+    </Panel>
+  );
+};
+
+const AdminsSnapshot: React.FC<{ tid: number; go: (t: Tab) => void }> = ({ tid, go }) => {
+  const [admins, setAdmins] = useState<TenantAdmin[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    Promise.resolve(platformApi.admins(tid))
+      .then((r) => live && setAdmins(Array.isArray(r) ? r : []))
+      .catch(() => live && (setAdmins([]), setFailed(true)));
+    return () => {
+      live = false;
+    };
+  }, [tid]);
+  const active = admins?.filter((a) => a.status === "ACTIVE") ?? [];
+  const owners = active.filter((a) => a.kind === "OWNER").length;
+  const pending = active.filter((a) => a.mustChangePassword).length;
+  return (
+    <Panel title="Administrators" icon={UserCog} action={<LinkBtn onClick={() => go("admins")} label="Manage" />}>
+      {admins === null ? (
+        <div className="space-y-3" role="status" aria-busy="true" aria-label="Loading administrators">
+          <div className="flex -space-x-2">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-10 w-10 !rounded-full ring-2 ring-white dark:ring-gray-900" />
+            ))}
+          </div>
+          <Skeleton className="h-3.5 w-32" />
+        </div>
+      ) : failed ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Couldn't load the administrators.</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="flex -space-x-2" aria-hidden>
+              {active.slice(0, 5).map((a) => (
+                <span key={a.userId} title={a.name} className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-2 ring-white dark:bg-blue-500/15 dark:text-blue-300 dark:ring-gray-900">
+                  {initials(a.name) || "?"}
+                </span>
+              ))}
+              {active.length > 5 && <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-gray-600 ring-2 ring-white dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-900">+{active.length - 5}</span>}
+            </div>
+            <div>
+              <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-white">{active.length}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">active</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Pill tone="blue" icon={Crown}>
+              {owners} {owners === 1 ? "owner" : "owners"}
+            </Pill>
+            {pending > 0 && (
+              <Pill tone="amber" icon={KeyRound}>
+                {pending} without a password
+              </Pill>
+            )}
+            {owners === 0 && (
+              <Pill tone="red" icon={TriangleAlert}>
+                No owner
+              </Pill>
+            )}
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 };
 
@@ -250,7 +518,7 @@ export const ProvisioningPanel: React.FC<{ run: ProvisioningRun; onRun: (r: Prov
 // Package & limits
 // ---------------------------------------------------------------------------
 
-const PackageTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => void }> = ({ d, onChange }) => {
+const PackageTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => void; apps?: React.ReactNode }> = ({ d, onChange, apps }) => {
   const [packages, setPackages] = useState<PackageInfo[] | null>(null);
   const [catalog, setCatalog] = useState<Entitlement[]>([]);
   const [pick, setPick] = useState<string | null>(null);
@@ -329,6 +597,11 @@ const PackageTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => voi
           </motion.div>
         )}
       </AnimatePresence>
+      {apps && (
+        <Panel title="Apps" icon={LayoutGrid} aside={`${d.apps.filter((a) => a.status === "ACTIVE").length} of ${d.apps.length} on`}>
+          {apps}
+        </Panel>
+      )}
       <Overrides d={d} catalog={catalog} canEdit={canOverride} onChange={onChange} />
     </div>
   );
@@ -563,41 +836,6 @@ const AppsTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => void }
         );
       })}
     </ul>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Usage
-// ---------------------------------------------------------------------------
-
-const UsageTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
-  const ct = useChartTheme();
-  const data = d.usage.daily.map((x) => ({ ...x, day: x.day.slice(5) }));
-  return (
-    <div className="space-y-4">
-      <Card className="space-y-4">
-        <div className="flex flex-wrap justify-around gap-4">
-          {d.usage.meters.map((m) => (
-            <Meter key={m.key} meter={m} />
-          ))}
-        </div>
-        <h2 className={sectionTitle}>30 days</h2>
-        <div className="h-60" role="img" aria-label="Active users, AI requests and code runs per day, last 30 days">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
-              <CartesianGrid vertical={false} stroke={ct.grid} strokeDasharray="3 3" />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: ct.tick }} tickLine={false} axisLine={false} interval={4} />
-              <YAxis allowDecimals={false} width={32} tick={{ fontSize: 11, fill: ct.tick }} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={ct.tooltip} />
-              <Legend wrapperStyle={{ fontSize: 12, color: ct.tick }} />
-              <Line type="monotone" dataKey="activeUsers" name="Active" stroke={ct.series[0]} strokeWidth={2.5} dot={false} />
-              <Line type="monotone" dataKey="aiRequests" name="AI" stroke={ct.series[2]} strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="codeRuns" name="Code runs" stroke={ct.series[3]} strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
-    </div>
   );
 };
 
