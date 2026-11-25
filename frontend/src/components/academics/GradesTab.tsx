@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, RefreshCw, Edit, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, RefreshCw, Edit, Trash2, AlertTriangle, FileSpreadsheet } from "lucide-react";
+import GradesBulkUpload from "./bulk/GradesBulkUpload";
 import { Grade, Program } from "../../api/academics";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
@@ -35,6 +36,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
   onUpdate,
   onDelete,
 }) => {
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -214,6 +216,18 @@ const GradesTab: React.FC<GradesTabProps> = ({
 
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button
+              variant="secondary"
+              onClick={() => setShowBulkUpload(true)}
+              title="Add many grades from an Excel sheet"
+              className="flex items-center gap-2 px-6 py-3 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-600/50 text-sm"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Upload Excel
+            </Button>
+          </motion.div>
+
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button
               onClick={() => setShowCreateModal(true)}
               className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm"
             >
@@ -362,6 +376,14 @@ const GradesTab: React.FC<GradesTabProps> = ({
           </div>
         )}
       </motion.div>
+
+      <GradesBulkUpload
+        isOpen={showBulkUpload}
+        onClose={() => setShowBulkUpload(false)}
+        onDone={onRefresh}
+        programs={programs}
+        grades={data}
+      />
 
       {/* Create Modal */}
       <Modal

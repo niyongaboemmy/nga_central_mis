@@ -60,6 +60,7 @@ import {
   assignUniqueSubjectColors,
   nextSubjectColor,
 } from "../utils/subjectColors";
+import { runGradeImport, runSubjectImport } from "../services/academics/bulkImport";
 import {
   getTeacherAssignments,
   getTeacherRosterRows,
@@ -1530,6 +1531,7 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
     color: resolvedColor,
     rqf_level: rqf_level ? sanitizeString(rqf_level) : null,
     learning_hours: learning_hours ? sanitizeString(learning_hours) : null,
+    module_weight: weight ?? null,
   });
 
   const subjectId = (result as any).insertId;
@@ -6810,3 +6812,55 @@ export const bulkUnenrollStudentsFromSubjects = asyncHandler(
     successResponse(res, "Students unenrolled from subjects successfully", result);
   },
 );
+
+// Bulk upload (Excel) -- the browser reads the sheet and sends its rows.
+// `dryRun: true` only checks; otherwise the valid rows are saved together.
+const isDryRun = (v: unknown) => v === true || v === "true" || v === 1 || v === "1";
+
+export const bulkImportGrades = asyncHandler(async (req: any, res: any) => {
+  const dryRun = isDryRun(req.body?.dryRun);
+  const summary = await runGradeImport(req.body?.rows, dryRun);
+  if (!dryRun && summary.create + summary.update > 0) {
+    await bumpStructuralHolders();
+    logger.info("Grades bulk uploaded", { created: summary.create, updated: summary.update });
+    if (req.user?.userId) {
+      await recordActivity(
+        req.user.userId,
+        "GRADE_BULK_IMPORT",
+        `Bulk uploaded grades: ${summary.create} created, ${summary.update} updated`,
+        "Grade",
+        undefined,
+        { created: summary.create, updated: summary.update, skipped: summary.skip, errors: summary.error },
+        req.user.userId,
+      );
+    }
+  }
+  successResponse(res, dryRun ? "Grades checked" : "Grades uploaded", summary);
+});
+
+export const bulkImportSubjects = asyncHandler(async (req: any, res: any) => {
+  const dryRun = isDryRun(req.body?.dryRun);
+  const raw = req.body?.grade_id;
+  let gradeId: number | null = null;
+  if (raw !== undefined && raw !== null && raw !== "") {
+    gradeId = Number(raw);
+    if (!Number.isInteger(gradeId) || gradeId < 1) throw new ValidationError("Invalid grade ID");
+  }
+  const summary = await runSubjectImport(req.body?.rows, gradeId, dryRun);
+  if (!dryRun && summary.create + summary.assign > 0) {
+    await bumpStructuralHolders();
+    logger.info("Subjects bulk uploaded", { gradeId, created: summary.create, linked: summary.assign });
+    if (req.user?.userId) {
+      await recordActivity(
+        req.user.userId,
+        "SUBJECT_BULK_IMPORT",
+        `Bulk uploaded subjects${gradeId ? ` for grade ID ${gradeId}` : ""}: ${summary.create} created, ${summary.assign} linked`,
+        "Subject",
+        undefined,
+        { grade_id: gradeId, created: summary.create, linked: summary.assign, skipped: summary.skip, errors: summary.error },
+        req.user.userId,
+      );
+    }
+  }
+  successResponse(res, dryRun ? "Subjects checked" : "Subjects uploaded", summary);
+});

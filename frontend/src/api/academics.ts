@@ -165,6 +165,48 @@ export const subjectsApi = {
     }>("/academics/subjects/assign-colors", opts ?? {}),
 };
 
+// Bulk upload (Excel). The browser reads the sheet and sends its rows; the
+// server checks every row (names compared ignoring case) and, unless dryRun,
+// saves the valid ones together.
+export type BulkRowAction = "create" | "update" | "assign" | "skip" | "error";
+
+export interface BulkRowResult {
+  line: number;
+  label: string;
+  action: BulkRowAction;
+  errors: string[];
+  warnings: string[];
+  changes: string[];
+}
+
+export interface BulkImportSummary {
+  dryRun: boolean;
+  total: number;
+  create: number;
+  update: number;
+  assign: number;
+  skip: number;
+  error: number;
+  rows: BulkRowResult[];
+}
+
+export type BulkSheetRow = { line: number } & Record<string, string>;
+
+export const academicsBulkApi = {
+  grades: (rows: BulkSheetRow[], dryRun: boolean) =>
+    api
+      .post<{ data: BulkImportSummary }>("/academics/grades/bulk-import", { rows, dryRun })
+      .then((r) => r.data.data),
+  subjects: (rows: BulkSheetRow[], gradeId: number, dryRun: boolean) =>
+    api
+      .post<{ data: BulkImportSummary }>("/academics/subjects/bulk-import", {
+        rows,
+        grade_id: gradeId,
+        dryRun,
+      })
+      .then((r) => r.data.data),
+};
+
 // Course Categories API
 export const courseCategoriesApi = {
   getAll: () =>
