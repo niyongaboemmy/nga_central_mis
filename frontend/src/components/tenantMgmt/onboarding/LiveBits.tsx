@@ -25,22 +25,22 @@ export const WaitIllustration: React.FC<{ status: ApplicationStatus }> = ({ stat
       <div className="relative flex h-16 w-16 shrink-0 items-center justify-center">
         {!reduced && (
           <>
-            <motion.span className="absolute inset-0 rounded-full bg-brand-500/15" animate={{ scale: [1, 1.35], opacity: [0.8, 0] }} transition={{ duration: 1.8, repeat: Infinity }} aria-hidden />
+            <motion.span className="absolute inset-0 rounded-full bg-blue-500/15" animate={{ scale: [1, 1.35], opacity: [0.8, 0] }} transition={{ duration: 1.8, repeat: Infinity }} aria-hidden />
             <motion.span className="absolute inset-0" animate={{ rotate: 360 }} transition={{ duration: 3.2, repeat: Infinity, ease: "linear" }} aria-hidden>
-              <span className="absolute left-1/2 top-0 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-brand-500" />
+              <span className="absolute left-1/2 top-0 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-blue-500" />
               <span className="absolute bottom-1 left-1 h-2 w-2 rounded-full bg-emerald-500" />
               <span className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-amber-400" />
             </motion.span>
           </>
         )}
-        <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-blue-500 text-white">
+        <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-500 text-white">
           <Icon className="h-5 w-5" aria-hidden />
         </span>
       </div>
       <div>
-        <p className="font-semibold text-slate-900 dark:text-white">{c.line}</p>
+        <p className="font-semibold text-gray-900 dark:text-white">{c.line}</p>
         {c.eta && (
-          <p className="flex items-center gap-1 text-sm text-slate-600 dark:text-gray-300">
+          <p className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-300">
             <Clock className="h-3.5 w-3.5" aria-hidden />
             {c.eta}
           </p>
@@ -51,12 +51,12 @@ export const WaitIllustration: React.FC<{ status: ApplicationStatus }> = ({ stat
 };
 
 const STEP_VIEW: Record<StepStatus, { icon: LucideIcon; cls: string; sr: string; spin?: boolean }> = {
-  PENDING: { icon: Circle, cls: "text-slate-400 dark:text-gray-500", sr: "waiting" },
-  RUNNING: { icon: Loader2, cls: "text-brand-600 dark:text-brand-200", sr: "in progress", spin: true },
+  PENDING: { icon: Circle, cls: "text-gray-400 dark:text-gray-500", sr: "waiting" },
+  RUNNING: { icon: Loader2, cls: "text-blue-600 dark:text-blue-400", sr: "in progress", spin: true },
   DONE: { icon: Check, cls: "bg-emerald-500 text-white rounded-full p-0.5", sr: "done" },
   // an applicant never sees a raw failure: the platform retries
   FAILED: { icon: Clock, cls: "text-amber-600 dark:text-amber-300", sr: "retrying" },
-  SKIPPED: { icon: Minus, cls: "text-slate-400 dark:text-gray-500", sr: "skipped" },
+  SKIPPED: { icon: Minus, cls: "text-gray-400 dark:text-gray-500", sr: "skipped" },
 };
 
 /** The provisioning run, live: spinner -> tick per step. */
@@ -65,16 +65,16 @@ export const ProvisioningSteps: React.FC<{ run: ProvisioningRun }> = ({ run }) =
   const done = run.steps.filter((s) => s.status === "DONE" || s.status === "SKIPPED").length;
   const pct = run.steps.length ? Math.round((done / run.steps.length) * 100) : 0;
   return (
-    <section aria-labelledby="prov-title" className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+    <section aria-labelledby="prov-title" className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700/40 dark:bg-gray-800/40">
       <div className="mb-3 flex items-center gap-2">
-        <Rocket className="h-5 w-5 text-brand-600 dark:text-brand-200" aria-hidden />
-        <h3 id="prov-title" className="flex-1 font-semibold text-slate-900 dark:text-white">
+        <Rocket className="h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden />
+        <h3 id="prov-title" className="flex-1 font-semibold text-gray-900 dark:text-white">
           Setting up
         </h3>
-        <span className="text-sm font-bold tabular-nums text-slate-700 dark:text-gray-200">{pct}%</span>
+        <span className="text-sm font-bold tabular-nums text-gray-700 dark:text-gray-200">{pct}%</span>
       </div>
-      <div className="mb-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-800" aria-hidden>
-        <motion.div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-emerald-500" initial={false} animate={{ width: `${pct}%` }} {...m("fill")} />
+      <div className="mb-3 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800" aria-hidden>
+        <motion.div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-500" initial={false} animate={{ width: `${pct}%` }} {...m("fill")} />
       </div>
       <ol className="space-y-2" aria-label="Setup steps">
         {run.steps.map((s) => {
@@ -86,7 +86,7 @@ export const ProvisioningSteps: React.FC<{ run: ProvisioningRun }> = ({ run }) =
                   <v.icon className={cx("h-4 w-4", v.cls, v.spin && "animate-spin")} aria-hidden />
                 </motion.span>
               </AnimatePresence>
-              <span className={cx(s.status === "DONE" ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-gray-300", s.status === "RUNNING" && "font-semibold")}>{s.label}</span>
+              <span className={cx(s.status === "DONE" ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300", s.status === "RUNNING" && "font-semibold")}>{s.label}</span>
               <span className="sr-only">({v.sr})</span>
             </li>
           );

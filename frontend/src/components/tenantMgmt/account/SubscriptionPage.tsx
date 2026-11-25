@@ -31,7 +31,7 @@ import {
   type PaymentMethod,
   type TenantAccount,
 } from "../../../api/tenantMgmt";
-import { CountUp, EmptyState, EntitlementIcons, Meter, PackageCard, Segmented, StatusPill, ActionCard, accentOf, entIcon } from "../kit";
+import { CountUp, EmptyState, EntitlementIcons, Meter, PackageCard, Segmented, StatusPill, ActionCard, accentOf, entIcon, isLiveStatus } from "../kit";
 import { useMotion } from "../../../design/motion";
 import { useAccess } from "../../../hooks/useAccess";
 import Modal from "../../ui/Modal";
@@ -74,7 +74,7 @@ const DiffPanel: React.FC<{ from: PackageInfo; to: PackageInfo }> = ({ from, to 
   const fmt = (v: number | null, key: string) => (v === null ? "∞" : `${v.toLocaleString()}${key === "limit.storage_gb" ? " GB" : ""}`);
   return (
     <div className="space-y-3" data-testid="plan-diff">
-      <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-gray-100">
+      <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
         <span>{from.name}</span>
         <ArrowRight className="h-4 w-4" aria-hidden />
         <span className={accentOf(to.accent).text}>{to.name}</span>
@@ -197,7 +197,7 @@ const SubscriptionPage: React.FC = () => {
   if (access.loading) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-500" aria-label="Loading" />
+        <Loader2 className="h-6 w-6 animate-spin text-gray-500" aria-label="Loading" />
       </div>
     );
   }
@@ -216,7 +216,7 @@ const SubscriptionPage: React.FC = () => {
   if (!acct) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-500" aria-label="Loading" />
+        <Loader2 className="h-6 w-6 animate-spin text-gray-500" aria-label="Loading" />
       </div>
     );
   }
@@ -259,7 +259,7 @@ const SubscriptionPage: React.FC = () => {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-5 px-4 py-6 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Subscription</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Subscription</h1>
         <Link to="/settings/support" className={btn.ghost}>
           <LifeBuoy className="h-4 w-4" aria-hidden /> Support access
         </Link>
@@ -293,11 +293,11 @@ const SubscriptionPage: React.FC = () => {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-white/90">{tenant.name}</div>
-            <div className="text-3xl font-extrabold">{pkg.name}</div>
+            <div className="text-3xl font-bold">{pkg.name}</div>
             <div className="mt-1 text-sm text-white/90">{sub?.billingCycle === "YEAR" ? "Yearly" : "Per term"}</div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <StatusPill status={tenant.status} className="bg-white/90 text-slate-900 dark:bg-white/90 dark:text-gray-900" />
+            <StatusPill status={tenant.status} live={isLiveStatus(tenant.status)} className="bg-white/90 text-gray-900 dark:bg-white/90 dark:text-gray-900" />
             {pendingChange && (
               <button
                 type="button"
@@ -336,7 +336,7 @@ const SubscriptionPage: React.FC = () => {
       </section>
 
       <section className={cx(card, "p-4")} aria-label="Usage">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
           <Gauge className="h-4 w-4" aria-hidden /> Usage
         </h2>
         <div className="grid grid-cols-3 gap-4 sm:grid-cols-6" data-testid="meters">
@@ -348,7 +348,7 @@ const SubscriptionPage: React.FC = () => {
 
       {openInvoices.length > 0 && (
         <section className="space-y-3" aria-label="Open invoices">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
             <Receipt className="h-4 w-4" aria-hidden /> To pay
           </h2>
           <div className="grid gap-4 lg:grid-cols-2">
@@ -362,7 +362,7 @@ const SubscriptionPage: React.FC = () => {
       {/* Change plan */}
       <section className={cx(card, "p-4")} aria-label="Change plan">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
             <Zap className="h-4 w-4" aria-hidden /> Plans
           </h2>
           {changing ? (
@@ -402,7 +402,7 @@ const SubscriptionPage: React.FC = () => {
               </div>
               <AnimatePresence mode="wait">
                 {target && diff && (
-                  <motion.div key={target.code} {...m("reveal")} className="space-y-4 rounded-2xl bg-slate-50 p-4 dark:bg-gray-800/60">
+                  <motion.div key={target.code} {...m("reveal")} className="space-y-4 rounded-2xl bg-gray-50 p-4 dark:bg-gray-800/60">
                     <DiffPanel from={pkg} to={target} />
                     <div className="flex flex-wrap items-center gap-3">
                       {diff.downgrade ? (
@@ -420,7 +420,7 @@ const SubscriptionPage: React.FC = () => {
                           ]}
                         />
                       )}
-                      <span className="text-lg font-extrabold text-slate-900 dark:text-white">
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">
                         {formatMoney(cycle === "YEAR" ? target.priceYear : target.priceTerm, target.currency)}
                       </span>
                       <div className="ml-auto flex gap-2">
@@ -448,17 +448,17 @@ const SubscriptionPage: React.FC = () => {
 
       {history.length > 0 && (
         <section className={cx(card, "p-4")} aria-label="Invoice history">
-          <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+          <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
             <History className="h-4 w-4" aria-hidden /> History
           </h2>
-          <ul className="divide-y divide-slate-100 dark:divide-gray-800">
+          <ul className="divide-y divide-gray-100 dark:divide-gray-700/30">
             {history.map((inv) => (
               <li key={inv.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
-                <span className="font-mono font-semibold text-slate-800 dark:text-gray-100">{inv.number ?? `#${inv.id}`}</span>
+                <span className="font-mono font-semibold text-gray-800 dark:text-gray-100">{inv.number ?? `#${inv.id}`}</span>
                 <StatusPill status={inv.status} />
-                <span className="text-xs text-slate-600 dark:text-gray-300">{shortDate(inv.issuedAt ?? inv.periodStart)}</span>
-                <span className="ml-auto tabular-nums font-semibold text-slate-900 dark:text-white">{formatMoney(inv.amount, inv.currency)}</span>
-                <a href={pdfOf(inv)} target="_blank" rel="noopener noreferrer" className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800">
+                <span className="text-xs text-gray-600 dark:text-gray-300">{shortDate(inv.issuedAt ?? inv.periodStart)}</span>
+                <span className="ml-auto tabular-nums font-semibold text-gray-900 dark:text-white">{formatMoney(inv.amount, inv.currency)}</span>
+                <a href={pdfOf(inv)} target="_blank" rel="noopener noreferrer" className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">
                   <FileDown className="h-4 w-4" aria-hidden />
                   <span className="sr-only">PDF of {inv.number ?? inv.id}</span>
                 </a>

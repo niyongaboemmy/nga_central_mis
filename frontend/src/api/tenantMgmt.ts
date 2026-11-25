@@ -486,7 +486,7 @@ export interface PersonElsewhere {
 }
 
 export interface TenantDetail {
-  tenant: TenantListItem & { timezone: string; country: string | null; activatedAt: string | null; suspendedAt: string | null; statusReason: string | null };
+  tenant: TenantListItem & { legalName?: string | null; timezone: string; country: string | null; activatedAt: string | null; suspendedAt: string | null; statusReason: string | null };
   entitlements: EffectiveEntitlements;
   overrides: Array<{ id: number; key: string; value: number | null; enabled: boolean; reason: string; expiresAt: string | null; grantedBy: string | null }>;
   apps: Array<{ systemId: number; name: string; clientId: string | null; status: "ACTIVE" | "DISABLED"; source: "PACKAGE" | "OVERRIDE"; /** entitlement key ("app.tupo"), null when unmapped */ key?: string | null }>;
@@ -495,7 +495,7 @@ export interface TenantDetail {
   invoices: Invoice[];
   provisioning: ProvisioningRun | null;
   audit: AuditEntry[];
-  allowedActions: Array<"suspend" | "reactivate" | "extend_grace" | "archive" | "delete" | "change_package" | "override">;
+  allowedActions: Array<"suspend" | "reactivate" | "extend_grace" | "archive" | "delete" | "change_package" | "override" | "edit_details">;
 }
 
 export interface Subscription {
@@ -588,6 +588,9 @@ export const platformApi = {
   // tenants (routes/platformTenants.ts)
   tenants: (params: { status?: string; q?: string } = {}) => unwrap<TenantListItem[]>(api.get("/platform/tenants", { params })),
   tenant: (tid: number) => unwrap<TenantDetail>(api.get(`/platform/tenants/${tid}`)),
+  /** name, legal name (invoices), timezone, country; the slug is fixed */
+  updateDetails: (tid: number, body: { name?: string; legalName?: string; timezone?: string; country?: string; reason: string }) =>
+    unwrap<TenantDetail>(api.put(`/platform/tenants/${tid}/details`, body)),
   suspend: (tid: number, reason: string) => unwrap<TenantDetail>(api.post(`/platform/tenants/${tid}/suspend`, { reason })),
   reactivate: (tid: number, reason: string) => unwrap<TenantDetail>(api.post(`/platform/tenants/${tid}/reactivate`, { reason })),
   extendGrace: (tid: number, days: number, reason: string) => unwrap<TenantDetail>(api.post(`/platform/tenants/${tid}/extend-grace`, { days, reason })),

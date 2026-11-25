@@ -12,17 +12,17 @@ export const cx = (...c: Array<string | false | null | undefined>) => c.filter(B
 
 export const inputCls = (error?: string | null) =>
   cx(
-    "w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-500 transition-colors",
-    "focus:outline-none focus:ring-2 focus:ring-brand-500 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-400",
-    error ? "border-red-500 dark:border-red-400" : "border-slate-300 dark:border-gray-600",
+    "w-full rounded-xl border bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-500 transition-colors",
+    "focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:bg-gray-900/50 dark:text-white dark:placeholder:text-gray-400",
+    error ? "border-red-500 dark:border-red-400/70" : "border-gray-200 dark:border-gray-700/30",
   );
 
 export const primaryBtn =
-  "inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-gray-900";
+  "inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-gray-900";
 export const ghostBtn =
-  "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 dark:text-gray-200 dark:hover:bg-gray-800";
+  "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 dark:text-gray-200 dark:hover:bg-gray-800";
 export const iconBtn =
-  "inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-300 dark:hover:bg-gray-800";
+  "inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:hover:bg-gray-800";
 
 /** Debounced copy of a value. */
 export function useDebounced<T>(value: T, ms = 400): T {
@@ -77,10 +77,10 @@ export const Field: React.FC<{
   return (
     <Shake error={error} className={className}>
       <div className="mb-1 flex items-center justify-between gap-2">
-        <label htmlFor={id} className="flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-gray-100">
-          {Icon && <Icon className="h-4 w-4 text-slate-500 dark:text-gray-300" aria-hidden />}
+        <label htmlFor={id} className="flex items-center gap-1.5 text-sm font-medium text-gray-800 dark:text-gray-100">
+          {Icon && <Icon className="h-4 w-4 text-gray-500 dark:text-gray-300" aria-hidden />}
           {label}
-          {optional && <span className="text-xs font-normal text-slate-600 dark:text-gray-300">(optional)</span>}
+          {optional && <span className="text-xs font-normal text-gray-600 dark:text-gray-300">(optional)</span>}
         </label>
         {trailing}
       </div>
@@ -103,7 +103,7 @@ export const NumberStepper: React.FC<{
   const m = useMotion();
   const clamp = (v: number) => Math.max(min, Math.min(max, v));
   const btn =
-    "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-300 text-slate-700 transition-colors hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800";
+    "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-700 transition-colors hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-gray-800/70 dark:text-gray-200 dark:hover:bg-gray-800";
   return (
     <div className="flex items-center gap-2">
       <motion.button type="button" {...m("tap")} className={btn} onClick={() => onChange(clamp((value ?? 0) - step))}>
@@ -139,7 +139,7 @@ export const LiveCheck: React.FC<{ state: CheckState; label: string }> = ({ stat
       <AnimatePresence mode="wait" initial={false}>
         {state === "checking" && (
           <motion.span key="c" {...m("fade")}>
-            <Loader2 className="h-4 w-4 animate-spin text-slate-500 dark:text-gray-300" aria-hidden />
+            <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-300" aria-hidden />
           </motion.span>
         )}
         {state === "ok" && (
@@ -177,7 +177,7 @@ export const CountdownRing: React.FC<{ left: number; total: number; size?: numbe
   const ratio = total > 0 ? left / total : 0;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={3} className="stroke-slate-200 dark:stroke-gray-700" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={3} className="stroke-gray-200 dark:stroke-gray-700" />
       <circle
         cx={size / 2}
         cy={size / 2}
@@ -187,7 +187,7 @@ export const CountdownRing: React.FC<{ left: number; total: number; size?: numbe
         strokeLinecap="round"
         strokeDasharray={c}
         strokeDashoffset={c * (1 - ratio)}
-        className="stroke-brand-500 transition-[stroke-dashoffset] duration-1000 ease-linear"
+        className="stroke-blue-500 transition-[stroke-dashoffset] duration-1000 ease-linear"
       />
     </svg>
   );
@@ -222,7 +222,7 @@ export const StepFooter: React.FC<{ onBack?: () => void; primary: string; busy?:
 }) => {
   const m = useMotion();
   return (
-    <div className="mt-6 flex items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-gray-800">
+    <div className="mt-8 flex items-center justify-between gap-3">
       {onBack ? (
         <button type="button" onClick={onBack} className={ghostBtn}>
           <ArrowLeft className="h-4 w-4" aria-hidden />

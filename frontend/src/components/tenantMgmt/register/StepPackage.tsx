@@ -41,7 +41,7 @@ const StepPackage: React.FC<{
       </div>
       {!packages ? (
         <div className="flex justify-center py-10">
-          <Loader2 className="h-6 w-6 animate-spin text-brand-500" aria-label="Loading packages" />
+          <Loader2 className="h-6 w-6 animate-spin text-blue-500" aria-label="Loading packages" />
         </div>
       ) : (
         <Shake error={error}>

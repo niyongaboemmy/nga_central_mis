@@ -76,8 +76,9 @@ function needReason(reason: unknown): string {
 export function allowedActions(t: RowDataPacket, caps: (cap: string) => boolean) {
   const status = String(t.status);
   const primary = isPrimaryRow(t);
-  const out: Array<"suspend" | "reactivate" | "extend_grace" | "archive" | "delete" | "change_package" | "override"> = [];
+  const out: Array<"suspend" | "reactivate" | "extend_grace" | "archive" | "delete" | "change_package" | "override" | "edit_details"> = [];
   if (caps(PLATFORM_CAPS.lifecycle)) {
+    if (status !== "ARCHIVED") out.push("edit_details");
     if (!primary && canTransition("tenant", status, "SUSPENDED")) out.push("suspend");
     if (!primary && (status === "SUSPENDED" || status === "GRACE")) out.push("reactivate");
     if (!primary && status === "GRACE") out.push("extend_grace");
@@ -119,6 +120,114 @@ export async function revokeTenantSessions(tid: number): Promise<number> {
 // ---------------------------------------------------------------------------
 // Status moves
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// School details (name, legal name, timezone, country)
+// ---------------------------------------------------------------------------
+
+export interface TenantDetailsInput {
+  name?: unknown;
+  legalName?: unknown;
+  timezone?: unknown;
+  country?: unknown;
+  reason?: unknown;
+}
+
+const validTimezone = (tz: string) => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Edit a school's identity. The slug is not editable: it is the school's address and its
+ * databases are named after it. A rename also renames the school's own School row when that
+ * row still carries the old name (a name the school set itself is left alone), drops the
+ * registry cache and tells the other apps, so branding and sign-in pages follow at once.
+ */
+export async function updateTenantDetails(tid: number, input: TenantDetailsInput, actor: PlatformActorInfo) {
+  const why = needReason(input.reason);
+  const t = await tenantRow(tid);
+  refuseArchived(t, "edited");
+
+  const next: Record<string, string | null> = {};
+  if (input.name !== undefined) {
+    const name = typeof input.name === "string" ? input.name.trim().replace(/\s+/g, " ") : "";
+    if (name.length < 3 || name.length > 150) throw new ValidationError("The school name must be 3 to 150 characters.");
+    next.display_name = name;
+  }
+  if (input.legalName !== undefined) {
+    const legal = typeof input.legalName === "string" ? input.legalName.trim().replace(/\s+/g, " ") : "";
+    if (legal.length > 200) throw new ValidationError("The legal name can be at most 200 characters.");
+    next.legal_name = legal || null;
+  }
+  if (input.timezone !== undefined) {
+    const tz = typeof input.timezone === "string" ? input.timezone.trim() : "";
+    if (!tz || tz.length > 64 || !validTimezone(tz)) throw new ValidationError("Choose a valid timezone, e.g. Africa/Kigali.");
+    next.timezone = tz;
+  }
+  if (input.country !== undefined) {
+    const c = typeof input.country === "string" ? input.country.trim().toUpperCase() : "";
+    if (c && !/^[A-Z]{2}$/.test(c)) throw new ValidationError("The country is a two-letter code, e.g. RW.");
+    next.country = c || null;
+  }
+
+  const changed = Object.keys(next).filter((k) => (next[k] ?? null) !== (t[k] === undefined || t[k] === null ? null : String(t[k])));
+  if (!changed.length) throw new ValidationError("Nothing changed.");
+
+  if (next.display_name && changed.includes("display_name")) {
+    const [dupes] = await controlPool().query<RowDataPacket[]>(
+      "SELECT tenant_id FROM Tenant WHERE tenant_id <> ? AND status <> 'ARCHIVED' AND LOWER(TRIM(display_name)) = LOWER(?) LIMIT 1",
+      [tid, next.display_name],
+    );
+    if (dupes.length) throw new TenantActionError(409, "NAME_TAKEN", "Another school already has this name.");
+  }
+
+  await controlPool().query(`UPDATE Tenant SET ${changed.map((k) => `\`${k}\` = ?`).join(", ")} WHERE tenant_id = ?`, [...changed.map((k) => next[k]), tid]);
+  invalidateTenants();
+
+  // Keep the school's own School row in step (only for a provisioned, non-primary school;
+  // the primary tenant's School rows are its campuses and belong to it).
+  let schoolRowSynced = false;
+  if (!isPrimaryRow(t) && t.mis_db_name) {
+    try {
+      const pool = poolFor(tid);
+      const [cols] = await pool.query<RowDataPacket[]>(
+        "SELECT COLUMN_NAME AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'School'",
+      );
+      const has = new Set(cols.map((r) => String(r.c)));
+      const set: string[] = [];
+      const vals: unknown[] = [];
+      if (changed.includes("display_name")) {
+        set.push("name = IF(name = ?, ?, name)");
+        vals.push(String(t.display_name), next.display_name);
+        if (has.has("email_from_name")) {
+          set.push("email_from_name = IF(email_from_name = ? OR email_from_name IS NULL, ?, email_from_name)");
+          vals.push(String(t.display_name), next.display_name);
+        }
+      }
+      if (changed.includes("timezone") && has.has("timezone")) {
+        set.push("timezone = ?");
+        vals.push(next.timezone);
+      }
+      if (set.length) {
+        const [r]: any = await pool.query(`UPDATE School SET ${set.join(", ")} WHERE school_id = ?`, [...vals, tid]);
+        schoolRowSynced = Number(r?.changedRows ?? 0) > 0;
+      }
+    } catch (err) {
+      logger.warn(`[tenantMgmt] School row sync for t${tid} failed: ${(err as Error)?.message ?? err}`);
+    }
+  }
+
+  await publishTenantChanged(tid);
+  const before = Object.fromEntries(changed.map((k) => [k, t[k] ?? null]));
+  const after = Object.fromEntries(changed.map((k) => [k, next[k]]));
+  await platformAudit({ action: "tenant.details", actorUserId: actor.userId, ip: actor.ip ?? null, targetTid: tid, payload: { reason: why, before, after, schoolRowSynced } });
+  return { changed, schoolRowSynced };
+}
 
 export async function suspendTenant(tid: number, reason: unknown, actor: PlatformActorInfo, opts: { system?: boolean } = {}) {
   const why = opts.system ? String(reason) : needReason(reason);

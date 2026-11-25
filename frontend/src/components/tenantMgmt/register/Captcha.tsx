@@ -73,7 +73,7 @@ const Captcha: React.FC<{ provider: CaptchaProvider; siteKey: string; onToken: (
   }, [provider, siteKey]);
   return (
     <div className="flex min-h-[65px] items-center">
-      {state === "loading" && <Loader2 className="h-5 w-5 animate-spin text-slate-500" aria-label="Loading check" />}
+      {state === "loading" && <Loader2 className="h-5 w-5 animate-spin text-gray-500" aria-label="Loading check" />}
       {state === "error" && <span className="text-sm text-red-600 dark:text-red-400">Check unavailable · reload</span>}
       <div ref={box} />
     </div>

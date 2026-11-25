@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Infinity as InfinityIcon, Package as PackageIcon, Save } from "lucide-react";
 import { EmptyState, Segmented, accentOf, entIcon } from "../kit";
 import { platformApi, type EntKind, type Entitlement, type PackageInfo } from "../../../api/tenantMgmt";
-import { Btn, Card, Spinner, Switch, cx, errorText, inputCls, toast, usePlatform } from "./platformShared";
+import { Btn, Card, SkeletonGrid, Switch, cx, errorText, inputCls, surface, toast, usePlatform } from "./platformShared";
 
 type Meta = Pick<PackageInfo, "name" | "tagline" | "priceTerm" | "priceYear" | "isPublic" | "isActive">;
 /** per key: APP/FEATURE -> held (value null); LIMIT -> number | null (∞) */
@@ -62,7 +62,7 @@ const PackagesPage: React.FC = () => {
   }, [anyDirty, setDirty]);
 
   if (error) return <EmptyState icon={PackageIcon} title={error} />;
-  if (!packages) return <Spinner />;
+  if (!packages) return <SkeletonGrid cards={4} label="Loading packages" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" cardClassName="h-64" />;
 
   const setMeta = (code: string, patch: Partial<Meta>) => setDrafts((d) => ({ ...d, [code]: { ...d[code], meta: { ...d[code].meta, ...patch } } }));
   const setCell = (code: string, key: string, patch: Partial<Cell>) =>
@@ -147,17 +147,17 @@ const PackagesPage: React.FC = () => {
               return (
                 <Fragment key={g.kind}>
                   <tr>
-                    <th colSpan={packages.length + 1} scope="colgroup" className="bg-slate-50 px-3 py-1.5 text-left text-xs font-bold uppercase tracking-wide text-slate-600 dark:bg-gray-800 dark:text-gray-300">
+                    <th colSpan={packages.length + 1} scope="colgroup" className="bg-gray-50 px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 dark:bg-gray-800/50 dark:text-gray-400">
                       {g.label}
                     </th>
                   </tr>
                   {rows.map((e) => {
                     const Icon = entIcon(e.key);
                     return (
-                      <tr key={e.key} className="border-t border-slate-100 dark:border-gray-800">
-                        <th scope="row" className="sticky left-0 z-10 bg-white p-2 pl-3 text-left font-medium text-slate-800 dark:bg-gray-900 dark:text-gray-100">
+                      <tr key={e.key} className={cx("border-t", surface.divider)}>
+                        <th scope="row" className="sticky left-0 z-10 bg-white p-2 pl-3 text-left font-medium text-gray-800 dark:bg-gray-900 dark:text-gray-100">
                           <span className="flex items-center gap-2">
-                            <Icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-gray-300" aria-hidden />
+                            <Icon className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-300" aria-hidden />
                             <span className="truncate">{e.label}</span>
                           </span>
                         </th>
@@ -165,7 +165,7 @@ const PackagesPage: React.FC = () => {
                           const cell = drafts[p.code].cells[e.key];
                           const changed = base[p.code] && (base[p.code].cells[e.key]?.on !== cell.on || base[p.code].cells[e.key]?.value !== cell.value);
                           return (
-                            <td key={p.code} className={cx("p-2 text-center", changed && "bg-brand-50 dark:bg-brand-500/10", colCls(p.code))}>
+                            <td key={p.code} className={cx("p-2 text-center", changed && "bg-blue-50 dark:bg-blue-500/10", colCls(p.code))}>
                               {e.kind === "LIMIT" ? (
                                 <LimitInput label={`${drafts[p.code].meta.name}: ${e.label}`} value={cell.value} onChange={(v) => setCell(p.code, e.key, { value: v })} />
                               ) : (
@@ -198,7 +198,7 @@ const PriceInput: React.FC<{ label: string; short: string; value: number | null;
       onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
       className={cx(inputCls, "py-1 pr-10 text-right text-xs tabular-nums")}
     />
-    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 dark:text-gray-300">{short}</span>
+    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-600 dark:text-gray-300">{short}</span>
   </label>
 );
 
@@ -231,7 +231,7 @@ const LimitInput: React.FC<{ label: string; value: number | null; onChange: (v: 
         aria-label={`${label}: unlimited`}
         title="Unlimited"
         onClick={() => onChange(unlimited ? last : null)}
-        className={cx("flex h-7 w-7 items-center justify-center rounded-full", unlimited ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-300")}
+        className={cx("flex h-7 w-7 items-center justify-center rounded-full", unlimited ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300")}
       >
         <InfinityIcon className="h-4 w-4" aria-hidden />
       </button>

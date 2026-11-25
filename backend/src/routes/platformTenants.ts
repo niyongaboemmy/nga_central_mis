@@ -21,6 +21,7 @@ import {
   setTenantApp,
   suspendTenant,
   tenantRow,
+  updateTenantDetails,
 } from "../services/tenantMgmt/lifecycle";
 import { retryRun, runForTenant, serializeRun } from "../services/tenantMgmt/provisioning";
 import { listActiveSessions, openSession } from "../services/tenantMgmt/support";
@@ -146,6 +147,7 @@ export async function tenantDetail(tid: number, can: (cap: string) => boolean) {
   return {
     tenant: {
       ...publicItem(item),
+      legalName: r.legal_name ?? null,
       timezone: String(r.timezone),
       country: r.country ?? null,
       activatedAt: iso(r.activated_at),
@@ -210,6 +212,20 @@ router.get(
   "/tenants/:id",
   ...VIEW,
   wrap(async (req, res) => ok(res, await detailFor(req, idParam(req.params.id)))),
+);
+
+// --- details ----------------------------------------------------------------
+
+// Name, legal name (on invoices), timezone, country. The slug is fixed. Reason required.
+router.put(
+  "/tenants/:id/details",
+  ...LIFECYCLE,
+  wrap(async (req, res) => {
+    const tid = idParam(req.params.id);
+    const b = req.body ?? {};
+    await updateTenantDetails(tid, { name: b.name, legalName: b.legalName, timezone: b.timezone, country: b.country, reason: b.reason }, platformActor(req));
+    ok(res, await detailFor(req, tid));
+  }),
 );
 
 // --- lifecycle --------------------------------------------------------------

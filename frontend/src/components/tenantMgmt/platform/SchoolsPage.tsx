@@ -7,7 +7,7 @@ import TenantLogo from "../../brand/TenantLogo";
 import { loadBranding } from "../../../hooks/useTenantBranding";
 import { platformApi, type PackageInfo, type TenantLifecycle, type TenantListItem, type UsageMeter } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
-import { ago, cx, daysUntil, errorText, inputCls } from "./platformShared";
+import { SkeletonGrid, accent, ago, cx, daysUntil, errorText, inputCls, surface } from "./platformShared";
 
 type Filter = "all" | TenantLifecycle;
 
@@ -29,7 +29,7 @@ export const listMeters = (t: TenantListItem, pkg: PackageInfo | undefined): Usa
 export const PeriodChip: React.FC<{ periodEnd: string | null; graceUntil?: string | null }> = ({ periodEnd, graceUntil }) => {
   const d = daysUntil(graceUntil ?? periodEnd);
   if (d === null) return null;
-  const tone = d < 0 ? "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-200" : d <= 30 ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" : "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-200";
+  const tone = d < 0 ? "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-200" : d <= 30 ? "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
   return (
     <span
       className={cx("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", tone)}
@@ -52,7 +52,7 @@ const SchoolLogo: React.FC<{ slug: string; name: string; primary: boolean }> = (
     };
   }, [slug]);
   return (
-    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-950">
+    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-50 p-1 dark:bg-gray-900/50">
       <TenantLogo src={url} name={name} isPrimary={primary} className="h-full w-full" rounded="rounded-lg" />
     </span>
   );
@@ -65,18 +65,18 @@ export const SchoolCard: React.FC<{ t: TenantListItem; pkg: PackageInfo | undefi
     <Link
       to={`/platform/schools/${t.tid}`}
       aria-label={`${t.name}, ${t.status.toLowerCase()}, ${pkg?.name ?? t.pkg} package`}
-      className="group flex h-full flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:border-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:hover:border-brand-500"
+      className={cx(surface.card, "group flex h-full flex-col gap-4 p-4 transition-colors hover:border-blue-300 dark:hover:border-blue-500/50", accent.focus)}
     >
       <div className="flex items-start gap-3">
         <SchoolLogo slug={t.slug} name={t.name} primary={t.isPrimary} />
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 font-semibold leading-snug text-slate-900 dark:text-white" title={t.name}>
+          <p className="line-clamp-2 font-semibold leading-snug text-gray-900 dark:text-white" title={t.name}>
             {t.name}
           </p>
-          <p className="flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-gray-400">
+          <p className="flex items-center gap-1.5 truncate text-xs text-gray-500 dark:text-gray-400">
             <span className="font-mono">{t.slug}</span>
             {t.isPrimary && (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-50 px-1.5 py-0.5 font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-50 px-1.5 py-0.5 font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-400">
                 <ShieldCheck className="h-3 w-3" aria-hidden /> Primary
               </span>
             )}
@@ -91,15 +91,15 @@ export const SchoolCard: React.FC<{ t: TenantListItem; pkg: PackageInfo | undefi
         ))}
       </div>
 
-      <div className="mt-auto space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-600 dark:border-gray-800 dark:text-gray-300">
+      <div className={cx(surface.inset, "mt-auto space-y-2 px-3 py-2.5 text-xs text-gray-600 dark:text-gray-300")}>
         <div className="flex items-center gap-2">
           <span className={cx("inline-flex items-center rounded-full px-2 py-0.5 font-semibold", a.soft, a.text)}>{pkg?.name ?? t.pkg}</span>
           {t.isPrimary ? (
-            <span className="text-slate-500 dark:text-gray-400">No renewal</span>
+            <span className="text-gray-500 dark:text-gray-400">No renewal</span>
           ) : (
             <PeriodChip periodEnd={t.periodEnd} graceUntil={t.status === "GRACE" ? t.graceUntil : null} />
           )}
-          <ChevronRight className="ml-auto h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600" aria-hidden />
+          <ChevronRight className="ml-auto h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-600" aria-hidden />
         </div>
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1" title="People who signed in during the last 7 days">
@@ -197,17 +197,13 @@ const SchoolsPage: React.FC = () => {
           </button>
         )}
         <div className="relative min-w-[12rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" aria-hidden />
           <input aria-label="Search schools" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} className={cx(inputCls, "pl-9")} />
         </div>
       </div>
       {error && <p className="text-sm text-red-600 dark:text-red-300">{error}</p>}
       {!rows ? (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading schools">
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="h-56 animate-pulse rounded-2xl border border-slate-200 bg-slate-50 dark:border-gray-800 dark:bg-gray-900" />
-          ))}
-        </ul>
+        <SkeletonGrid cards={6} label="Loading schools" cardClassName="h-56" />
       ) : shown.length === 0 ? (
         <EmptyState icon={Inbox} title="No schools" />
       ) : (
