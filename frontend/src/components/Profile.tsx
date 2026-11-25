@@ -485,12 +485,13 @@ const Profile: React.FC = () => {
               <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">Something wrong here? Ask the school office to change it.</p>
             </div>
 
-            {/* Sticky while you scroll the form, so Save is always in reach. */}
+            {/* Sticky while you scroll the form, so Save is always in reach. Frosted and
+                near-opaque so the fields scrolling underneath never show through. */}
             <footer
-              className={`sticky bottom-0 flex flex-wrap items-center justify-end gap-2 rounded-b-2xl border-t px-5 py-3 sm:px-6 ${
+              className={`sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 rounded-b-2xl border-t px-5 py-3 backdrop-blur-xl backdrop-saturate-150 transition-colors sm:px-6 ${
                 dirty
-                  ? "border-blue-200 bg-blue-50/95 backdrop-blur dark:border-blue-500/30 dark:bg-blue-950/80"
-                  : `${surface.divider} bg-transparent`
+                  ? "border-blue-200 bg-blue-50/90 dark:border-blue-500/40 dark:bg-[#0c1424]/90"
+                  : "border-gray-200 bg-white/90 dark:border-gray-700/40 dark:bg-[#0b0e14]/90"
               }`}
             >
               {dirty ? (

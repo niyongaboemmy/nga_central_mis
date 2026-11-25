@@ -65,7 +65,8 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ name, avatar, src, userId, size
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
 
-  const box = `relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden ${
+  // align-middle: an inline box on the text baseline leaves a descender gap under it.
+  const box = `relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden align-middle ${
     shape === "rounded" ? "rounded-xl" : "rounded-full"
   } ${
     ring ? "ring-2 ring-white dark:ring-gray-900" : ""
