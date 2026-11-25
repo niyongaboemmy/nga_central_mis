@@ -476,7 +476,7 @@ const ClassTeacherSubjectsPage: React.FC = () => {
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
               aria-label="Previous page"
-              className="p-2 rounded-xl bg-white dark:bg-gray-800/30 border border-gray-200 dark:border-gray-700/40 disabled:opacity-40 disabled:cursor-not-allowed hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+              className="p-2 rounded-full bg-white dark:bg-gray-800/30 border border-gray-200 dark:border-gray-700/40 disabled:opacity-40 disabled:cursor-not-allowed hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -487,7 +487,7 @@ const ClassTeacherSubjectsPage: React.FC = () => {
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
               aria-label="Next page"
-              className="p-2 rounded-xl bg-white dark:bg-gray-800/30 border border-gray-200 dark:border-gray-700/40 disabled:opacity-40 disabled:cursor-not-allowed hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+              className="p-2 rounded-full bg-white dark:bg-gray-800/30 border border-gray-200 dark:border-gray-700/40 disabled:opacity-40 disabled:cursor-not-allowed hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

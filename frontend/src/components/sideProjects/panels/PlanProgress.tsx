@@ -53,7 +53,7 @@ const PlanProgress: React.FC<{
     const reports = list.reduce((s, f) => s + (f.reports ?? 0), 0);
     return (
       <li key={ph?.id ?? "none"}>
-        <button type="button" onClick={() => openSection("plan")} className="group w-full rounded-xl px-2 py-1.5 text-left transition hover:bg-slate-50 dark:hover:bg-gray-800/50">
+        <button type="button" onClick={() => openSection("plan")} className="group w-full rounded-full px-2 py-1.5 text-left transition hover:bg-slate-50 dark:hover:bg-gray-800/50">
           <span className="flex items-center justify-between gap-2 text-xs">
             <span className="truncate font-semibold text-slate-800 dark:text-gray-100">{ph?.title ?? "Other features"}</span>
             <span className="shrink-0 tabular-nums text-slate-500 dark:text-gray-400">
@@ -168,7 +168,7 @@ const PlanProgress: React.FC<{
               .slice(0, 6)
               .map((f) => (
                 <li key={f.id}>
-                  <button type="button" onClick={() => onShowReports(f.id)} className="inline-flex max-w-[14rem] items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-800 dark:bg-white/[0.06] dark:text-gray-200 dark:hover:bg-blue-500/15 dark:hover:text-blue-200">
+                  <button type="button" onClick={() => onShowReports(f.id)} className="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-800 dark:bg-white/[0.06] dark:text-gray-200 dark:hover:bg-blue-500/15 dark:hover:text-blue-200">
                     <CircleDot className="h-3 w-3 shrink-0" aria-hidden />
                     <span className="truncate">{f.title}</span>
                     <span className="shrink-0 tabular-nums opacity-80">{f.reports}</span>

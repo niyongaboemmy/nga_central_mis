@@ -92,7 +92,7 @@ export const InstallGuide: React.FC<{ onDone?: () => void; compact?: boolean }> 
             type="button"
             onClick={install}
             disabled={busy}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-200 disabled:opacity-60 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-200 disabled:opacity-60 sm:w-auto"
           >
             <Download className="h-4 w-4" />
             {busy ? "Opening…" : "Install the NGA app"}

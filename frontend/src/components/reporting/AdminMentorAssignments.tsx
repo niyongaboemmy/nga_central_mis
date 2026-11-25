@@ -279,7 +279,7 @@ const AdminMentorAssignments: React.FC = () => {
                             key={m.mentor_id}
                             onClick={() => handleDownloadMentorReport(m.mentor_id, m.mentor_name)}
                             disabled={isDownloading}
-                            className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                            className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-full text-left hover:bg-blue-600 disabled:opacity-50 transition-colors"
                           >
                             <UserAvatar decorative userId={m.mentor_id} name={name} size={28} />
                             <span className="min-w-0 flex-1 truncate">
@@ -810,7 +810,7 @@ export const AssignMentorModal: React.FC<{
                         aria-selected={i === mentorActive}
                         onMouseEnter={() => setMentorActive(i)}
                         onClick={() => pickMentor(u)}
-                        className={`w-full flex items-center gap-2.5 text-left px-2.5 py-2 rounded-xl text-sm transition-colors ${
+                        className={`w-full flex items-center gap-2.5 text-left px-2.5 py-2 rounded-full text-sm transition-colors ${
                           i === mentorActive ? "bg-blue-50 dark:bg-blue-900/30" : ""
                         }`}
                       >
@@ -952,7 +952,7 @@ export const AssignMentorModal: React.FC<{
                         disabled={mine}
                         onMouseEnter={() => setStudentActive(i)}
                         onClick={() => toggleStudent(u)}
-                        className={`w-full flex items-center gap-2.5 text-left px-2.5 py-2 rounded-xl text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        className={`w-full flex items-center gap-2.5 text-left px-2.5 py-2 rounded-full text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                           i === studentActive && !mine ? "bg-blue-50 dark:bg-blue-900/30" : ""
                         }`}
                       >

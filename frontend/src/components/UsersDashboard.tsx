@@ -295,7 +295,7 @@ const UsersDashboard: React.FC<UsersDashboardProps> = ({
             onClick={() => setView("chart")}
             aria-pressed={view === "chart"}
             aria-label="Chart view"
-            className={`p-1.5 rounded-lg transition-colors ${
+            className={`p-1.5 rounded-full transition-colors ${
               view === "chart"
                 ? "bg-blue-500 text-white"
                 : "text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-slate-700"
@@ -308,7 +308,7 @@ const UsersDashboard: React.FC<UsersDashboardProps> = ({
             onClick={() => setView("table")}
             aria-pressed={view === "table"}
             aria-label="Table view"
-            className={`p-1.5 rounded-lg transition-colors ${
+            className={`p-1.5 rounded-full transition-colors ${
               view === "table"
                 ? "bg-blue-500 text-white"
                 : "text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-slate-700"

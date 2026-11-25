@@ -166,7 +166,7 @@ const CompetencePicker: React.FC<CompetencePickerProps> = ({ options, currentId,
     >
       <button
         onClick={() => onPick(null)}
-        className={`w-full text-left px-3 py-2 rounded-lg text-xs italic transition-colors ${
+        className={`w-full text-left px-3 py-2 rounded-full text-xs italic transition-colors ${
           currentId === null
             ? "bg-blue-50 dark:bg-blue-400/15 text-blue-700 dark:text-blue-300"
             : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.07]"
@@ -178,7 +178,7 @@ const CompetencePicker: React.FC<CompetencePickerProps> = ({ options, currentId,
         <button
           key={c.competency_id}
           onClick={() => onPick(c.competency_id)}
-          className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
+          className={`w-full text-left px-3 py-2 rounded-full text-xs transition-colors ${
             currentId === c.competency_id
               ? "bg-blue-50 dark:bg-blue-400/15 text-blue-700 dark:text-blue-300"
               : "text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/[0.07]"
@@ -753,7 +753,7 @@ const SchemeTableEditor: React.FC<Props> = ({
                           )}
                           <button
                             onClick={() => setPickerForGroup(pickerForGroup === groupIndex ? null : groupIndex)}
-                            className="absolute top-1.5 right-1.5 p-1 rounded-md text-gray-400 dark:text-gray-500 opacity-0 group-hover/comp:opacity-100 focus-visible:opacity-100 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all"
+                            className="absolute top-1.5 right-1.5 p-1 rounded-full text-gray-400 dark:text-gray-500 opacity-0 group-hover/comp:opacity-100 focus-visible:opacity-100 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all"
                             title="Change Learning Outcome for this group"
                           >
                             <Pencil className="w-3 h-3" />
@@ -809,7 +809,7 @@ const SchemeTableEditor: React.FC<Props> = ({
                               <button
                                 onClick={() => toggleSkip(entry)}
                                 title={skipped ? "Restore this week" : "Mark as skipped/holiday"}
-                                className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-amber-600 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-400/15 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 transition-all"
+                                className="p-1 rounded-full text-gray-400 dark:text-gray-500 hover:text-amber-600 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-400/15 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 transition-all"
                               >
                                 {skipped ? <RotateCcw className="w-3.5 h-3.5" /> : <CalendarOff className="w-3.5 h-3.5" />}
                               </button>
@@ -817,7 +817,7 @@ const SchemeTableEditor: React.FC<Props> = ({
                                 onClick={() => handleInsertAfter(entry.entry_id)}
                                 disabled={insertingAfterId !== null}
                                 title="Insert a new week below this one"
-                                className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-400/15 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all disabled:opacity-40"
+                                className="p-1 rounded-full text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-400/15 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all disabled:opacity-40"
                               >
                                 {insertingAfterId === entry.entry_id ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -829,7 +829,7 @@ const SchemeTableEditor: React.FC<Props> = ({
                                 onClick={() => handleRemoveWeek(entry)}
                                 disabled={isRemovingWeek}
                                 title="Remove this week"
-                                className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-400/15 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 transition-all"
+                                className="p-1 rounded-full text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-400/15 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 transition-all"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -862,7 +862,7 @@ const SchemeTableEditor: React.FC<Props> = ({
         <button
           onClick={handleAddWeek}
           disabled={isAddingWeek}
-          className="mt-4 flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-400/10 border border-dashed border-blue-300 dark:border-blue-400/30 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-400/20 hover:border-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all disabled:opacity-60"
+          className="mt-4 flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-400/10 border border-dashed border-blue-300 dark:border-blue-400/30 rounded-2xl hover:bg-blue-100 dark:hover:bg-blue-400/20 hover:border-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all disabled:opacity-60"
         >
           {isAddingWeek ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
           Add Week

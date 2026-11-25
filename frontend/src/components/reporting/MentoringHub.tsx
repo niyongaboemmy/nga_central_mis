@@ -315,7 +315,7 @@ const MentoringHub: React.FC = () => {
                 <motion.li key={student.user_id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx, 15) * 0.02 }}>
                   <button
                     onClick={() => navigate(`/my-mentees/${student.user_id}`)}
-                    className={`group w-full flex items-center gap-3 p-3 rounded-xl border bg-white dark:bg-gray-800/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${borderAccent}`}
+                    className={`group w-full flex items-center gap-3 p-3 rounded-full border bg-white dark:bg-gray-800/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${borderAccent}`}
                   >
                     <div className="relative flex-shrink-0">
                       <UserAvatar decorative userId={student.user_id} name={fullName || "?"} size={36} />

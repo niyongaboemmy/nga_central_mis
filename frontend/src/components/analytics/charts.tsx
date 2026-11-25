@@ -106,7 +106,7 @@ export const ChartPanel: React.FC<{
                 aria-checked={asTable === v}
                 title={`Show as ${label.toLowerCase()}`}
                 onClick={() => setAsTable(v)}
-                className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors ${
+                className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full transition-colors ${
                   asTable === v ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "text-slate-600 dark:text-slate-300 hover:bg-surface-light dark:hover:bg-slate-800"
                 }`}
               >
@@ -173,7 +173,7 @@ export const Legend: React.FC<{
               onMouseLeave={() => onHover?.(null)}
               onFocus={() => onHover?.(key)}
               onBlur={() => onHover?.(null)}
-              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-2xl border transition-colors ${
                 off ? "border-dashed border-border-light dark:border-slate-700 text-slate-500 dark:text-slate-400 line-through" : "border-transparent hover:bg-surface-light dark:hover:bg-slate-800"
               }`}
               title={off ? "Show this series" : "Hide this series"}
@@ -560,7 +560,7 @@ export const Donut: React.FC<{
           <li key={p.key}>
             <button
               type="button"
-              className={`w-full flex items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors ${active === p.key ? "bg-slate-100 dark:bg-slate-800" : "hover:bg-slate-50 dark:hover:bg-slate-800/60"}`}
+              className={`w-full flex items-center gap-2 rounded-full px-2 py-1 text-left transition-colors ${active === p.key ? "bg-slate-100 dark:bg-slate-800" : "hover:bg-slate-50 dark:hover:bg-slate-800/60"}`}
               onMouseEnter={() => setActive(p.key)}
               onMouseLeave={() => setActive(null)}
               onFocus={() => setActive(p.key)}
@@ -763,8 +763,8 @@ export const Pager: React.FC<{ page: number; total: number; limit: number; onPag
         {fmtInt((page - 1) * limit + 1)}–{fmtInt(Math.min(total, page * limit))} of {fmtInt(total)}
       </span>
       <div className="flex gap-1">
-        <button className="px-2 py-1 rounded border border-border-light dark:border-slate-700 disabled:opacity-40" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
-        <button className="px-2 py-1 rounded border border-border-light dark:border-slate-700 disabled:opacity-40" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next</button>
+        <button className="px-2 py-1 rounded-full border border-border-light dark:border-slate-700 disabled:opacity-40" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
+        <button className="px-2 py-1 rounded-full border border-border-light dark:border-slate-700 disabled:opacity-40" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next</button>
       </div>
     </div>
   );

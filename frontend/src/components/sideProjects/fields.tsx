@@ -168,7 +168,7 @@ export const PersonPicker: React.FC<{
       <div className={`${inputCls} flex items-center gap-2`}>
         <UserAvatar name={value.name} userId={value.id} size={24} decorative />
         <span className="flex-1 truncate font-medium">{value.name}</span>
-        <button type="button" aria-label="Clear" onClick={() => onChange(null)} className="rounded p-0.5 text-slate-400 hover:text-slate-700 dark:text-gray-500 dark:hover:text-gray-200">
+        <button type="button" aria-label="Clear" onClick={() => onChange(null)} className="rounded-full p-0.5 text-slate-400 hover:text-slate-700 dark:text-gray-500 dark:hover:text-gray-200">
           <X className="h-4 w-4" />
         </button>
       </div>

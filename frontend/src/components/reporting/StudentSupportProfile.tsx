@@ -208,7 +208,7 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
           {canLog ? (
             <button
               onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
             >
               <Plus className="w-4 h-4" />
               Log Session
@@ -323,7 +323,7 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
                     <li key={c.checkin_id}>
                       <button
                         onClick={() => setOpenCheckIn(c)}
-                        className={`w-full text-left rounded-xl px-3 py-2 transition-colors ${
+                        className={`w-full text-left rounded-full px-3 py-2 transition-colors ${
                           isNew ? "bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100/70" : "hover:bg-gray-50 dark:hover:bg-gray-800/60"
                         }`}
                       >

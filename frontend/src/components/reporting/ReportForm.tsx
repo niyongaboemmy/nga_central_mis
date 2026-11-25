@@ -572,7 +572,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                   </div>
                   <button
                     onClick={addTopic}
-                    className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-all shadow-blue-200 dark:shadow-blue-900/20"
+                    className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-all shadow-blue-200 dark:shadow-blue-900/20"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -619,7 +619,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                       </label>
                       <button
                         onClick={() => removeArrayItem("topics", idx)}
-                        className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                        className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all opacity-0 group-hover:opacity-100"
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>

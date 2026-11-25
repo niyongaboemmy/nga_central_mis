@@ -141,7 +141,7 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
                       setChosen(i);
                       if (feedback && !feedback.correct) setFeedback(null);
                     }}
-                    className={`w-full flex items-center gap-3 text-left min-h-[48px] px-4 py-2.5 rounded-xl border text-sm transition-colors focus:outline-none focus-visible:shadow-glow ${
+                    className={`w-full flex items-center gap-3 text-left min-h-[48px] px-4 py-2.5 rounded-2xl border text-sm transition-colors focus:outline-none focus-visible:shadow-glow ${
                       showCorrect
                         ? "border-success-500 el-chip-success"
                         : showWrong

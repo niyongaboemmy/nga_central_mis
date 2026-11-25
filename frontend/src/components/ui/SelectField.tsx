@@ -372,7 +372,7 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(functi
             setQuery("");
             searchRef.current?.focus();
           }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-gray-200"
+          className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-gray-200"
           aria-label="Clear search"
         >
           <X className="h-3.5 w-3.5" aria-hidden />

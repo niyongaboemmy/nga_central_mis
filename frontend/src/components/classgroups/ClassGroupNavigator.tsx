@@ -124,7 +124,7 @@ const ClassGroupNavigator: React.FC<{ onSelect?: () => void }> = ({
           type="button"
           onClick={() => setOnlyIncomplete((v) => !v)}
           aria-pressed={onlyIncomplete}
-          className={`w-full inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors ${
+          className={`w-full inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${
             onlyIncomplete
               ? "bg-amber-500 text-white"
               : "bg-gray-50 dark:bg-slate-900/50 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700/60"
@@ -204,7 +204,7 @@ const ClassGroupNavigator: React.FC<{ onSelect?: () => void }> = ({
                               focusClassGroup(row, activeLens);
                               onSelect?.();
                             }}
-                            className={`w-full text-left rounded-xl px-2.5 py-2 transition-colors border ${
+                            className={`w-full text-left rounded-2xl px-2.5 py-2 transition-colors border ${
                               selected
                                 ? "bg-blue-500/10 border-blue-500/40"
                                 : "bg-white/50 dark:bg-slate-800/40 border-transparent hover:bg-gray-50 dark:hover:bg-slate-700/40"

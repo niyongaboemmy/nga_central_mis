@@ -673,7 +673,7 @@ const CreateWizard: React.FC<WizardProps> = ({ open, initialStatus = "IDEA", cat
               type="button"
               data-autofocus={k === "ai" ? true : undefined}
               onClick={() => (setSetup(k), k === "ai" && setAiOpened(true))}
-              className={`group flex flex-col gap-3 rounded-3xl border p-5 text-left transition hover:border-blue-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-600/20 ${k === "ai" ? "border-blue-200 bg-blue-50/70 dark:border-blue-500/30 dark:bg-blue-500/10" : "border-slate-900/[0.07] bg-white dark:border-white/10 dark:bg-gray-800/40"}`}
+              className={`group flex flex-col gap-3 rounded-2xl border p-5 text-left transition hover:border-blue-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-600/20 ${k === "ai" ? "border-blue-200 bg-blue-50/70 dark:border-blue-500/30 dark:bg-blue-500/10" : "border-slate-900/[0.07] bg-white dark:border-white/10 dark:bg-gray-800/40"}`}
             >
               <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${k === "ai" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 dark:bg-gray-700 dark:text-gray-200"}`}>
                 <Icon className="h-5 w-5" aria-hidden />

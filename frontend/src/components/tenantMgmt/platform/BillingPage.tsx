@@ -126,7 +126,7 @@ export const PaymentsQueue: React.FC = () => {
                   type="button"
                   onClick={() => p.proofUrl && setPreview(p)}
                   disabled={!p.proofUrl}
-                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default dark:bg-gray-800"
+                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default dark:bg-gray-800"
                 >
                   {p.proofUrl && !isPdf(p.proofUrl) ? <img src={p.proofUrl} alt="" className="h-full w-full object-cover" /> : <FileText className="h-8 w-8 text-gray-400" aria-hidden />}
                   <span className="sr-only">{p.proofUrl ? "View proof" : "No proof"}</span>

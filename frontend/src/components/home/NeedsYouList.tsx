@@ -126,7 +126,7 @@ const TierGroup: React.FC<{
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-controls={headingId}
-        className="flex min-h-[40px] w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="flex min-h-[40px] w-full items-center gap-2 rounded-full px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       >
         <span className={`w-2 h-2 rounded-full ${TIER_DOT[tier]}`} aria-hidden />
         {label}
@@ -146,7 +146,7 @@ const TierGroup: React.FC<{
               <button
                 type="button"
                 onClick={() => setAll((a) => !a)}
-                className="ml-2 mt-1 inline-flex min-h-[36px] items-center rounded-lg px-2 text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="ml-2 mt-1 inline-flex min-h-[36px] items-center rounded-full px-2 text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 {all ? "Show fewer" : `Show ${items.length - VISIBLE_PER_TIER} more`}
               </button>

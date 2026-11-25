@@ -103,10 +103,10 @@ const ItemRow: React.FC<{
         ) : (
           draftNote && <span className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip-warning">note is draft</span>
         )}
-        <button onClick={onTogglePublished} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label={item.is_published ? "Hide from students" : "Show to students"} title={item.is_published ? "Visible to students" : "Hidden from students"}>
+        <button onClick={onTogglePublished} className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label={item.is_published ? "Hide from students" : "Show to students"} title={item.is_published ? "Visible to students" : "Hidden from students"}>
           {item.is_published ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
         </button>
-        <button onClick={onOpen} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Item settings">
+        <button onClick={onOpen} className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Item settings">
           <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>
@@ -516,7 +516,7 @@ const CourseBuilderPage: React.FC = () => {
                       ["Pull in new notes", RefreshCw, () => elearningApi.reseed(cid).then((r) => { setData(r.data.data); showToast(r.data.data.created ? `Added ${r.data.data.created} item(s)` : "Nothing new to add", "info"); })],
                       [isLive ? "Move the whole course back to draft" : "Publish the whole course", isLive ? EyeOff : Eye, togglePublishCourse],
                     ] as [string, React.ElementType, () => void][]).map(([label, Icon, fn]) => (
-                      <button key={label} role="menuitem" onClick={() => { setMoreOpen(false); fn(); }} className="w-full flex items-center gap-2.5 px-3 min-h-[44px] rounded-xl text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 text-left">
+                      <button key={label} role="menuitem" onClick={() => { setMoreOpen(false); fn(); }} className="w-full flex items-center gap-2.5 px-3 min-h-[44px] rounded-full text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 text-left">
                         <Icon className="w-4 h-4 text-gray-400" /> {label}
                       </button>
                     ))}
@@ -818,7 +818,7 @@ const CourseBuilderPage: React.FC = () => {
             <motion.div {...m("reveal")} onClick={(e) => e.stopPropagation()} className="w-[390px] max-w-full h-[80vh] rounded-[2rem] el-float overflow-hidden flex flex-col border-8 border-gray-900/90">
               <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-white/[0.06] text-xs text-gray-500">
                 <span>Student view · structure only</span>
-                <button onClick={() => setPreview(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close preview"><X className="w-4 h-4" /></button>
+                <button onClick={() => setPreview(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close preview"><X className="w-4 h-4" /></button>
               </div>
               <div className="flex-1 overflow-y-auto">
                 {previewCourse.sections.length === 0 ? (
@@ -879,7 +879,7 @@ const SettingsTab: React.FC<{ data: BuilderCourse; onChange: (patch: Record<stri
             aria-checked={!icon}
             onClick={() => { setIcon(""); onChange({ icon: null }); }}
             title={`Automatic — ${resolveSubjectIcon(data.subject.name, null).label}`}
-            className={`min-h-[44px] px-3 rounded-xl border text-xs font-medium ${!icon ? "border-brand-500 el-chip-brand" : "border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300"}`}
+            className={`min-h-[44px] px-3 rounded-full border text-xs font-medium ${!icon ? "border-brand-500 el-chip-brand" : "border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300"}`}
           >
             Auto
           </button>
@@ -892,7 +892,7 @@ const SettingsTab: React.FC<{ data: BuilderCourse; onChange: (patch: Record<stri
               aria-label={label}
               title={label}
               onClick={() => { setIcon(key); onChange({ icon: key }); }}
-              className={`w-11 h-11 flex items-center justify-center rounded-xl border transition-colors ${
+              className={`w-11 h-11 flex items-center justify-center rounded-full border transition-colors ${
                 icon === key ? "border-brand-500 el-chip-brand" : "border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-brand-200 dark:hover:border-brand-500/40"
               }`}
               style={icon === key ? { color: data.course.cover_color || data.subject.color || undefined } : undefined}

@@ -156,7 +156,7 @@ const ProgramsTab: React.FC<ProgramsTabProps> = ({
             <button
               onClick={openAddProgramModal}
               disabled={loadingAvailablePrograms}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors mx-auto disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors mx-auto disabled:opacity-50"
             >
               {loadingAvailablePrograms ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

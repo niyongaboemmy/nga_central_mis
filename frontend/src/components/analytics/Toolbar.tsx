@@ -119,7 +119,7 @@ export const Toolbar: React.FC<{
               key={a}
               onClick={() => toggle("app", a)}
               aria-pressed={state.app.includes(a)}
-              className={`px-2.5 py-1 rounded-xl text-xs font-medium border transition-colors ${
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                 state.app.includes(a)
                   ? "border-brand-600 bg-brand-50 dark:bg-slate-700 text-text-primary-light dark:text-text-primary-dark"
                   : "border-border-light dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-surface-light dark:hover:bg-slate-800"
@@ -150,7 +150,7 @@ export const Toolbar: React.FC<{
                   key={t}
                   onClick={() => toggle("type", t)}
                   aria-pressed={state.type.includes(t)}
-                  className={`px-2 py-1 rounded-lg text-xs border ${
+                  className={`px-2 py-1 rounded-full text-xs border ${
                     state.type.includes(t)
                       ? "border-brand-600 bg-brand-50 dark:bg-slate-700 text-text-primary-light dark:text-text-primary-dark"
                       : "border-border-light dark:border-slate-700 text-slate-700 dark:text-slate-200"

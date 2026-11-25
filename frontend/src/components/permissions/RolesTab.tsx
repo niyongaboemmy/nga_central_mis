@@ -109,7 +109,7 @@ const RolesTab: React.FC<RolesTabProps> = ({
                 <button
                   onClick={() => onEdit(role)}
                   aria-label="Edit role"
-                  className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                  className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
@@ -119,7 +119,7 @@ const RolesTab: React.FC<RolesTabProps> = ({
                   aria-label={
                     role.status === "ACTIVE" ? "Disable role" : "Enable role"
                   }
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-2 rounded-full transition-colors ${
                     togglingRoleId === role.role_id
                       ? "opacity-50 cursor-not-allowed"
                       : role.status === "ACTIVE"

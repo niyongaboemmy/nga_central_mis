@@ -137,7 +137,7 @@ const SubmittedReports: React.FC<SubmittedReportsProps> = ({
             <button
               key={p.id}
               onClick={() => setPreset(p.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
                 preset === p.id
                   ? "bg-blue-600 text-white shadow-sm"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"

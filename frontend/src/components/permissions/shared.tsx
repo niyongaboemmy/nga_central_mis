@@ -290,7 +290,7 @@ export const PermissionNamePicker: React.FC<PermissionNamePickerProps> = ({
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 rounded-lg text-sm text-left focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all ${
+        className={`w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 rounded-2xl text-sm text-left focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all ${
           value
             ? "text-gray-900 dark:text-white"
             : "text-gray-400 dark:text-gray-500"

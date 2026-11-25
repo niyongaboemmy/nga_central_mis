@@ -505,7 +505,7 @@ const TeacherDashboard: React.FC = () => {
             {failure.retryable && (
               <button
                 onClick={() => load()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 Try again
@@ -1010,7 +1010,7 @@ const TeacherDashboard: React.FC = () => {
                   <button
                     onClick={() => setShowCompleted((v) => !v)}
                     aria-expanded={showCompleted}
-                    className="mx-2 mb-1 flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
+                    className="mx-2 mb-1 flex items-center gap-1.5 rounded-full px-2 py-1.5 text-xs text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
                   >
                     <ChevronDown
                       className={`w-3.5 h-3.5 transition-transform ${showCompleted ? "rotate-180" : ""}`}

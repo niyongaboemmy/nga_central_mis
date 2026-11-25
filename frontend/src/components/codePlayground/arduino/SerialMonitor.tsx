@@ -154,7 +154,7 @@ const SerialMonitor: React.FC<SerialMonitorProps> = ({ lines, partial, baud, run
       role="tab"
       aria-selected={view === id}
       onClick={() => setView(id)}
-      className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium ${view === id ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"}`}
+      className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-full text-xs font-medium ${view === id ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"}`}
       data-testid={`arduino-${id}-tab`}
     >
       {icon}
@@ -225,7 +225,7 @@ const SerialMonitor: React.FC<SerialMonitorProps> = ({ lines, partial, baud, run
             </option>
           ))}
         </SelectField>
-        <button type="submit" disabled={!running} className="inline-flex items-center gap-1 h-8 px-3 rounded-md bg-brand-600 text-white text-xs font-semibold disabled:opacity-50" data-testid="arduino-serial-send">
+        <button type="submit" disabled={!running} className="inline-flex items-center gap-1 h-8 px-3 rounded-full bg-brand-600 text-white text-xs font-semibold disabled:opacity-50" data-testid="arduino-serial-send">
           <Send className="w-3.5 h-3.5" /> Send
         </button>
       </form>

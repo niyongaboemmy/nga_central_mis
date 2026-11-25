@@ -166,20 +166,20 @@ export const ReminderNudge: React.FC = () => {
                     type="button"
                     onClick={primary}
                     disabled={busy}
-                    className="rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-200 disabled:opacity-60"
+                    className="rounded-full bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-200 disabled:opacity-60"
                   >
                     {busy ? "…" : content[nudge].cta}
                   </button>
                   <button
                     type="button"
                     onClick={close}
-                    className="rounded-xl px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                    className="rounded-full px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                   >
                     Not now
                   </button>
                 </div>
               </div>
-              <button type="button" onClick={close} aria-label="Dismiss" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+              <button type="button" onClick={close} aria-label="Dismiss" className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                 <X className="h-4 w-4" />
               </button>
             </div>

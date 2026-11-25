@@ -180,7 +180,7 @@ const FamilyTab: React.FC<FamilyTabProps> = ({ user, onViewUser }) => {
         {onViewUser && (
           <button
             onClick={() => onViewUser(relation.user_id)}
-            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
             title="View Profile"
           >
             <Eye className="w-4 h-4" />
@@ -188,7 +188,7 @@ const FamilyTab: React.FC<FamilyTabProps> = ({ user, onViewUser }) => {
         )}
         <button
           onClick={() => handleRemove(relation, type)}
-          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
           title="Remove Relationship"
         >
           <Trash2 className="w-4 h-4" />
@@ -319,7 +319,7 @@ const FamilyTab: React.FC<FamilyTabProps> = ({ user, onViewUser }) => {
                       key={user.user_id}
                       onClick={() => handleAssign(user.user_id)}
                       disabled={assigning}
-                      className="w-full flex items-center justify-between p-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition group text-left"
+                      className="w-full flex items-center justify-between p-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition group text-left"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-gray-200 dark:bg-slate-700 rounded-full flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">

@@ -183,7 +183,7 @@ const MathFormulaModal: React.FC<Props> = ({ isOpen, onClose, onInsert }) => {
                 key={cat.label}
                 type="button"
                 onClick={() => setActiveCategory(i)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg whitespace-nowrap transition-colors ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-colors ${
                   activeCategory === i
                     ? "bg-violet-600 text-white"
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"
@@ -201,7 +201,7 @@ const MathFormulaModal: React.FC<Props> = ({ isOpen, onClose, onInsert }) => {
                 type="button"
                 onClick={() => insertSymbol(sym.latex)}
                 title={sym.label}
-                className="flex flex-col items-center gap-0.5 p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-violet-400 dark:hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors text-center"
+                className="flex flex-col items-center gap-0.5 p-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-violet-400 dark:hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-colors text-center"
               >
                 <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{sym.preview}</span>
                 <span className="text-[9px] text-gray-400 dark:text-gray-500 truncate max-w-full">{sym.label}</span>

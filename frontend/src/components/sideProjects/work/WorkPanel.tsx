@@ -159,7 +159,7 @@ export function StatusMenu<T extends string>({
                       trigger.current?.focus();
                       if (!on) onPick(o);
                     }}
-                    className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left outline-none transition focus-visible:bg-slate-100 dark:focus-visible:bg-gray-800 ${on ? "bg-blue-50 dark:bg-blue-500/10" : "hover:bg-slate-50 dark:hover:bg-gray-800/70"}`}
+                    className={`flex w-full items-center gap-2.5 rounded-full px-2.5 py-2 text-left outline-none transition focus-visible:bg-slate-100 dark:focus-visible:bg-gray-800 ${on ? "bg-blue-50 dark:bg-blue-500/10" : "hover:bg-slate-50 dark:hover:bg-gray-800/70"}`}
                   >
                     <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${on ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-gray-400"}`}>
                       <M.icon className="h-3.5 w-3.5" aria-hidden />

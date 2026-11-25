@@ -822,7 +822,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   </h3>
                   <button
                     onClick={() => setShowAddRoleModal(false)}
-                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg"
+                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -900,7 +900,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   </h3>
                   <button
                     onClick={() => setShowAddProgramModal(false)}
-                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg"
+                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1002,7 +1002,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   </h3>
                   <button
                     onClick={() => setShowAddGradeModal(false)}
-                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg"
+                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full"
                   >
                     <X className="w-5 h-5" />
                   </button>

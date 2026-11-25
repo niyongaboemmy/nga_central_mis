@@ -454,7 +454,7 @@ const ArduinoSimulator: React.FC<ArduinoSimulatorProps> = ({ firmware, compiling
           {!firmware && !compiling && (
             <div className="mb-3 rounded-xl border border-dashed border-slate-300 dark:border-white/15 p-3 text-sm text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-2">
               <Cpu className="w-4 h-4 text-brand-600" /> Press <b>Run</b> to compile your sketch and run it on the simulated Uno.
-              <button type="button" onClick={onRun} className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-success-700 hover:bg-green-800 text-white text-xs font-semibold" data-testid="arduino-run">
+              <button type="button" onClick={onRun} className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-success-700 hover:bg-green-800 text-white text-xs font-semibold" data-testid="arduino-run">
                 <Play className="w-3.5 h-3.5 fill-current" /> Run
               </button>
             </div>
@@ -470,7 +470,7 @@ const ArduinoSimulator: React.FC<ArduinoSimulatorProps> = ({ firmware, compiling
               <span className="flex-1 min-w-0">Wired what your code uses: {autoAdded.map(describe).join(", ")}.</span>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 h-7 px-2 rounded-md hover:bg-brand-100 dark:hover:bg-white/10"
+                className="inline-flex items-center gap-1 h-7 px-2 rounded-full hover:bg-brand-100 dark:hover:bg-white/10"
                 onClick={() => {
                   setParts(circuit.parts.filter((p) => !autoAdded.some((a) => a.id === p.id)));
                   setAutoAdded(null);
@@ -478,7 +478,7 @@ const ArduinoSimulator: React.FC<ArduinoSimulatorProps> = ({ firmware, compiling
               >
                 <Undo2 className="w-3.5 h-3.5" /> Undo
               </button>
-              <button type="button" aria-label="Dismiss" className="p-1 rounded-md hover:bg-brand-100 dark:hover:bg-white/10" onClick={() => setAutoAdded(null)}>
+              <button type="button" aria-label="Dismiss" className="p-1 rounded-full hover:bg-brand-100 dark:hover:bg-white/10" onClick={() => setAutoAdded(null)}>
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -487,7 +487,7 @@ const ArduinoSimulator: React.FC<ArduinoSimulatorProps> = ({ firmware, compiling
             <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 dark:border-brand-500/30 px-3 py-2 text-[12.5px] text-slate-700 dark:text-slate-200" data-testid="arduino-suggest">
               <Sparkles className="w-4 h-4 text-brand-600 shrink-0" />
               <span className="flex-1 min-w-0">Your code also uses: {missing.map(describe).join(", ")}.</span>
-              <button type="button" className="h-7 px-2.5 rounded-md bg-brand-600 text-white text-xs font-semibold" onClick={() => setParts([...circuit.parts, ...missing])} data-testid="arduino-suggest-add">
+              <button type="button" className="h-7 px-2.5 rounded-full bg-brand-600 text-white text-xs font-semibold" onClick={() => setParts([...circuit.parts, ...missing])} data-testid="arduino-suggest-add">
                 Add {missing.length === 1 ? "it" : "them"}
               </button>
             </div>
@@ -522,10 +522,10 @@ const ArduinoSimulator: React.FC<ArduinoSimulatorProps> = ({ firmware, compiling
                     <span className="flex-1 min-w-0 truncate text-[11.5px] font-semibold text-slate-700 dark:text-slate-200" title={describe(p)}>
                       {describe(p)}
                     </span>
-                    <button type="button" aria-label={`Edit ${describe(p)}`} aria-expanded={editing === p.id} onClick={() => setEditing(editing === p.id ? null : p.id)} className="p-1 rounded text-slate-500 hover:bg-slate-200/70 dark:hover:bg-white/10">
+                    <button type="button" aria-label={`Edit ${describe(p)}`} aria-expanded={editing === p.id} onClick={() => setEditing(editing === p.id ? null : p.id)} className="p-1 rounded-full text-slate-500 hover:bg-slate-200/70 dark:hover:bg-white/10">
                       <Settings2 className="w-3.5 h-3.5" />
                     </button>
-                    <button type="button" aria-label={`Remove ${describe(p)}`} onClick={() => remove(p.id)} className="p-1 rounded text-slate-500 hover:bg-slate-200/70 dark:hover:bg-white/10">
+                    <button type="button" aria-label={`Remove ${describe(p)}`} onClick={() => remove(p.id)} className="p-1 rounded-full text-slate-500 hover:bg-slate-200/70 dark:hover:bg-white/10">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -537,13 +537,13 @@ const ArduinoSimulator: React.FC<ArduinoSimulatorProps> = ({ firmware, compiling
             })}
 
             <div className="relative">
-              <button type="button" onClick={() => setAdding((a) => !a)} aria-expanded={adding} className="w-[150px] h-[110px] rounded-xl border-2 border-dashed border-slate-300 dark:border-white/15 flex flex-col items-center justify-center gap-1 text-[12.5px] text-slate-500 dark:text-slate-400 hover:border-brand-500 hover:text-brand-600" data-testid="arduino-add-part">
+              <button type="button" onClick={() => setAdding((a) => !a)} aria-expanded={adding} className="w-[150px] h-[110px] rounded-2xl border-2 border-dashed border-slate-300 dark:border-white/15 flex flex-col items-center justify-center gap-1 text-[12.5px] text-slate-500 dark:text-slate-400 hover:border-brand-500 hover:text-brand-600" data-testid="arduino-add-part">
                 <Plus className="w-5 h-5" /> Add a part
               </button>
               {adding && (
                 <div role="menu" aria-label="Parts" className="absolute z-30 mt-1 left-0 w-[260px] p-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#161b22] shadow-2xl">
                   {(Object.keys(PART_INFO) as PartType[]).map((t) => (
-                    <button key={t} type="button" role="menuitem" onClick={() => add(t)} className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10" data-testid={`arduino-add-${t}`}>
+                    <button key={t} type="button" role="menuitem" onClick={() => add(t)} className="w-full text-left px-2.5 py-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-white/10" data-testid={`arduino-add-${t}`}>
                       <span className="block text-[13px] font-medium text-slate-800 dark:text-slate-100">{PART_INFO[t].label}</span>
                       <span className="block text-[11px] text-slate-500 dark:text-slate-400">{PART_INFO[t].hint}</span>
                     </button>
@@ -624,7 +624,7 @@ const UploadDialog: React.FC<{ hex: string; sketchName: string; onClose: () => v
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">Arduino Uno or Nano (ATmega328P), connected with its USB cable.</p>
           </div>
-          <button type="button" onClick={onClose} disabled={busy} aria-label="Close" className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10">
+          <button type="button" onClick={onClose} disabled={busy} aria-label="Close" className="p-1.5 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -656,10 +656,10 @@ const UploadDialog: React.FC<{ hex: string; sketchName: string; onClose: () => v
               </p>
             )}
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={onClose} disabled={busy} className="h-9 px-4 rounded-lg text-sm hover:bg-slate-100 dark:hover:bg-white/10">
+              <button type="button" onClick={onClose} disabled={busy} className="h-9 px-4 rounded-full text-sm hover:bg-slate-100 dark:hover:bg-white/10">
                 {done ? "Close" : "Cancel"}
               </button>
-              <button type="button" onClick={() => void go()} disabled={busy} className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold disabled:opacity-60" data-testid="arduino-upload-go">
+              <button type="button" onClick={() => void go()} disabled={busy} className="inline-flex items-center gap-2 h-9 px-4 rounded-full bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold disabled:opacity-60" data-testid="arduino-upload-go">
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Usb className="w-4 h-4" />}
                 {done ? "Upload again" : busy ? "Uploading…" : "Choose the board's port & upload"}
               </button>

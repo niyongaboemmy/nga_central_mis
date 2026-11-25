@@ -126,7 +126,7 @@ const ReaderControls: React.FC<{
                   key={p.value}
                   onClick={() => update("paper", p.value)}
                   aria-pressed={prefs.paper === p.value}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border text-[11px] font-medium transition-all ${
+                  className={`flex flex-col items-center gap-1 p-2 rounded-2xl border text-[11px] font-medium transition-all ${
                     prefs.paper === p.value
                       ? "border-brand-500 text-brand-700 dark:text-brand-200"
                       : "border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-gray-300"
@@ -151,7 +151,7 @@ const ReaderControls: React.FC<{
                   key={f.value}
                   onClick={() => update("font", f.value)}
                   aria-pressed={prefs.font === f.value}
-                  className={`flex items-center justify-center gap-1 p-2 rounded-xl border text-sm transition-all ${f.className} ${
+                  className={`flex items-center justify-center gap-1 p-2 rounded-full border text-sm transition-all ${f.className} ${
                     prefs.font === f.value
                       ? "border-brand-500 text-brand-700 dark:text-brand-200"
                       : "border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-gray-300"

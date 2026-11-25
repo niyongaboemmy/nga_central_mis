@@ -259,7 +259,7 @@ const FeedbackPanel: React.FC<{ p: ProjectDetail; meId: number; staff: boolean; 
               onClick={send}
               disabled={busy || (mode !== "VERIFIED" && !text.trim())}
               aria-label={mode === "VERIFIED" ? "Verify completion" : mode === "CHANGES_REQUESTED" ? "Request changes" : "Send"}
-              className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40 ${mode === "CHANGES_REQUESTED" ? "bg-amber-500 hover:bg-amber-600" : mode === "VERIFIED" ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"}`}
+              className={`inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40 ${mode === "CHANGES_REQUESTED" ? "bg-amber-500 hover:bg-amber-600" : mode === "VERIFIED" ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"}`}
             >
               {busy ? <Spinner className="h-4 w-4" /> : mode === "VERIFIED" ? <BadgeCheck className="h-4 w-4" /> : mode === "CHANGES_REQUESTED" ? <MessageSquareWarning className="h-4 w-4" /> : <SendHorizontal className="h-4 w-4" />}
               <span className="hidden sm:inline">{mode === "VERIFIED" ? "Verify" : mode === "CHANGES_REQUESTED" ? "Request" : "Send"}</span>

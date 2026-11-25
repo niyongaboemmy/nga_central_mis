@@ -391,20 +391,20 @@ const DashboardCalendarWidget: React.FC = () => {
           <div className="flex items-center gap-1">
           <button
             onClick={goToPreviousWeek}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500 dark:text-gray-400"
+            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500 dark:text-gray-400"
             title="Previous week"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={goToToday}
-            className="px-2.5 py-1 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors font-medium"
+            className="px-2.5 py-1 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors font-medium"
           >
             Today
           </button>
           <button
             onClick={goToNextWeek}
-            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500 dark:text-gray-400"
+            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500 dark:text-gray-400"
             title="Next week"
           >
             <ChevronRight className="w-4 h-4" />

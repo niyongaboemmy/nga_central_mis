@@ -94,7 +94,7 @@ const SystemCard = ({
       <div className="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-slate-700/30">
         {/* <button
           onClick={() => onAssign(system)}
-          className="flex-1 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm font-semibold rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center gap-2"
+          className="flex-1 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm font-semibold rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center gap-2"
         >
           <Check className="w-4 h-4" />
           Assign
@@ -104,7 +104,7 @@ const SystemCard = ({
             e.stopPropagation();
             onView(system);
           }}
-          className="flex-1 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm font-semibold rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center gap-1.5"
+          className="flex-1 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm font-semibold rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center gap-1.5"
         >
           View details
           <ChevronRight className="w-4 h-4" />
@@ -114,7 +114,7 @@ const SystemCard = ({
             e.stopPropagation();
             onEdit(system);
           }}
-          className="px-3 py-2 bg-gray-50 dark:bg-slate-700/50 text-gray-600 dark:text-gray-400 text-sm font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+          className="px-3 py-2 bg-gray-50 dark:bg-slate-700/50 text-gray-600 dark:text-gray-400 text-sm font-semibold rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
         >
           <Edit className="w-4 h-4" />
         </button>
@@ -123,7 +123,7 @@ const SystemCard = ({
             e.stopPropagation();
             onDelete(system);
           }}
-          className="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+          className="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-full hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -404,7 +404,7 @@ const SystemModal = ({
               <button
                 type="button"
                 onClick={() => copyToClipboard(createdSecret)}
-                className="p-2 bg-yellow-100 dark:bg-yellow-800 text-yellow-700 dark:text-yellow-200 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-700"
+                className="p-2 bg-yellow-100 dark:bg-yellow-800 text-yellow-700 dark:text-yellow-200 rounded-full hover:bg-yellow-200 dark:hover:bg-yellow-700"
               >
                 <Copy className="w-4 h-4" />
               </button>
@@ -542,7 +542,7 @@ const AssignModal = ({
       <div className="flex p-1 bg-gray-100 dark:bg-slate-700/50 rounded-xl mb-6">
         <button
           onClick={() => setActiveTab("school")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-full transition-all ${
             activeTab === "school"
               ? "bg-white dark:bg-slate-600 text-blue-600 dark:text-white shadow-sm"
               : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
@@ -553,7 +553,7 @@ const AssignModal = ({
         </button>
         <button
           onClick={() => setActiveTab("role")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-full transition-all ${
             activeTab === "role"
               ? "bg-white dark:bg-slate-600 text-blue-600 dark:text-white shadow-sm"
               : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
@@ -610,7 +610,7 @@ const AssignModal = ({
             <button
               onClick={handleAssignSchool}
               disabled={loading || !selectedSchoolId}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:shadow-none"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:shadow-none"
             >
               {loading ? "Processing..." : "Grant Access"}
             </button>
@@ -685,7 +685,7 @@ const AssignModal = ({
             <button
               onClick={handleAssignRole}
               disabled={loading || !roleAssignSchoolId || !selectedRoleId}
-              className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50 disabled:shadow-none"
+              className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-full transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50 disabled:shadow-none"
             >
               {loading ? "Processing..." : "Grant Role Access"}
             </button>

@@ -26,7 +26,7 @@ const TaskCard: React.FC<{ t: Task; itemTitle: string; onOpen: () => void; dragg
         aria-roledescription={draggable ? "draggable task" : undefined}
         aria-label={`${t.title}, ${t.status.toLowerCase().replace("_", " ")}`}
         onClick={onOpen}
-        className="w-full rounded-xl border border-slate-900/[0.06] bg-white p-3 text-left transition hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-white/[0.06] dark:bg-gray-900 dark:hover:border-blue-500/50"
+        className="w-full rounded-2xl border border-slate-900/[0.06] bg-white p-3 text-left transition hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-white/[0.06] dark:bg-gray-900 dark:hover:border-blue-500/50"
       >
         <p className="line-clamp-1 text-[11px] font-medium text-slate-500 dark:text-gray-400">{itemTitle}</p>
         <p className={`mt-0.5 line-clamp-2 text-sm font-semibold leading-snug ${t.status === "DONE" ? "text-slate-500 line-through dark:text-gray-400" : "text-slate-800 dark:text-gray-100"}`}>{t.title}</p>

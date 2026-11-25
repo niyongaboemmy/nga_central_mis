@@ -57,7 +57,7 @@ const Bars: React.FC<{ data: InsightResult; onDrill: (node: string, label: strin
         return (
           <li key={String(r.key)} title={label}>
             {drillable && r.key !== "none" ? (
-              <button className="w-full flex items-center gap-3 text-sm rounded-lg hover:bg-surface-light dark:hover:bg-slate-800 px-1 py-0.5" onClick={() => onDrill(`${data.groupBy}:${r.key}`, r.label)}>
+              <button className="w-full flex items-center gap-3 text-sm rounded-full hover:bg-surface-light dark:hover:bg-slate-800 px-1 py-0.5" onClick={() => onDrill(`${data.groupBy}:${r.key}`, r.label)}>
                 {content}
               </button>
             ) : (

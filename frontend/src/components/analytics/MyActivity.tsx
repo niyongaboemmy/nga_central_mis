@@ -330,7 +330,7 @@ export default function MyActivity() {
                   type="button"
                   disabled={busy}
                   onClick={signOutEverywhere}
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
                 >
                   <LogOut className="h-4 w-4" aria-hidden /> Sign out everywhere
                 </button>

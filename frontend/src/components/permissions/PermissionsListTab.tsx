@@ -147,7 +147,7 @@ const PermissionsListTab: React.FC<PermissionsListTabProps> = ({
                 <button
                   onClick={() => onEdit(perm)}
                   aria-label="Edit permission"
-                  className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                  className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
@@ -159,7 +159,7 @@ const PermissionsListTab: React.FC<PermissionsListTabProps> = ({
                       ? "Disable permission"
                       : "Enable permission"
                   }
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-2 rounded-full transition-colors ${
                     togglingPermId === perm.perm_id
                       ? "opacity-50 cursor-not-allowed"
                       : perm.status === "ACTIVE"

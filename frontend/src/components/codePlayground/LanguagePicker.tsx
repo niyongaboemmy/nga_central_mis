@@ -217,7 +217,7 @@ const LanguagePicker: React.FC<LanguagePickerProps> = ({
         aria-haspopup="listbox"
         aria-expanded={open}
         title="Change language"
-        className="inline-flex items-center gap-2 h-8 pl-2 pr-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-[13px] font-semibold text-slate-800 dark:text-slate-100 hover:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/50 outline-none transition-colors"
+        className="inline-flex items-center gap-2 h-8 pl-2 pr-2 rounded-full border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-[13px] font-semibold text-slate-800 dark:text-slate-100 hover:border-brand-500 focus-visible:ring-2 focus-visible:ring-brand-500/50 outline-none transition-colors"
         data-testid="playground-language"
       >
         <span className="inline-flex items-center justify-center h-5 min-w-[22px] px-1 rounded bg-brand-50 dark:bg-brand-500/20 text-[10px] font-bold text-brand-700 dark:text-brand-200">
@@ -264,7 +264,7 @@ const LanguagePicker: React.FC<LanguagePickerProps> = ({
                 type="button"
                 onClick={() => (search(""), inputRef.current?.focus())}
                 aria-label="Clear search"
-                className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

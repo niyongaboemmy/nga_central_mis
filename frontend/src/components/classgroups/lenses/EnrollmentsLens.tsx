@@ -419,7 +419,7 @@ const EnrollmentsLens: React.FC = () => {
                             disabled={!can.manageEnrollments}
                             onClick={() => toggleColumn(subject.subject_id)}
                             title={`${allOn ? "Unenroll" : "Enroll"} every student in view from ${subject.name}`}
-                            className={`w-full min-w-[72px] max-w-[110px] px-1.5 py-1 rounded-lg text-[11px] font-semibold leading-tight transition-colors ${
+                            className={`w-full min-w-[72px] max-w-[110px] px-1.5 py-1 rounded-2xl text-[11px] font-semibold leading-tight transition-colors ${
                               allOn
                                 ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
                                 : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700"

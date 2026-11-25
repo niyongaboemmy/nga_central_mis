@@ -81,7 +81,7 @@ const StageTrack: React.FC<{
                   onClick={() => onStep(s)}
                   aria-current={current ? "step" : undefined}
                   title={clickable ? (paused ? `Resume in ${M.label}` : `Move to ${M.label}`) : M.label}
-                  className="group flex w-full min-w-0 flex-col gap-1.5 rounded-lg pb-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default"
+                  className="group flex w-full min-w-0 flex-col gap-1.5 rounded-2xl pb-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default"
                 >
                   <span className="relative h-1 w-full overflow-hidden rounded-full bg-slate-200 transition group-enabled:group-hover:bg-slate-300 dark:bg-gray-700 dark:group-enabled:group-hover:bg-gray-600" aria-hidden>
                     {fill > 0 && (
@@ -211,7 +211,7 @@ export const StageList: React.FC<{ p: ProjectDetail; canMove: boolean; onStep: (
                 onClick={() => onStep(s)}
                 aria-current={current ? "step" : undefined}
                 title={clickable ? (paused ? `Resume in ${M.label}` : `Move to ${M.label}`) : M.label}
-                className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default ${current ? "bg-slate-100 dark:bg-gray-800" : "enabled:hover:bg-slate-50 dark:enabled:hover:bg-gray-800/60"}`}
+                className={`flex w-full items-center gap-3 rounded-full px-2.5 py-2 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default ${current ? "bg-slate-100 dark:bg-gray-800" : "enabled:hover:bg-slate-50 dark:enabled:hover:bg-gray-800/60"}`}
               >
                 <span
                   className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? "text-white" : current ? "text-white" : "border-2 border-slate-900/[0.07] text-slate-400 dark:border-white/10 dark:text-gray-500"} ${current && paused ? "opacity-60" : ""}`}

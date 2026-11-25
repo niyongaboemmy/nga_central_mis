@@ -105,7 +105,7 @@ const RoleModal: React.FC<{ p: ProjectDetail; target: PositionTarget | null; can
                     role="radio"
                     aria-checked={on}
                     onClick={() => setF((x) => ({ ...x, roleKey: k }))}
-                    className={`flex items-center gap-2 rounded-2xl px-3 py-2.5 text-left text-xs font-semibold transition ${on ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-700 hover:bg-slate-100 dark:bg-gray-800/60 dark:text-gray-200 dark:hover:bg-gray-800"}`}
+                    className={`flex items-center gap-2 rounded-full px-3 py-2.5 text-left text-xs font-semibold transition ${on ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-700 hover:bg-slate-100 dark:bg-gray-800/60 dark:text-gray-200 dark:hover:bg-gray-800"}`}
                   >
                     <R.icon className="h-4 w-4 shrink-0" aria-hidden /> {R.label}
                   </button>
@@ -177,10 +177,10 @@ const InlinePosition: React.FC<{ p: ProjectDetail; target: PositionTarget; label
             <option key={s} value={s} />
           ))}
         </datalist>
-        <button type="button" aria-label="Save position" onClick={save} disabled={busy} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
+        <button type="button" aria-label="Save position" onClick={save} disabled={busy} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">
           {busy ? <Spinner className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
         </button>
-        <button type="button" aria-label="Cancel" onClick={() => (setV(target.roleTitle ?? ""), setEditing(false))} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-gray-800">
+        <button type="button" aria-label="Cancel" onClick={() => (setV(target.roleTitle ?? ""), setEditing(false))} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-gray-400 dark:hover:bg-gray-800">
           <X className="h-3.5 w-3.5" />
         </button>
       </span>
@@ -191,7 +191,7 @@ const InlinePosition: React.FC<{ p: ProjectDetail; target: PositionTarget; label
       type="button"
       onClick={() => (setV(target.roleTitle ?? ""), setEditing(true))}
       title="Change the position"
-      className="group/pos mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded-md text-left text-[13px] font-medium text-slate-600 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:hover:text-blue-300"
+      className="group/pos mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded-full text-left text-[13px] font-medium text-slate-600 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:hover:text-blue-300"
     >
       <span className="truncate">{target.roleTitle ? label : <span className="inline-flex items-center gap-1 text-blue-700 dark:text-blue-300"><Plus className="h-3 w-3" aria-hidden />Add a position</span>}</span>
       <Pencil className="h-3 w-3 shrink-0 opacity-0 transition group-hover/pos:opacity-100 group-focus-visible/pos:opacity-100" aria-hidden />

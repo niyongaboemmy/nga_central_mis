@@ -155,7 +155,7 @@ const NotificationBell: React.FC = () => {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setIsOpen((v) => !v)}
-        className="relative p-2 rounded-xl text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200"
+        className="relative p-2 rounded-full text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200"
         aria-label="Notifications"
         title="Notifications"
       >

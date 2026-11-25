@@ -79,7 +79,7 @@ const CredentialField = ({
             type="button"
             onClick={() => setRevealed((r) => !r)}
             title={revealed ? "Hide" : "Reveal"}
-            className="px-3 flex items-center justify-center bg-gray-50 dark:bg-slate-900/60 border border-gray-200 dark:border-slate-700/40 rounded-xl text-gray-500 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            className="px-3 flex items-center justify-center bg-gray-50 dark:bg-slate-900/60 border border-gray-200 dark:border-slate-700/40 rounded-full text-gray-500 hover:text-gray-800 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
           >
             {revealed ? (
               <EyeOff className="w-4 h-4" />
@@ -93,7 +93,7 @@ const CredentialField = ({
           onClick={handleCopy}
           disabled={!hasValue}
           title="Copy"
-          className="px-3 flex items-center justify-center bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 rounded-xl text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 flex items-center justify-center bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/40 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {copied ? (
             <Check className="w-4 h-4 text-green-600 dark:text-green-400" />

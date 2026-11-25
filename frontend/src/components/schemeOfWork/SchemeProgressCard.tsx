@@ -87,7 +87,7 @@ const SchemeProgressCard: React.FC<{
         type="button"
         onClick={onOpen}
         disabled={isNavigating}
-        className="flex flex-1 flex-col text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-xl"
+        className="flex flex-1 flex-col text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-2xl"
       >
         <div className="flex items-start gap-3">
           <span className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">

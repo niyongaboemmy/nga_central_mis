@@ -102,7 +102,7 @@ const WeekContextPanel: React.FC<{
                       type="button"
                       onClick={() => onToggleCriterion(c.criteria_id)}
                       aria-pressed={on}
-                      className={`w-full flex items-start gap-2 text-left p-2 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
+                      className={`w-full flex items-start gap-2 text-left p-2 rounded-2xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
                         on
                           ? "el-chip-brand border-brand-500/40"
                           : "border-transparent hover:border-gray-200 dark:hover:border-white/10 hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-600 dark:text-gray-300"

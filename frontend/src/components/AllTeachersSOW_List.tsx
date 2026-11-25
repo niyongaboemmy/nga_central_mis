@@ -185,7 +185,7 @@ const AllTeachersSOW_List: React.FC<Props> = ({
             <button
               key={chip.key}
               onClick={() => onStatusFilterChange(chip.key)}
-              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+              className={`px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
                 statusFilter === chip.key
                   ? "bg-blue-600 text-white shadow-sm shadow-blue-500/25"
                   : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-blue-400"

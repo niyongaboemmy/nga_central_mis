@@ -86,7 +86,7 @@ export default function ActivityNotice() {
           {isAuthenticated ? ". " : ""}
           <a href="/privacy/#activity" className="underline">Privacy notice</a>
         </p>
-        <button onClick={dismiss} className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium border border-border-light dark:border-slate-700 hover:bg-surface-light dark:hover:bg-slate-800 inline-flex items-center gap-1">
+        <button onClick={dismiss} className="shrink-0 rounded-full px-2 py-1 text-xs font-medium border border-border-light dark:border-slate-700 hover:bg-surface-light dark:hover:bg-slate-800 inline-flex items-center gap-1">
           <X className="w-3.5 h-3.5" aria-hidden /> Got it
         </button>
       </div>

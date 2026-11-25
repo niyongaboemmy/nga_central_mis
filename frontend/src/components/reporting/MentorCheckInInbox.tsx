@@ -116,7 +116,7 @@ const MentorCheckInInbox: React.FC<MentorCheckInInboxProps> = ({ onUnreadCountCh
                 role="tab"
                 aria-selected={active}
                 onClick={() => setFilter(f.value)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-colors ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
                   active
                     ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
                     : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"

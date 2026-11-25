@@ -51,7 +51,7 @@ const TriCheckbox: React.FC<{
       e.stopPropagation();
       onToggle();
     }}
-    className={`w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+    className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
       state === "none"
         ? "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:border-gray-400"
         : ACCENTS[accent].box
@@ -184,7 +184,7 @@ const CurriculumPicker: React.FC<Props> = ({
                 setQuery("");
                 searchRef.current?.focus();
               }}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-gray-400 hover:text-gray-600"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-gray-400 hover:text-gray-600"
               aria-label="Clear search"
             >
               <X className="w-3.5 h-3.5" />
@@ -205,7 +205,7 @@ const CurriculumPicker: React.FC<Props> = ({
             type="button"
             onClick={() => setMany(outcomes.flatMap((o) => o.criteria.map((c) => c.criteria_id)), true)}
             disabled={selected.size === totalCriteria}
-            className="px-2 py-1 text-[11px] font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-gray-700/60 disabled:opacity-40"
+            className="px-2 py-1 text-[11px] font-medium rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-gray-700/60 disabled:opacity-40"
           >
             Select all
           </button>
@@ -213,7 +213,7 @@ const CurriculumPicker: React.FC<Props> = ({
             type="button"
             onClick={() => onChange([])}
             disabled={selected.size === 0}
-            className="px-2 py-1 text-[11px] font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-gray-700/60 disabled:opacity-40"
+            className="px-2 py-1 text-[11px] font-medium rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-gray-700/60 disabled:opacity-40"
           >
             Clear
           </button>

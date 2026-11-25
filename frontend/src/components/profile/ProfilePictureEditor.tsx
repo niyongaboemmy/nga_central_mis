@@ -110,7 +110,7 @@ const ProfilePictureEditor: React.FC<Props> = (props) => {
           <button
             type="button"
             onClick={() => setZoom((z) => Math.max(1, +(z - 0.2).toFixed(2)))}
-            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
             aria-label="Zoom out"
           >
             <ZoomOut className="w-4 h-4" />
@@ -128,7 +128,7 @@ const ProfilePictureEditor: React.FC<Props> = (props) => {
           <button
             type="button"
             onClick={() => setZoom((z) => Math.min(4, +(z + 0.2).toFixed(2)))}
-            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
             aria-label="Zoom in"
           >
             <ZoomIn className="w-4 h-4" />
@@ -139,7 +139,7 @@ const ProfilePictureEditor: React.FC<Props> = (props) => {
               setZoom(1);
               setCrop({ x: 0, y: 0 });
             }}
-            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
             aria-label="Reset framing"
             title="Reset"
           >

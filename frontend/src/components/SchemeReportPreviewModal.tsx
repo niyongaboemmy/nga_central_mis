@@ -50,14 +50,14 @@ const SchemeReportPreviewModal: React.FC<SchemeReportPreviewModalProps> = ({
             <div className="flex items-center gap-3">
               <button
                 onClick={onDownload}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm shadow-blue-500/20"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-sm font-bold transition-colors shadow-sm shadow-blue-500/20"
               >
                 <Download className="w-4 h-4" />
                 Download PDF
               </button>
               <button
                 onClick={onClose}
-                className="p-2 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors"
+                className="p-2 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
                 title="Close Preview"
               >
                 <X className="w-5 h-5" />

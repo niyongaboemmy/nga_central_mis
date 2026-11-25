@@ -131,7 +131,7 @@ export default function AccessStudio() {
             aria-controls={`access-panel-${key}`}
             tabIndex={current === key ? 0 : -1}
             onClick={() => setTab(key)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+            className={`px-3 py-1.5 rounded-full text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
               current === key
                 ? "bg-brand-600 text-white"
                 : "text-slate-700 dark:text-slate-200 hover:bg-surface-light dark:hover:bg-slate-800"

@@ -1377,7 +1377,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                                 type="button"
                                 key={s.slot}
                                 onClick={() => toggleSkipWeek(s.slot)}
-                                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs transition-colors text-left ${
+                                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-2xl text-xs transition-colors text-left ${
                                   s.skipped
                                     ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50"
                                     : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 border border-gray-200 dark:border-gray-700"
@@ -1418,7 +1418,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={() => adjustNumWeeks(-1)}
-                          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                           aria-label="Decrease number of weeks"
                         >
                           <Minus className="w-3.5 h-3.5" />
@@ -1435,7 +1435,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={() => adjustNumWeeks(1)}
-                          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                           aria-label="Increase number of weeks"
                         >
                           <Plus className="w-3.5 h-3.5" />

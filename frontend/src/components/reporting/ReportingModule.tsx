@@ -142,7 +142,7 @@ const ReportingModule: React.FC = () => {
                   type="button"
                   onClick={() => setDashboardSubTab(tab.id)}
                   aria-pressed={dashboardSubTab === tab.id}
-                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all duration-200 ${
+                  className={`relative flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold cursor-pointer transition-all duration-200 ${
                     dashboardSubTab === tab.id
                       ? "bg-blue-600 text-white shadow-md shadow-blue-500/20 scale-[1.02]"
                       : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/60 hover:text-gray-700 dark:hover:text-gray-200"

@@ -618,7 +618,7 @@ const LessonNotesListPage: React.FC = () => {
                           e.stopPropagation();
                           openNote(note.note_id);
                         }}
-                        className="text-left hover:text-blue-600 dark:hover:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 rounded transition-colors"
+                        className="text-left hover:text-blue-600 dark:hover:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 rounded-full transition-colors"
                       >
                         {note.title}
                       </button>

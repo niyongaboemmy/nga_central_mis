@@ -262,7 +262,7 @@ export const StructureTab: React.FC<{
               type="button"
               onClick={() => setQuery("")}
               aria-label="Clear search"
-              className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-slate-500 hover:bg-surface-light focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-slate-500 hover:bg-surface-light focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <X className="h-4 w-4" />
             </button>
@@ -275,7 +275,7 @@ export const StructureTab: React.FC<{
               type="button"
               aria-pressed={filter === key}
               onClick={() => setFilter(key)}
-              className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+              className={`inline-flex h-10 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
                 filter === key
                   ? "border-transparent bg-brand-600 text-white"
                   : "border-border-light bg-white text-slate-700 hover:bg-surface-light dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -297,7 +297,7 @@ export const StructureTab: React.FC<{
             <button
               type="button"
               onClick={() => setAll(!allOpen)}
-              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border-light bg-white px-3 text-sm font-medium text-slate-700 hover:bg-surface-light focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border-light bg-white px-3 text-sm font-medium text-slate-700 hover:bg-surface-light focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               {allOpen ? <ChevronsDownUp className="h-4 w-4" aria-hidden /> : <ChevronsUpDown className="h-4 w-4" aria-hidden />}
               {allOpen ? "Collapse all" : "Expand all"}
@@ -341,7 +341,7 @@ export const StructureTab: React.FC<{
                           <button
                             type="button"
                             onClick={onAssign}
-                            className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-200 dark:hover:bg-slate-800"
+                            className="inline-flex min-h-[36px] items-center gap-1 rounded-full px-2.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-200 dark:hover:bg-slate-800"
                           >
                             <UserPlus className="h-3.5 w-3.5" aria-hidden /> Assign
                           </button>
@@ -419,7 +419,7 @@ export const StructureTab: React.FC<{
                       aria-expanded={expanded}
                       aria-controls={bodyId}
                       onClick={() => setOpen((o) => ({ ...o, [p.id]: !expanded }))}
-                      className="flex min-h-[40px] flex-1 items-center gap-3 rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                      className="flex min-h-[40px] flex-1 items-center gap-3 rounded-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                     >
                       <ChevronDown
                         className={`h-5 w-5 flex-shrink-0 text-slate-500 motion-safe:transition-transform dark:text-slate-300 ${expanded ? "" : "-rotate-90"}`}
@@ -453,7 +453,7 @@ export const StructureTab: React.FC<{
                               type="button"
                               onClick={onAssign}
                               aria-label={`Assign a programme lead for ${p.name}`}
-                              className="grid h-9 w-9 place-items-center rounded-lg text-brand-700 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-200 dark:hover:bg-slate-800"
+                              className="grid h-9 w-9 place-items-center rounded-full text-brand-700 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-200 dark:hover:bg-slate-800"
                             >
                               <UserPlus className="h-4 w-4" aria-hidden />
                             </button>
@@ -522,7 +522,7 @@ export const StructureTab: React.FC<{
                                                   type="button"
                                                   onClick={onAssign}
                                                   aria-label={`Assign a class teacher for ${c.name}`}
-                                                  className="inline-flex min-h-[32px] items-center gap-1 rounded-lg px-2 text-xs font-semibold text-brand-700 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-200 dark:hover:bg-slate-800"
+                                                  className="inline-flex min-h-[32px] items-center gap-1 rounded-full px-2 text-xs font-semibold text-brand-700 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-200 dark:hover:bg-slate-800"
                                                 >
                                                   <UserPlus className="h-3.5 w-3.5" aria-hidden /> Assign
                                                 </button>

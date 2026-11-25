@@ -293,7 +293,7 @@ const SaveToDocumentsDialog: React.FC<SaveToDocumentsDialogProps> = ({ files, ac
               tabIndex={-1}
               aria-label={isOpen ? `Close ${f.name}` : `Open ${f.name}`}
               onClick={() => setOpen((o) => (o.has(f.folder_id) ? new Set([...o].filter((x) => x !== f.folder_id)) : new Set(o).add(f.folder_id)))}
-              className={`h-6 w-6 inline-flex items-center justify-center rounded text-slate-400 ${kids.length ? "hover:text-slate-700 dark:hover:text-slate-200" : "invisible"}`}
+              className={`h-6 w-6 inline-flex items-center justify-center rounded-full text-slate-400 ${kids.length ? "hover:text-slate-700 dark:hover:text-slate-200" : "invisible"}`}
             >
               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-90" : ""}`} />
             </button>
@@ -339,7 +339,7 @@ const SaveToDocumentsDialog: React.FC<SaveToDocumentsDialogProps> = ({ files, ac
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">Keep your code in your MIS documents to open it again later.</p>
           </div>
-          <button type="button" onClick={onClose} disabled={saving} aria-label="Close" className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10">
+          <button type="button" onClick={onClose} disabled={saving} aria-label="Close" className="p-1.5 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -364,7 +364,7 @@ const SaveToDocumentsDialog: React.FC<SaveToDocumentsDialogProps> = ({ files, ac
                 className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg border border-slate-200 dark:border-white/15 text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/5">
                 <FolderOpen className="w-4 h-4" /> Open Documents
               </a>
-              <button type="button" onClick={onClose} autoFocus className="h-9 px-5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold">
+              <button type="button" onClick={onClose} autoFocus className="h-9 px-5 rounded-full bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold">
                 Done
               </button>
             </div>
@@ -438,7 +438,7 @@ const SaveToDocumentsDialog: React.FC<SaveToDocumentsDialogProps> = ({ files, ac
                     <button
                       type="button"
                       onClick={() => setPlace("root")}
-                      className={`w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left text-[13px] ${place === "root" ? "bg-brand-50 dark:bg-brand-500/15 font-semibold text-brand-700 dark:text-brand-200" : "hover:bg-slate-50 dark:hover:bg-white/5"}`}
+                      className={`w-full flex items-center gap-2 h-8 px-2 rounded-full text-left text-[13px] ${place === "root" ? "bg-brand-50 dark:bg-brand-500/15 font-semibold text-brand-700 dark:text-brand-200" : "hover:bg-slate-50 dark:hover:bg-white/5"}`}
                       data-testid="save-docs-root"
                     >
                       <Home className="w-4 h-4 shrink-0" />
@@ -478,10 +478,10 @@ const SaveToDocumentsDialog: React.FC<SaveToDocumentsDialogProps> = ({ files, ac
                       className="flex-1 min-w-0 h-8 px-2 rounded-md border border-slate-300 dark:border-white/15 bg-white dark:bg-[#0d1117] text-sm outline-none focus:border-brand-500"
                       data-testid="save-docs-folder-name"
                     />
-                    <button type="button" onClick={() => void createFolder()} disabled={creating || !newFolder.trim()} className="h-8 px-3 rounded-md bg-brand-600 text-white text-xs font-semibold disabled:opacity-50" data-testid="save-docs-create-folder">
+                    <button type="button" onClick={() => void createFolder()} disabled={creating || !newFolder.trim()} className="h-8 px-3 rounded-full bg-brand-600 text-white text-xs font-semibold disabled:opacity-50" data-testid="save-docs-create-folder">
                       {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Create"}
                     </button>
-                    <button type="button" onClick={() => setNewFolder(null)} aria-label="Cancel new folder" className="p-1 rounded text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10">
+                    <button type="button" onClick={() => setNewFolder(null)} aria-label="Cancel new folder" className="p-1 rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -547,13 +547,13 @@ const SaveToDocumentsDialog: React.FC<SaveToDocumentsDialogProps> = ({ files, ac
             )}
 
             <div className="flex items-center justify-end gap-2 pt-1">
-              <button type="button" onClick={onClose} disabled={saving} className="h-9 px-4 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10">
+              <button type="button" onClick={onClose} disabled={saving} className="h-9 px-4 rounded-full text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10">
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving || !finalName}
-                className="inline-flex items-center gap-2 h-9 px-5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold disabled:opacity-60"
+                className="inline-flex items-center gap-2 h-9 px-5 rounded-full bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold disabled:opacity-60"
                 data-testid="save-docs-submit"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />}

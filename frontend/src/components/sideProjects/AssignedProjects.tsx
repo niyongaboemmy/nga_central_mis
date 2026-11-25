@@ -274,7 +274,7 @@ const AssignedProjects: React.FC = () => {
               role="radio"
               aria-checked={on}
               onClick={() => setQuick(on ? "none" : t.key)}
-              className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30 ${
+              className={`flex items-center gap-3 rounded-full border p-4 text-left transition focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30 ${
                 on ? "border-blue-600 bg-blue-600 text-white" : "border-slate-900/[0.07] bg-white hover:border-blue-300 dark:border-white/[0.06] dark:bg-gray-900/60 dark:hover:border-blue-500/40"
               }`}
             >

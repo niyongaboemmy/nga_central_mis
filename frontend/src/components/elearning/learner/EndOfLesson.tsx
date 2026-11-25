@@ -30,7 +30,7 @@ const EndOfLesson: React.FC<{ opened: OpenedItem; onNext?: () => void; onBack: (
       {canGoNext ? (
         <button
           onClick={onNext}
-          className="mt-3 w-full group flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 hover:border-brand-200 dark:hover:border-brand-500/40 hover:shadow-soft focus:outline-none focus-visible:shadow-glow transition-all text-left"
+          className="mt-3 w-full group flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 hover:border-brand-200 dark:hover:border-brand-500/40 hover:shadow-soft focus:outline-none focus-visible:shadow-glow transition-all text-left"
         >
           <span className="w-10 h-10 rounded-xl el-subtle flex items-center justify-center text-brand-600 dark:text-brand-200 flex-shrink-0">
             <ItemTypeIcon type={next!.item_type} className="w-4 h-4" />

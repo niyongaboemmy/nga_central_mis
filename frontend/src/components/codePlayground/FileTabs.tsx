@@ -108,7 +108,7 @@ const FileTabs: React.FC<FileTabsProps> = ({ files, entry, active, onSelect, onA
                   aria-label={`More for ${f.path}`}
                   aria-haspopup="menu"
                   aria-expanded={menu === f.path}
-                  className="h-6 w-6 inline-flex items-center justify-center rounded-md text-slate-500 hover:bg-slate-200/70 dark:hover:bg-white/10"
+                  className="h-6 w-6 inline-flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-200/70 dark:hover:bg-white/10"
                   data-testid="playground-file-menu"
                 >
                   <MoreHorizontal className="w-3.5 h-3.5" />
@@ -137,7 +137,7 @@ const FileTabs: React.FC<FileTabsProps> = ({ files, entry, active, onSelect, onA
             <button
               type="button"
               onClick={() => setAdding(suggest())}
-              className="flex-shrink-0 inline-flex items-center gap-1 h-7 px-2 ml-0.5 rounded-md text-slate-500 dark:text-slate-400 hover:text-brand-600 hover:bg-slate-200/60 dark:hover:bg-white/10"
+              className="flex-shrink-0 inline-flex items-center gap-1 h-7 px-2 ml-0.5 rounded-full text-slate-500 dark:text-slate-400 hover:text-brand-600 hover:bg-slate-200/60 dark:hover:bg-white/10"
               title="Add a file"
               aria-label="Add a file"
               data-testid="playground-add-file"
@@ -163,7 +163,7 @@ const FileTabs: React.FC<FileTabsProps> = ({ files, entry, active, onSelect, onA
               <div className="mt-2 flex gap-2">
                 <button
                   type="button"
-                  className="h-8 px-3 rounded-lg bg-danger-700 text-white text-xs font-semibold"
+                  className="h-8 px-3 rounded-full bg-danger-700 text-white text-xs font-semibold"
                   onClick={() => {
                     onDelete(menu);
                     setMenu(null);
@@ -173,21 +173,21 @@ const FileTabs: React.FC<FileTabsProps> = ({ files, entry, active, onSelect, onA
                 >
                   Delete
                 </button>
-                <button type="button" className="h-8 px-3 rounded-lg text-xs" onClick={() => setConfirmDelete(null)}>
+                <button type="button" className="h-8 px-3 rounded-full text-xs" onClick={() => setConfirmDelete(null)}>
                   Cancel
                 </button>
               </div>
             </div>
           ) : (
             <>
-              <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-white/5" onClick={() => (setRenaming({ path: menu, value: menu }), setMenu(null))}>
+              <button type="button" role="menuitem" className="w-full flex items-center gap-2 px-2 py-1.5 rounded-full text-left hover:bg-slate-50 dark:hover:bg-white/5" onClick={() => (setRenaming({ path: menu, value: menu }), setMenu(null))}>
                 <Pencil className="w-3.5 h-3.5" /> Rename
               </button>
               <button
                 type="button"
                 role="menuitem"
                 disabled={menu === entry}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-white/5 disabled:opacity-50"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-full text-left hover:bg-slate-50 dark:hover:bg-white/5 disabled:opacity-50"
                 onClick={() => (onSetEntry(menu), setMenu(null))}
                 data-testid="playground-set-main"
               >
@@ -197,7 +197,7 @@ const FileTabs: React.FC<FileTabsProps> = ({ files, entry, active, onSelect, onA
                 type="button"
                 role="menuitem"
                 disabled={files.length < 2}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-danger-700 dark:text-red-400 hover:bg-danger-100/60 dark:hover:bg-red-500/10 disabled:opacity-50"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-full text-left text-danger-700 dark:text-red-400 hover:bg-danger-100/60 dark:hover:bg-red-500/10 disabled:opacity-50"
                 onClick={() => setConfirmDelete(menu)}
                 data-testid="playground-delete-file"
               >

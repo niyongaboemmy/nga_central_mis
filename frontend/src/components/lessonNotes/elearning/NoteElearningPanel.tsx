@@ -400,7 +400,7 @@ const NoteElearningPanel: React.FC<Props> = ({ noteId, onClose, onChanged, onPub
                                   aria-checked={here}
                                   onClick={() => placeIn(w)}
                                   disabled={!!busy}
-                                  className={`w-full text-left rounded-xl border p-3 transition-all disabled:cursor-wait ${
+                                  className={`w-full text-left rounded-2xl border p-3 transition-all disabled:cursor-wait ${
                                     here
                                       ? "border-emerald-400 bg-emerald-50/60 dark:bg-emerald-400/10 dark:border-emerald-400/40"
                                       : w.suggested

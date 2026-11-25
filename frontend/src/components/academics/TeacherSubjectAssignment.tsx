@@ -407,7 +407,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
                             ) && (
                               <button
                                 onClick={() => handleDelete(assignment)}
-                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>

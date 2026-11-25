@@ -142,7 +142,7 @@ const FolderTree: React.FC<FolderTreeProps> = ({
             onClick={onCreateFolder}
             title="New folder"
             aria-label="New folder"
-            className="grid h-8 w-8 place-items-center rounded-lg text-brand-600 transition-colors hover:bg-brand-50 dark:text-brand-200 dark:hover:bg-brand-500/15"
+            className="grid h-8 w-8 place-items-center rounded-full text-brand-600 transition-colors hover:bg-brand-50 dark:text-brand-200 dark:hover:bg-brand-500/15"
           >
             <FolderPlus className="h-4 w-4" />
           </button>

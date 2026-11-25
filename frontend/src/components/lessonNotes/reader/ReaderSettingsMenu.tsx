@@ -51,7 +51,7 @@ const ReaderSettingsMenu: React.FC<Props> = ({
       <button
         onClick={() => setOpen(!open)}
         title="Reading settings"
-        className={`p-2 rounded-lg transition-colors ${
+        className={`p-2 rounded-full transition-colors ${
           open
             ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
             : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -80,7 +80,7 @@ const ReaderSettingsMenu: React.FC<Props> = ({
                   )
                 }
                 aria-label="Smaller text"
-                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="p-1.5 rounded-full border border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
@@ -100,7 +100,7 @@ const ReaderSettingsMenu: React.FC<Props> = ({
                   )
                 }
                 aria-label="Larger text"
-                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="p-1.5 rounded-full border border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -123,7 +123,7 @@ const ReaderSettingsMenu: React.FC<Props> = ({
                 <button
                   key={f.key}
                   onClick={() => update("font", f.key)}
-                  className={`${f.cls} px-3 py-2 rounded-xl text-sm border transition-colors ${
+                  className={`${f.cls} px-3 py-2 rounded-full text-sm border transition-colors ${
                     prefs.font === f.key
                       ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
                       : "border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -143,7 +143,7 @@ const ReaderSettingsMenu: React.FC<Props> = ({
                   key={lh}
                   onClick={() => update("lineHeight", lh)}
                   aria-label={`Line spacing ${lh}`}
-                  className={`flex items-center justify-center py-2 rounded-xl border transition-colors ${
+                  className={`flex items-center justify-center py-2 rounded-full border transition-colors ${
                     prefs.lineHeight === lh
                       ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
                       : "border-gray-200 dark:border-gray-600 text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -165,7 +165,7 @@ const ReaderSettingsMenu: React.FC<Props> = ({
                 <button
                   key={p.key}
                   onClick={() => update("paper", p.key)}
-                  className={`flex flex-col items-center gap-1.5 py-2 rounded-xl border transition-colors ${
+                  className={`flex flex-col items-center gap-1.5 py-2 rounded-2xl border transition-colors ${
                     prefs.paper === p.key
                       ? "border-blue-500 bg-blue-50/60 dark:bg-blue-900/20"
                       : "border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"

@@ -457,7 +457,7 @@ const MyMentor: React.FC = () => {
                     onClick={() => setCategoryMenuOpen((v) => !v)}
                     aria-haspopup="listbox"
                     aria-expanded={categoryMenuOpen}
-                    className="w-full flex items-center justify-between gap-2 text-sm border border-gray-200 dark:border-gray-700/60 rounded-xl pl-3.5 pr-3 py-2.5 bg-gray-50 dark:bg-gray-900/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+                    className="w-full flex items-center justify-between gap-2 text-sm border border-gray-200 dark:border-gray-700/60 rounded-full pl-3.5 pr-3 py-2.5 bg-gray-50 dark:bg-gray-900/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
                   >
                     <span className="flex items-center gap-2">
                       <span className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${selectedCategoryDef.tint}`}>
@@ -499,7 +499,7 @@ const MyMentor: React.FC = () => {
                                   setCategory(c.value);
                                   setCategoryMenuOpen(false);
                                 }}
-                                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-left transition-colors ${
+                                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-full text-sm text-left transition-colors ${
                                   selected
                                     ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-semibold"
                                     : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"

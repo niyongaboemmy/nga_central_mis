@@ -20,7 +20,7 @@ const Panel: React.FC<{ title: string; icon: React.ElementType; children: React.
 );
 
 const ProjectLine: React.FC<{ r: MonitorRow; onOpen: (id: number) => void; right: React.ReactNode }> = ({ r, onOpen, right }) => (
-  <button type="button" onClick={() => onOpen(r.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-gray-700/40">
+  <button type="button" onClick={() => onOpen(r.id)} className="flex w-full items-center gap-3 rounded-full px-2 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-gray-700/40">
     <UserAvatar name={r.student.name} src={r.student.avatar} userId={r.student.id} size={28} decorative />
     <span className="min-w-0 flex-1">
       <span className="block truncate text-sm font-semibold text-slate-800 dark:text-white">{r.title}</span>
@@ -224,7 +224,7 @@ export const DeliveryInsights: React.FC<{ s: Summary; onOpen: (id: number) => vo
         <div className="mt-4 rounded-2xl bg-slate-50 p-2 dark:bg-gray-800/60">
           <p className="px-2 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-gray-400">At risk</p>
           {d.atRisk.map((r) => (
-            <button key={r.id} type="button" onClick={() => onOpen(r.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white dark:hover:bg-gray-900">
+            <button key={r.id} type="button" onClick={() => onOpen(r.id)} className="flex w-full items-center gap-3 rounded-full px-2 py-2 text-left transition hover:bg-white dark:hover:bg-gray-900">
               <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800 dark:text-white">{r.title}</span>
               {r.overdue > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">{r.overdue} overdue</span>}
               {r.blocked > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">{r.blocked} blocked</span>}

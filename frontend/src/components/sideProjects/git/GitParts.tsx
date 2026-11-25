@@ -59,7 +59,7 @@ export const CopyField: React.FC<{ value: string; label: string; mono?: boolean 
       <code className={`min-w-0 flex-1 truncate text-xs text-slate-800 dark:text-gray-100 ${mono ? "font-mono" : ""}`} title={value}>
         {value}
       </code>
-      <button type="button" onClick={copy} aria-label={`Copy ${label.toLowerCase()}`} className="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg bg-blue-600 px-2 text-[11px] font-semibold text-white transition hover:bg-blue-700">
+      <button type="button" onClick={copy} aria-label={`Copy ${label.toLowerCase()}`} className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full bg-blue-600 px-2 text-[11px] font-semibold text-white transition hover:bg-blue-700">
         {done ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />} {done ? "Copied" : "Copy"}
       </button>
     </div>

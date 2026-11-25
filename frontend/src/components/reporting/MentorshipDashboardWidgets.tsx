@@ -110,7 +110,7 @@ const MentorshipDashboardWidgets: React.FC<Props> = ({ schoolName = "NGA MIS" })
         <button
           onClick={handleDownload}
           disabled={downloading}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-full text-sm font-semibold"
         >
           <Download className="w-4 h-4" />
           {downloading ? "Generating..." : "Download My Consolidated Report"}

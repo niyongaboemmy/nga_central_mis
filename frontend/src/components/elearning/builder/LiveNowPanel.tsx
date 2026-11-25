@@ -90,7 +90,7 @@ const LiveNowPanel: React.FC<{
                   }
                   aria-pressed={followId === w.user_id}
                   title={`Follow ${w.name} — see where they are on the page`}
-                  className={`flex w-full items-center gap-3 rounded-xl px-2 py-1 text-left transition-colors ${
+                  className={`flex w-full items-center gap-3 rounded-full px-2 py-1 text-left transition-colors ${
                     followId === w.user_id
                       ? "bg-brand-50 dark:bg-brand-500/10"
                       : "hover:bg-gray-50 dark:hover:bg-white/[0.04]"

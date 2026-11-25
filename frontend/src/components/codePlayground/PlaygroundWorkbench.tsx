@@ -431,7 +431,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
       onClick={running ? stop : doRun}
       disabled={!running && (!runnable || !!problem || !files.some((x) => x.content.trim()))}
       title={running ? "Stop" : problem ? problem : runnable ? "Run (Ctrl/⌘ + Enter)" : `${lang.label} isn't on the code runner yet`}
-      className={`inline-flex items-center gap-2 h-9 pl-3 pr-4 rounded-lg text-sm font-semibold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+      className={`inline-flex items-center gap-2 h-9 pl-3 pr-4 rounded-full text-sm font-semibold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
         running ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900 hover:opacity-90" : "bg-success-700 hover:bg-green-800 text-white active:scale-[0.98]"
       }`}
       data-testid="playground-run"
@@ -460,10 +460,10 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
             <span role="dialog" aria-label="Replace your files?" className="absolute right-0 top-full mt-1 z-40 w-64 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#161b22] shadow-xl p-3 text-[13px] text-slate-700 dark:text-slate-200">
               Replace your files with the {lang.label} example? Your changes are lost.
               <span className="mt-2 flex gap-2">
-                <button type="button" className="h-8 px-3 rounded-lg bg-brand-500 text-white text-xs font-semibold" onClick={() => loadProject(example)} data-testid="playground-example-confirm">
+                <button type="button" className="h-8 px-3 rounded-full bg-brand-500 text-white text-xs font-semibold" onClick={() => loadProject(example)} data-testid="playground-example-confirm">
                   Replace
                 </button>
-                <button type="button" className="h-8 px-3 rounded-lg text-xs" onClick={() => setConfirmExample(false)}>
+                <button type="button" className="h-8 px-3 rounded-full text-xs" onClick={() => setConfirmExample(false)}>
                   Cancel
                 </button>
               </span>
@@ -662,7 +662,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     <div className={`flex-1 min-h-0 flex flex-col bg-white ${pane === "preview" ? "" : "hidden"}`}>
       {state.page && (
         <div className="flex items-center gap-1.5 h-8 px-2 border-b border-slate-200 bg-slate-50 text-[12px] text-slate-600 [color-scheme:light]" data-testid="playground-address">
-          <button type="button" onClick={back} disabled={!state.history.length} aria-label="Previous page" title="Previous page" className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-slate-200 disabled:opacity-40">
+          <button type="button" onClick={back} disabled={!state.history.length} aria-label="Previous page" title="Previous page" className="h-6 w-6 inline-flex items-center justify-center rounded-full hover:bg-slate-200 disabled:opacity-40">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <Globe className="w-3.5 h-3.5 text-slate-500" />
@@ -883,7 +883,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
         <span className="flex-1" />
         <div className="hidden md:block">{toolbar}</div>
         {onSave && (
-          <button type="button" onClick={() => onSave(asBlock())} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 dark:border-white/10 text-sm font-medium hover:bg-slate-100 dark:hover:bg-white/10">
+          <button type="button" onClick={() => onSave(asBlock())} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-slate-200 dark:border-white/10 text-sm font-medium hover:bg-slate-100 dark:hover:bg-white/10">
             <Save className="w-4 h-4" /> Save to block
           </button>
         )}

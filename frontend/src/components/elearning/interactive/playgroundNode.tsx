@@ -133,13 +133,13 @@ const PlaygroundEditForm: React.FC<{ initial: PlaygroundBlock; onSave: (b: Playg
         </>
       )}
       <div className="flex flex-wrap gap-2 pt-1">
-        <button type="button" onClick={() => onSave(b)} className="min-h-[36px] px-4 rounded-lg bg-brand-500 text-white text-sm font-semibold">
+        <button type="button" onClick={() => onSave(b)} className="min-h-[36px] px-4 rounded-full bg-brand-500 text-white text-sm font-semibold">
           Save
         </button>
-        <button type="button" onClick={() => openPlayground({ block: b, source: "Testing the block", onSave: (next) => setB(next) })} className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border border-gray-200 dark:border-white/10 text-sm">
+        <button type="button" onClick={() => openPlayground({ block: b, source: "Testing the block", onSave: (next) => setB(next) })} className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full border border-gray-200 dark:border-white/10 text-sm">
           <Play className="w-3.5 h-3.5" /> Test in the playground
         </button>
-        <button type="button" onClick={onCancel} className="min-h-[36px] px-3 rounded-lg text-sm text-gray-600 dark:text-gray-300">
+        <button type="button" onClick={onCancel} className="min-h-[36px] px-3 rounded-full text-sm text-gray-600 dark:text-gray-300">
           Cancel
         </button>
       </div>

@@ -80,7 +80,7 @@ export const WeekRail: React.FC<{
                 role="radio"
                 aria-checked={filter === f}
                 onClick={() => onFilter(f)}
-                className={`flex-1 min-h-[36px] px-2 rounded-lg font-medium ${filter === f ? "el-segment-on" : "text-slate-600 dark:text-slate-300"}`}
+                className={`flex-1 min-h-[36px] px-2 rounded-full font-medium ${filter === f ? "el-segment-on" : "text-slate-600 dark:text-slate-300"}`}
               >
                 {label}
               </button>
@@ -109,12 +109,12 @@ export const WeekRail: React.FC<{
                     aria-label={`${isSel ? "Remove" : "Add"} ${w.entry.week_number || "week"}`}
                     disabled={!can}
                     onClick={() => sid && onToggle(sid)}
-                    className={`mt-0.5 w-6 h-6 flex-shrink-0 rounded-md border-2 flex items-center justify-center transition-colors focus:outline-none focus-visible:shadow-glow ${isSel ? "bg-brand-600 border-brand-600 text-white" : "border-gray-300 dark:border-white/20"} disabled:cursor-not-allowed`}
+                    className={`mt-0.5 w-6 h-6 flex-shrink-0 rounded-full border-2 flex items-center justify-center transition-colors focus:outline-none focus-visible:shadow-glow ${isSel ? "bg-brand-600 border-brand-600 text-white" : "border-gray-300 dark:border-white/20"} disabled:cursor-not-allowed`}
                   >
                     {isSel && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
                   </button>
                 )}
-                <button onClick={() => sid && onFocus(sid)} disabled={!sid} aria-current={isFocus ? "true" : undefined} title={w.entry.topic ? factsText(w) : undefined} className="min-w-0 flex-1 text-left focus:outline-none focus-visible:shadow-glow rounded-md">
+                <button onClick={() => sid && onFocus(sid)} disabled={!sid} aria-current={isFocus ? "true" : undefined} title={w.entry.topic ? factsText(w) : undefined} className="min-w-0 flex-1 text-left focus:outline-none focus-visible:shadow-glow rounded-full">
                   {/* Primary: which week and what it's about */}
                   <span className="flex items-center gap-1.5">
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{w.entry.week_number || "Week"}</span>

@@ -127,7 +127,7 @@ const SubjectElearningLink: React.FC<{ subjectId: number }> = ({
     return (
       <button
         onClick={() => navigate(builderRoutes.list)}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-blue-300 hover:text-blue-600 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-800/60 dark:hover:text-blue-400"
+        className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-blue-300 hover:text-blue-600 dark:border-gray-700 dark:text-gray-200 dark:hover:border-blue-800/60 dark:hover:text-blue-400"
       >
         <Plus className="h-4 w-4" />
         Build a course
@@ -139,7 +139,7 @@ const SubjectElearningLink: React.FC<{ subjectId: number }> = ({
     return (
       <button
         onClick={() => navigate(targets[0].to)}
-        className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
       >
         {canBuild ? (
           <LayoutGrid className="h-4 w-4" />
@@ -159,7 +159,7 @@ const SubjectElearningLink: React.FC<{ subjectId: number }> = ({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
       >
         {canBuild ? (
           <LayoutGrid className="h-4 w-4" />

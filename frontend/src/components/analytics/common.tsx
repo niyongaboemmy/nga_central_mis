@@ -175,7 +175,7 @@ export const Segmented = <T extends string>({
         role="radio"
         aria-checked={value === o.value}
         onClick={() => onChange(o.value)}
-        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-150 whitespace-nowrap ${
+        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all duration-150 whitespace-nowrap ${
           value === o.value
             ? "bg-brand-600 text-white shadow-sm"
             : "text-text-primary-light dark:text-text-primary-dark hover:bg-surface-light dark:hover:bg-slate-800"

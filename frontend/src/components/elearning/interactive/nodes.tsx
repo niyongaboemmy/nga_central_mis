@@ -20,7 +20,7 @@ const RevealView: React.FC<NodeViewProps> = ({ node, updateAttributes, editor })
   return (
     <NodeViewWrapper className="my-3 rounded-xl border border-brand-200 dark:border-brand-700 bg-brand-50/50 dark:bg-brand-700/10">
       <div contentEditable={false} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-brand-700 dark:text-brand-200 select-none">
-        <button type="button" onClick={() => setOpen((o) => !o)} aria-label={open ? "Collapse" : "Expand"} className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-brand-100 dark:hover:bg-brand-700/30">
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-label={open ? "Collapse" : "Expand"} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-brand-100 dark:hover:bg-brand-700/30">
           <ChevronDown className={`w-4 h-4 transition-transform ${open ? "" : "-rotate-90"}`} />
         </button>
         {editingSummary ? (
@@ -46,7 +46,7 @@ const RevealView: React.FC<NodeViewProps> = ({ node, updateAttributes, editor })
           <button
             type="button"
             onClick={() => setEditingSummary(true)}
-            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-brand-100 dark:hover:bg-brand-700/30"
+            className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-brand-100 dark:hover:bg-brand-700/30"
             aria-label="Edit prompt"
           >
             <Pencil className="w-3.5 h-3.5" />
@@ -294,8 +294,8 @@ const ActivityView: React.FC<NodeViewProps> = ({ node, updateAttributes, editor,
           <p className="text-xs text-slate-600 dark:text-slate-300">{hint}</p>
           {error && <p className="text-xs text-danger-700 dark:text-danger-500">{error}</p>}
           <div className="flex gap-2">
-            <button type="button" onClick={save} className="min-h-[36px] px-3 rounded-lg bg-brand-500 text-white text-sm font-medium">Save</button>
-            <button type="button" onClick={() => setEditing(false)} className="min-h-[36px] px-3 rounded-lg border border-gray-200 dark:border-white/10 text-sm">Cancel</button>
+            <button type="button" onClick={save} className="min-h-[36px] px-3 rounded-full bg-brand-500 text-white text-sm font-medium">Save</button>
+            <button type="button" onClick={() => setEditing(false)} className="min-h-[36px] px-3 rounded-full border border-gray-200 dark:border-white/10 text-sm">Cancel</button>
           </div>
         </div>
       ) : (

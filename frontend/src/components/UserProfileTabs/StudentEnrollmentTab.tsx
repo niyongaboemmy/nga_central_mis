@@ -391,7 +391,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -818,7 +818,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                   </h3>
                   <button
                     onClick={() => setShowEnrollModal(false)}
-                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg"
+                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-full"
                   >
                     <X className="w-5 h-5" />
                   </button>

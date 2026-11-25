@@ -210,7 +210,7 @@ export const BarList: React.FC<{ items: BarItem[]; format?: (n: number) => strin
         return (
           <li key={it.key}>
             {it.onClick ? (
-              <button type="button" onClick={it.onClick} className={cx("flex w-full items-center gap-3 rounded-lg pr-1 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50", accent.focus)}>
+              <button type="button" onClick={it.onClick} className={cx("flex w-full items-center gap-3 rounded-full pr-1 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50", accent.focus)}>
                 {body}
               </button>
             ) : (

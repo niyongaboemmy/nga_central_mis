@@ -147,7 +147,7 @@ const PlanWorkPicker: React.FC<{
               <>
                 {matchTasks.length > 0 && <p className="px-2 pb-1 pt-1.5 text-[11px] font-medium text-slate-500 dark:text-gray-400">Tasks</p>}
                 {matchTasks.slice(0, 30).map((t) => (
-                  <button key={`t${t.id}`} type="button" role="option" aria-selected={false} onClick={() => add(t.planItemId, t.id)} className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-gray-800/70">
+                  <button key={`t${t.id}`} type="button" role="option" aria-selected={false} onClick={() => add(t.planItemId, t.id)} className="flex w-full items-center gap-2.5 rounded-full px-2 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-gray-800/70">
                     <ListChecks className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm text-slate-800 dark:text-gray-100">{t.title}</span>
@@ -159,7 +159,7 @@ const PlanWorkPicker: React.FC<{
                 ))}
                 {matchFeatures.length > 0 && <p className="px-2 pb-1 pt-2 text-[11px] font-medium text-slate-500 dark:text-gray-400">Features</p>}
                 {matchFeatures.slice(0, 30).map((f) => (
-                  <button key={`f${f.id}`} type="button" role="option" aria-selected={false} onClick={() => add(f.id, null)} className="flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-gray-800/70">
+                  <button key={`f${f.id}`} type="button" role="option" aria-selected={false} onClick={() => add(f.id, null)} className="flex w-full items-center gap-2.5 rounded-full px-2 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-gray-800/70">
                     <CircleDot className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm text-slate-800 dark:text-gray-100">{f.title}</span>

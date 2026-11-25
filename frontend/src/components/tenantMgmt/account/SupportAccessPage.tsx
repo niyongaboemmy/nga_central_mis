@@ -261,7 +261,7 @@ const SupportAccessPage: React.FC = () => {
             type="button"
             onClick={() => setShowPast((v) => !v)}
             aria-expanded={showPast}
-            className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-800"
+            className="flex w-full items-center justify-between rounded-full px-2 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-800"
           >
             <span>Past ({past.length})</span>
             <motion.span animate={{ rotate: showPast ? 180 : 0 }}>

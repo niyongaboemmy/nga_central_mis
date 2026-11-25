@@ -203,7 +203,7 @@ const ColorDropdown: React.FC<{
                 onPick(null);
                 setOpen(false);
               }}
-              className="mt-2 w-full text-left px-1.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/60 rounded"
+              className="mt-2 w-full text-left px-1.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/60 rounded-full"
             >
               Remove color
             </button>

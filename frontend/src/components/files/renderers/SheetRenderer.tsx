@@ -40,7 +40,7 @@ export const SheetTable: React.FC<{ sheets?: string[]; active?: number; onPick?:
     {sheets && sheets.length > 1 && (
       <div className="flex gap-1 overflow-x-auto pb-2" role="tablist" aria-label="Sheets">
         {sheets.map((n, i) => (
-          <button key={n} role="tab" aria-selected={i === active} onClick={() => onPick?.(i)} className={`min-h-[34px] px-3 rounded-lg text-xs font-medium whitespace-nowrap ${i === active ? "el-segment-on" : "el-chip"}`}>
+          <button key={n} role="tab" aria-selected={i === active} onClick={() => onPick?.(i)} className={`min-h-[34px] px-3 rounded-full text-xs font-medium whitespace-nowrap ${i === active ? "el-segment-on" : "el-chip"}`}>
             {n}
           </button>
         ))}

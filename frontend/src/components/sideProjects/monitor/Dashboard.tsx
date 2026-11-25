@@ -143,7 +143,7 @@ const Heat: React.FC<{ weeks: Summary["weeks"] }> = ({ weeks }) => {
 const AttentionRow: React.FC<{ r: MonitorRow; onOpen: (id: number) => void }> = ({ r, onOpen }) => {
   const H = HEALTH_META[r.health];
   return (
-    <button type="button" onClick={() => onOpen(r.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-gray-700/40">
+    <button type="button" onClick={() => onOpen(r.id)} className="flex w-full items-center gap-3 rounded-full px-2 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-gray-700/40">
       <UserAvatar name={r.student.name} src={r.student.avatar} userId={r.student.id} size={32} decorative />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-slate-800 dark:text-white">{r.title}</p>
@@ -319,7 +319,7 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
               {s.recentCompleted.map((r) => {
                 const Icon = CATEGORY_ICON[r.category?.icon ?? "sparkles"] ?? CATEGORY_ICON.sparkles;
                 return (
-                  <button key={r.id} type="button" onClick={() => onOpen(r.id)} className="group relative aspect-[4/3] overflow-hidden rounded-xl text-left" style={{ background: `linear-gradient(135deg, ${r.category?.color ?? t.s3}, ${(r.category?.color ?? t.s3)}88)` }}>
+                  <button key={r.id} type="button" onClick={() => onOpen(r.id)} className="group relative aspect-[4/3] overflow-hidden rounded-2xl text-left" style={{ background: `linear-gradient(135deg, ${r.category?.color ?? t.s3}, ${(r.category?.color ?? t.s3)}88)` }}>
                     {r.coverAssetId ? <img src={fileUrl(r.coverAssetId, "thumb")} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-105" /> : <Icon className="absolute right-2 top-2 h-8 w-8 text-white/40" aria-hidden />}
                     <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-2">
                       <span className="line-clamp-1 text-xs font-bold text-white">{r.title}</span>

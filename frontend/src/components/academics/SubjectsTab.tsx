@@ -390,7 +390,7 @@ const GradeAssignmentGrid: React.FC<{
                     })),
                   )
                 }
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded-full transition-colors"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Reset to Current
@@ -407,7 +407,7 @@ const GradeAssignmentGrid: React.FC<{
                   })),
                 )
               }
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-gray-700 rounded-full transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
               Clear All
@@ -423,7 +423,7 @@ const GradeAssignmentGrid: React.FC<{
                   })),
                 )
               }
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-full transition-colors"
             >
               <CheckCheck className="w-3.5 h-3.5" />
               Select All
@@ -445,7 +445,7 @@ const GradeAssignmentGrid: React.FC<{
                   );
                 }
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30 rounded-full transition-colors"
             >
               <Layers className="w-3.5 h-3.5" />
               Same Program

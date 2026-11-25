@@ -379,7 +379,7 @@ const LessonReportingCalendar: React.FC<Props> = ({
           <button
             ref={dateJumpButtonRef}
             onClick={() => setShowDatePicker((p) => !p)}
-            className={`p-1.5 rounded-lg transition-colors ${
+            className={`p-1.5 rounded-full transition-colors ${
               showDatePicker
                 ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10"
                 : "text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -391,26 +391,26 @@ const LessonReportingCalendar: React.FC<Props> = ({
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title="Refresh"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
             onClick={goToPrevMonth}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={goToToday}
-            className="px-3 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+            className="px-3 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
           >
             Today
           </button>
           <button
             onClick={goToNextMonth}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -666,7 +666,7 @@ const LessonReportingCalendar: React.FC<Props> = ({
                     setPopover(null);
                     openLesson(lesson);
                   }}
-                  className={`group w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-left transition-all ring-1 ring-inset ring-transparent hover:ring-2 hover:-translate-y-px hover:shadow-sm ${statusRowTint(lesson.reporting_status)}`}
+                  className={`group w-full flex items-center gap-2.5 px-3 py-2.5 rounded-full text-sm text-left transition-all ring-1 ring-inset ring-transparent hover:ring-2 hover:-translate-y-px hover:shadow-sm ${statusRowTint(lesson.reporting_status)}`}
                 >
                   <span
                     className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColor(lesson.reporting_status)}`}
@@ -692,7 +692,7 @@ const LessonReportingCalendar: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={(e) => handleAddUnscheduled(popover.date, e)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-left font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-full text-sm text-left font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add unscheduled activity

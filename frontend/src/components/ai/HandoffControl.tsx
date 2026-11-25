@@ -273,7 +273,7 @@ const HandoffControl: React.FC<Props> = ({ run, onImported, pupilData = false, d
                 setPasteOpen(false);
                 setError(null);
               }}
-              className="rounded p-0.5 text-slate-500 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white"
+              className="rounded-full p-0.5 text-slate-500 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white"
             >
               <X className="h-3.5 w-3.5" aria-hidden />
             </button>
@@ -292,7 +292,7 @@ const HandoffControl: React.FC<Props> = ({ run, onImported, pupilData = false, d
               type="button"
               onClick={() => void importAnswer()}
               disabled={disabled || !!busy || !text.trim()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy === "import" && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
               Import

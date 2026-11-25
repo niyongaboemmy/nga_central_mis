@@ -62,7 +62,7 @@ const LiveTopics: React.FC<{ topics: TopicPresence[] }> = ({ topics }) => {
                   type="button"
                   onClick={() => setOpenId(open ? null : key)}
                   aria-expanded={open}
-                  className="group w-full rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.04]"
+                  className="group w-full rounded-full px-2 py-1.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.04]"
                 >
                   <div className="flex items-center gap-2">
                     {topic.item_type ? (

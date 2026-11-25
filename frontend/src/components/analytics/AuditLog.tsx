@@ -245,7 +245,7 @@ const Filters: React.FC<{ state: Q["state"]; update: Q["update"]; facets?: { act
                 key={v}
                 onClick={() => toggleVerb(v)}
                 aria-pressed={on}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium border transition-all ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
                   on
                     ? "border-brand-600 bg-brand-50 dark:bg-slate-700 text-text-primary-light dark:text-text-primary-dark shadow-sm"
                     : "border-border-light dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-surface-light dark:hover:bg-slate-800"
@@ -283,7 +283,7 @@ const Filters: React.FC<{ state: Q["state"]; update: Q["update"]; facets?: { act
           <span className="inline-flex items-center gap-1.5 rounded-xl border border-brand-600 bg-brand-50 dark:bg-slate-700 px-2.5 py-1 text-xs font-medium text-text-primary-light dark:text-text-primary-dark">
             <UserRound className="w-3.5 h-3.5" aria-hidden />
             {state.userName || `User ${state.user}`}
-            <button aria-label="Remove person filter" className="rounded hover:text-rose-700 dark:hover:text-rose-300" onClick={() => update({ user: null, user_name: null })}>
+            <button aria-label="Remove person filter" className="rounded-full hover:text-rose-700 dark:hover:text-rose-300" onClick={() => update({ user: null, user_name: null })}>
               <X className="w-3.5 h-3.5" />
             </button>
           </span>
@@ -400,7 +400,7 @@ const Insights: React.FC<{ summary: ReturnType<typeof useReport<any>>; update: Q
               return (
                 <li key={u.user_id}>
                   <button
-                    className="group w-full text-left rounded-lg px-1.5 py-1.5 -mx-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                    className="group w-full text-left rounded-full px-1.5 py-1.5 -mx-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
                     onClick={() => update({ user: u.user_id, user_name: u.name })}
                     title="Show only this person's entries"
                   >
@@ -526,7 +526,7 @@ const LogTable: React.FC<{ qs: string; state: Q["state"]; update: Q["update"] }>
               key: "d",
               label: <span className="sr-only">Details</span>,
               render: (r) => (
-                <button className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setOpen(r)} aria-label={`Details of ${humanAction(r.action_type)} at ${fmtAt(r.created_at)}`}>
+                <button className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setOpen(r)} aria-label={`Details of ${humanAction(r.action_type)} at ${fmtAt(r.created_at)}`}>
                   <Eye className="w-3.5 h-3.5" aria-hidden /> Details
                 </button>
               ),

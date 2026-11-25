@@ -135,7 +135,7 @@ const MenteesQuickAccess: React.FC<{ compact?: boolean }> = ({ compact = false }
         title={label}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        className="relative p-2 rounded-xl text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200"
+        className="relative p-2 rounded-full text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200"
       >
         <Users2 className="w-5 h-5" />
         {unread > 0 && (

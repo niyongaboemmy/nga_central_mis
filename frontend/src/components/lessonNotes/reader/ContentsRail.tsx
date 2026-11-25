@@ -92,7 +92,7 @@ const ContentsRail: React.FC<Props> = ({
                 <button
                   onClick={() => onJump(t.id)}
                   aria-current={isActive ? "location" : undefined}
-                  className={`group relative flex w-full items-start gap-3 rounded-lg py-1.5 pl-0 pr-2 text-left transition-colors ${
+                  className={`group relative flex w-full items-start gap-3 rounded-full py-1.5 pl-0 pr-2 text-left transition-colors ${
                     isActive
                       ? "text-brand-700 dark:text-brand-200"
                       : isPassed

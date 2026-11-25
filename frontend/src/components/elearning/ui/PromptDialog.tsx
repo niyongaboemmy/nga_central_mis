@@ -113,7 +113,7 @@ const PromptDialog: React.FC<{
                 <h2 className="text-base font-semibold text-gray-900 dark:text-white">{request.title}</h2>
                 {request.detail && <p className="mt-0.5 text-[13px] text-gray-500 dark:text-gray-400">{request.detail}</p>}
               </div>
-              <button onClick={onCancel} aria-label="Cancel" className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 flex-shrink-0">
+              <button onClick={onCancel} aria-label="Cancel" className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 flex-shrink-0">
                 <X className="w-4 h-4" />
               </button>
             </div>

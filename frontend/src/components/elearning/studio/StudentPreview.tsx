@@ -96,7 +96,7 @@ const DeviceSwitch: React.FC<{ device: Device; onChange: (d: Device) => void }> 
       ["phone", "Phone", Smartphone],
       ["desktop", "Desktop", Monitor],
     ] as [Device, string, React.ElementType][]).map(([d, label, Icon]) => (
-      <button key={d} role="radio" aria-checked={device === d} onClick={() => onChange(d)} className={`inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-lg font-medium ${device === d ? "el-segment-on" : "text-slate-600 dark:text-slate-300"}`}>
+      <button key={d} role="radio" aria-checked={device === d} onClick={() => onChange(d)} className={`inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-full font-medium ${device === d ? "el-segment-on" : "text-slate-600 dark:text-slate-300"}`}>
         <Icon className="w-3.5 h-3.5" aria-hidden /> {label}
       </button>
     ))}
@@ -119,7 +119,7 @@ export const StudentPreview: React.FC<PreviewProps> = (props) => {
     <div>
       <div className="flex items-center justify-between gap-2 mb-2">
         <p className="text-[11px] uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">What students get</p>
-        <button onClick={() => setBig(true)} className="inline-flex items-center gap-1 min-h-[36px] px-2 rounded-lg text-xs font-medium text-brand-700 dark:text-brand-200 hover:bg-brand-50 dark:hover:bg-brand-500/10" aria-label="Enlarge the student preview">
+        <button onClick={() => setBig(true)} className="inline-flex items-center gap-1 min-h-[36px] px-2 rounded-full text-xs font-medium text-brand-700 dark:text-brand-200 hover:bg-brand-50 dark:hover:bg-brand-500/10" aria-label="Enlarge the student preview">
           <Maximize2 className="w-3.5 h-3.5" aria-hidden /> Enlarge
         </button>
       </div>

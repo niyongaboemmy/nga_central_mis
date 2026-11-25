@@ -184,7 +184,7 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
               setMenu((m) => !m);
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className="rounded-lg p-1 text-slate-400 opacity-0 transition hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover:opacity-100 dark:text-gray-500 dark:hover:bg-gray-700/50 dark:hover:text-gray-200"
+            className="rounded-full p-1 text-slate-400 opacity-0 transition hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover:opacity-100 dark:text-gray-500 dark:hover:bg-gray-700/50 dark:hover:text-gray-200"
           >
             <MoreHorizontal className="h-4 w-4" />
           </button>
@@ -202,7 +202,7 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
                       setMenu(false);
                       onMove(card.id, s);
                     }}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-700/50"
+                    className="flex w-full items-center gap-2 rounded-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-700/50"
                   >
                     <M.icon className="h-4 w-4" style={{ color: statusColor(s, dark) }} aria-hidden />
                     {s === "ON_HOLD" ? "Put on hold" : card.status === "ON_HOLD" ? `Resume in ${M.label}` : M.label}

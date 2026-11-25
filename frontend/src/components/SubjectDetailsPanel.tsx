@@ -367,7 +367,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Close subject details"
-              className="absolute top-5 right-5 p-2 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-95 transition-all"
+              className="absolute top-5 right-5 p-2 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-95 transition-all"
             >
               <X className="w-4 h-4" />
             </button>
@@ -448,7 +448,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                   aria-label={label}
                   tabIndex={active ? 0 : -1}
                   onClick={() => setTab(key)}
-                  className="relative flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-xl transition-colors"
+                  className="relative flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-2xl transition-colors"
                 >
                   {active && (
                     <motion.span
