@@ -21,7 +21,7 @@ export const BackButton: React.FC<{ fallback: string; label?: string; className?
     <button
       type="button"
       onClick={() => (canGoBack ? navigate(-1) : navigate(fallback))}
-      className={`group inline-flex items-center gap-1.5 rounded-xl border border-border-light dark:border-slate-700 bg-white/70 dark:bg-slate-800/60 pl-2 pr-3 py-1.5 text-sm font-medium text-text-primary-light dark:text-text-primary-dark hover:bg-white dark:hover:bg-slate-800 hover:shadow-soft transition-all ${className}`}
+      className={`group inline-flex items-center gap-1.5 rounded-full border border-border-light dark:border-slate-700 bg-white/70 dark:bg-slate-800/60 pl-2 pr-3 py-1.5 text-sm font-medium text-text-primary-light dark:text-text-primary-dark hover:bg-white dark:hover:bg-slate-800 hover:shadow-soft transition-all ${className}`}
     >
       <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" aria-hidden />
       {label}

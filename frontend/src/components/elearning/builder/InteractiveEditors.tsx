@@ -25,7 +25,7 @@ export const FlashcardsEditor: React.FC<{ cards: CardRow[]; onChange: (c: CardRo
         <li key={c.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start">
           <input aria-label={`Card ${i + 1} front`} className={input} value={c.front} placeholder="Term or question" onChange={(e) => onChange(cards.map((x, j) => (j === i ? { ...x, front: e.target.value } : x)))} />
           <input aria-label={`Card ${i + 1} back`} className={input} value={c.back} placeholder="Meaning or answer" onChange={(e) => onChange(cards.map((x, j) => (j === i ? { ...x, back: e.target.value } : x)))} />
-          <button aria-label={`Remove card ${i + 1}`} onClick={() => onChange(cards.filter((_, j) => j !== i))} className="w-10 h-10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center text-slate-600 dark:text-slate-300">
+          <button aria-label={`Remove card ${i + 1}`} onClick={() => onChange(cards.filter((_, j) => j !== i))} className="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center text-slate-600 dark:text-slate-300">
             <Trash2 className="w-4 h-4" />
           </button>
         </li>
@@ -58,7 +58,7 @@ export const PracticalEditor: React.FC<{ checklist: ChecklistRow[]; onChange: (c
               <option key={n} value={n}>{n}</option>
             ))}
           </SelectField>
-          <button aria-label={`Remove line ${i + 1}`} onClick={() => onChange(checklist.filter((_, j) => j !== i))} className="w-10 h-10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center text-slate-600 dark:text-slate-300">
+          <button aria-label={`Remove line ${i + 1}`} onClick={() => onChange(checklist.filter((_, j) => j !== i))} className="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center text-slate-600 dark:text-slate-300">
             <Trash2 className="w-4 h-4" />
           </button>
         </li>

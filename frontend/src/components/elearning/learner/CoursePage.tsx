@@ -423,14 +423,14 @@ const CoursePage: React.FC = () => {
             <button
               onClick={() => navigate(learnerRoutes.home)}
               aria-label={copy.home.title}
-              className="inline-flex items-center gap-1 min-h-[44px] min-w-[44px] px-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+              className="inline-flex items-center gap-1 min-h-[44px] min-w-[44px] px-2 rounded-full text-sm text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.06]"
             >
               <ArrowLeft className="w-4 h-4" />{" "}
               <span className="hidden sm:inline">{copy.home.title}</span>
             </button>
             <button
               onClick={() => setIndexOpen(true)}
-              className="lg:hidden inline-flex items-center gap-1 min-h-[44px] px-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+              className="lg:hidden inline-flex items-center gap-1 min-h-[44px] px-2 rounded-full text-sm text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
               aria-label={copy.course.index}
             >
               <List className="w-4 h-4" /> {copy.course.index}

@@ -102,7 +102,7 @@ const CopyableRow = ({
         type="button"
         onClick={copy}
         aria-label={`Copy ${label}`}
-        className="p-2 rounded-lg text-blue-400 hover:text-blue-700 dark:hover:text-blue-200 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+        className="p-2 rounded-full text-blue-400 hover:text-blue-700 dark:hover:text-blue-200 hover:bg-white dark:hover:bg-slate-800 transition-colors"
       >
         {copied ? (
           <Check className="w-4 h-4 text-blue-600" />
@@ -339,7 +339,7 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Close profile"
-              className="absolute top-4 right-4 p-2 rounded-lg bg-white/15 hover:bg-white/25 transition-colors"
+              className="absolute top-4 right-4 p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>

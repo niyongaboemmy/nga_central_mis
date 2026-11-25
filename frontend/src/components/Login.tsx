@@ -2306,7 +2306,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                             showPassword ? "Hide password" : "Show password"
                           }
                           aria-pressed={showPassword}
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-slate-700/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-slate-700/50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
                         >
                           <AnimatePresence mode="wait" initial={false}>
                             {showPassword ? (

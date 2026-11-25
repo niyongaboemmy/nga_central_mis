@@ -51,7 +51,7 @@ const NotificationSettingsModal: React.FC<NotificationSettingsModalProps> = ({
           <h3 className="text-lg font-semibold">Notification Settings</h3>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
           >
             <X className="w-5 h-5" />
           </button>
@@ -98,7 +98,7 @@ const NotificationSettingsModal: React.FC<NotificationSettingsModalProps> = ({
           <button
             onClick={onSave}
             disabled={isSubmitting}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSubmitting && (
               <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

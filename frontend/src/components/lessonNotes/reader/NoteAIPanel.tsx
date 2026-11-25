@@ -259,7 +259,7 @@ const NoteAIPanel: React.FC<Props> = ({
                   <button
                     onClick={() => setMessages([])}
                     title="Clear conversation"
-                    className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="p-2 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -267,7 +267,7 @@ const NoteAIPanel: React.FC<Props> = ({
                 <button
                   onClick={onClose}
                   aria-label="Close study assistant"
-                  className="p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="p-2 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -370,7 +370,7 @@ const NoteAIPanel: React.FC<Props> = ({
                               navigator.clipboard?.writeText(m.text || el.textContent || "");
                             }}
                             title="Copy answer"
-                            className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            className="p-1.5 rounded-full text-gray-300 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                           >
                             <Copy className="w-3.5 h-3.5" />
                           </button>
@@ -378,7 +378,7 @@ const NoteAIPanel: React.FC<Props> = ({
                             <button
                               onClick={() => send(lastUserTurn.text || "", lastUserTurn.selection)}
                               title="Ask again"
-                              className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                              className="p-1.5 rounded-full text-gray-300 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
                             </button>
@@ -448,7 +448,7 @@ const NoteAIPanel: React.FC<Props> = ({
                   onClick={() => send(input, pendingSelection || undefined)}
                   disabled={!input.trim() || busy}
                   aria-label="Send question"
-                  className="absolute right-2 bottom-2.5 p-2 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                  className="absolute right-2 bottom-2.5 p-2 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                 >
                   {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowUp className="w-3.5 h-3.5" />}
                 </button>

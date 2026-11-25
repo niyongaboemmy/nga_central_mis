@@ -96,7 +96,7 @@ export const GlanceTiles: React.FC<{ tiles: GlanceTile[]; insightsHref?: string;
         <button
           type="button"
           onClick={() => setAll((a) => !a)}
-          className="mx-4 mb-3 -mt-1 inline-flex min-h-[36px] items-center rounded-lg px-2 text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="mx-4 mb-3 -mt-1 inline-flex min-h-[36px] items-center rounded-full px-2 text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
           {all ? "Show fewer" : `Show ${tiles.length - TILE_CAP} more`}
         </button>
@@ -170,7 +170,7 @@ export const UpdatesCard: React.FC<{
         subtitle={unreadCount ? `${unreadCount} unread` : "You're up to date"}
         action={
           unreadCount > 0 ? (
-            <button type="button" onClick={onMarkAll} className="inline-flex min-h-[36px] items-center rounded-lg px-2 text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+            <button type="button" onClick={onMarkAll} className="inline-flex min-h-[36px] items-center rounded-full px-2 text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
               Mark all read
             </button>
           ) : undefined

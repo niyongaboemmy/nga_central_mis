@@ -977,7 +977,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
                             </h3>
                             <button
                               onClick={() => toggleExpanded(entry.entry_id)}
-                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded transition-colors"
+                              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded-full transition-colors"
                             >
                               {isExpanded ? (
                                 <ChevronUp className="w-4 h-4" />

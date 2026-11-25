@@ -37,7 +37,7 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
   return (
     <div className="el-segment inline-flex text-xs" role="radiogroup" aria-label={label}>
       {options.map(([v, text]) => (
-        <button key={v} role="radio" aria-checked={value === v} onClick={() => onChange(v)} className={`min-h-[34px] px-3 rounded-lg font-medium ${value === v ? "el-segment-on" : "text-slate-600 dark:text-slate-300"}`}>
+        <button key={v} role="radio" aria-checked={value === v} onClick={() => onChange(v)} className={`min-h-[34px] px-3 rounded-full font-medium ${value === v ? "el-segment-on" : "text-slate-600 dark:text-slate-300"}`}>
           {text}
         </button>
       ))}
@@ -47,14 +47,14 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
 
 const Stepper: React.FC<{ value: number; min: number; max: number; onChange: (v: number) => void; label: string; unit?: string }> = ({ value, min, max, onChange, label, unit }) => (
   <div className="inline-flex items-center gap-1" role="group" aria-label={label}>
-    <button aria-label={`Fewer ${label}`} disabled={value <= min} onClick={() => onChange(value - 1)} className="w-8 h-8 rounded-lg el-chip flex items-center justify-center disabled:opacity-40">
+    <button aria-label={`Fewer ${label}`} disabled={value <= min} onClick={() => onChange(value - 1)} className="w-8 h-8 rounded-full el-chip flex items-center justify-center disabled:opacity-40">
       <Minus className="w-3.5 h-3.5" />
     </button>
     <span className="min-w-[3.5rem] text-center text-sm font-semibold tabular-nums text-gray-900 dark:text-white" aria-live="polite">
       {value}
       {unit ? ` ${unit}` : ""}
     </span>
-    <button aria-label={`More ${label}`} disabled={value >= max} onClick={() => onChange(value + 1)} className="w-8 h-8 rounded-lg el-chip flex items-center justify-center disabled:opacity-40">
+    <button aria-label={`More ${label}`} disabled={value >= max} onClick={() => onChange(value + 1)} className="w-8 h-8 rounded-full el-chip flex items-center justify-center disabled:opacity-40">
       <Plus className="w-3.5 h-3.5" />
     </button>
   </div>

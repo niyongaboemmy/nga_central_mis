@@ -429,7 +429,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                   setEditingCategory(null);
                   setShowCategoryModal(true);
                 }}
-                className="p-1 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                className="p-1 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
                 title="New category"
               >
                 <FolderPlus className="w-4 h-4" />
@@ -464,7 +464,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                   <li key={cat.category_id} className="group/cat relative px-2">
                     <button
                       onClick={() => setSelectedCategoryId(cat.category_id)}
-                      className={`w-full flex items-center gap-2.5 pl-2.5 pr-2 py-2.5 text-left rounded-xl transition-colors ${
+                      className={`w-full flex items-center gap-2.5 pl-2.5 pr-2 py-2.5 text-left rounded-full transition-colors ${
                         isSelected
                           ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400"
                           : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/30"
@@ -502,7 +502,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                             setEditingCategory(cat);
                             setShowCategoryModal(true);
                           }}
-                          className="p-1 rounded-md text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                          className="p-1 rounded-full text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                           title="Edit category"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -513,7 +513,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                             handleDeleteCategory(cat);
                           }}
                           disabled={isDeleting}
-                          className="p-1 rounded-md text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+                          className="p-1 rounded-full text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
                           title="Delete category"
                         >
                           {isDeleting ? (
@@ -587,7 +587,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-xl transition-colors shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-full transition-colors shadow-sm"
                   >
                     {uploading ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -651,7 +651,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                                 : cancelUpload(key)
                             }
                             title={item.status === "error" ? "Dismiss" : "Cancel upload"}
-                            className="p-0.5 rounded text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                            className="p-0.5 rounded-full text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -800,14 +800,14 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                         <div className="flex items-center gap-1 mt-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => setPreviewDoc(doc)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+                            className="p-1.5 rounded-full text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
                             title="Preview"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDownload(doc)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                            className="p-1.5 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
                             title="Download"
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -816,7 +816,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                             <button
                               onClick={() => handleDeleteDocument(doc)}
                               disabled={isDeleting}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                              className="p-1.5 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                               title="Delete"
                             >
                               {isDeleting ? (
@@ -847,7 +847,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                     setEditingCategory(null);
                     setShowCategoryModal(true);
                   }}
-                  className="mt-3 flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
+                  className="mt-3 flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   New Category

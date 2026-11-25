@@ -130,7 +130,7 @@ const TenantStatusBanner: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => dismiss(w.key)}
-                  className="rounded-lg p-1 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  className="rounded-full p-1 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   <X className="h-4 w-4" aria-hidden />
                   <span className="sr-only">Hide {w.label} warning for today</span>

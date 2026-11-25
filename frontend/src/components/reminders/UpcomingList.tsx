@@ -99,7 +99,7 @@ export const UpcomingList: React.FC<{ jobs: ReminderJob[]; remindersOn: boolean;
                             onClick={() => act(job, "ack")}
                             disabled={busy === job.job_id}
                             aria-label={`Mark "${job.title}" as seen`}
-                            className="rounded-lg p-1.5 text-slate-500 transition dark:text-slate-300 hover:bg-success-100 hover:text-success-700 dark:hover:bg-success-500/15"
+                            className="rounded-full p-1.5 text-slate-500 transition dark:text-slate-300 hover:bg-success-100 hover:text-success-700 dark:hover:bg-success-500/15"
                           >
                             <CheckCheck className="h-4 w-4" />
                           </button>
@@ -108,7 +108,7 @@ export const UpcomingList: React.FC<{ jobs: ReminderJob[]; remindersOn: boolean;
                             onClick={() => act(job, "snooze")}
                             disabled={busy === job.job_id}
                             aria-label={`Snooze "${job.title}" for 5 minutes`}
-                            className="rounded-lg p-1.5 text-slate-500 transition dark:text-slate-300 hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-600/20"
+                            className="rounded-full p-1.5 text-slate-500 transition dark:text-slate-300 hover:bg-brand-50 hover:text-brand-700 dark:hover:bg-brand-600/20"
                           >
                             <TimerReset className="h-4 w-4" />
                           </button>

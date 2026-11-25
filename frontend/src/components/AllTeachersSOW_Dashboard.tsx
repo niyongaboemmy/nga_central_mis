@@ -540,7 +540,7 @@ const AllTeachersSOW_Dashboard: React.FC<Props> = ({
                 </div>
                 <button
                   onClick={() => setSelectedTeacherForModal(null)}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex-shrink-0"
+                  className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors flex-shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>

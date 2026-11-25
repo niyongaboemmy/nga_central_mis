@@ -117,7 +117,7 @@ const SectionRow: React.FC<{
           onClick={() => toggle(s.section_id)}
           aria-expanded={isOpen}
           aria-label={`${isOpen ? "Collapse" : "Expand"} ${s.title}`}
-          className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
+          className="w-6 h-6 flex items-center justify-center rounded-full text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
         >
           <ChevronDown
             className={`w-4 h-4 transition-transform ${isOpen ? "" : "-rotate-90"}`}
@@ -224,7 +224,7 @@ const SectionRow: React.FC<{
                     aria-current={
                       activeItemId === i.item_id ? "page" : undefined
                     }
-                    className={`relative my-px flex min-h-[34px] w-full items-center gap-2.5 rounded-lg py-1.5 pr-2.5 text-left transition-colors ${
+                    className={`relative my-px flex min-h-[34px] w-full items-center gap-2.5 rounded-full py-1.5 pr-2.5 text-left transition-colors ${
                       activeItemId === i.item_id
                         ? // Selected reads through one soft tint plus an accent
                           // bar. A saturated fill with white text shouted over
@@ -353,14 +353,14 @@ const IndexDrawer: React.FC<Props> = ({
             onClick={onToggleCollapsed}
             aria-label="Hide the week list"
             title="Hide the week list"
-            className="hidden lg:flex w-8 h-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+            className="hidden lg:flex w-8 h-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
           >
             <PanelLeftClose className="w-4 h-4" />
           </button>
         )}
         <button
           onClick={onClose}
-          className="lg:hidden w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+          className="lg:hidden w-10 h-10 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
           aria-label="Close index"
         >
           <X className="w-4 h-4" />
@@ -412,7 +412,7 @@ const IndexDrawer: React.FC<Props> = ({
               aria-label="Show the week list"
               title="Show the week list"
               aria-expanded={false}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
             >
               <PanelLeftOpen className="w-4 h-4" />
             </button>

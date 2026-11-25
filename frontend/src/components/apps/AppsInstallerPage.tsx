@@ -123,7 +123,7 @@ export const DesktopStatus: React.FC<{ current: string | null; latest: string | 
             type="button"
             onClick={update}
             disabled={state === "updating"}
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-700 shadow-lg transition hover:-translate-y-0.5 disabled:opacity-80"
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-brand-700 shadow-lg transition hover:-translate-y-0.5 disabled:opacity-80"
           >
             {state === "updating" ? (
               <>
@@ -368,7 +368,7 @@ export const AppsInstallerPage: React.FC = () => {
             type="button"
             onClick={goBack}
             aria-label="Back"
-            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
           </button>

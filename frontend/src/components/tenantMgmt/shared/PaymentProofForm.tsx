@@ -212,7 +212,7 @@ const PaymentProofForm: React.FC<PaymentProofFormProps> = ({ invoice, methods, o
           <motion.div {...m("reveal")} className="flex items-center gap-3 rounded-xl bg-emerald-50 p-3 dark:bg-emerald-400/10">
             <FileCheck2 className="h-5 w-5 text-emerald-600 dark:text-emerald-300" aria-hidden />
             <span className="min-w-0 flex-1 truncate text-sm text-gray-800 dark:text-gray-100">{proof.name}</span>
-            <button type="button" onClick={() => setProof(null)} className="rounded-lg p-1.5 text-gray-600 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-800">
+            <button type="button" onClick={() => setProof(null)} className="rounded-full p-1.5 text-gray-600 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-800">
               <X className="h-4 w-4" aria-hidden />
               <span className="sr-only">Remove receipt</span>
             </button>

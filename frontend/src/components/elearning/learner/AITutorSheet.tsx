@@ -97,7 +97,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Ask about this course</p>
                 <p className="text-[11px] text-gray-500">Answers come from your teacher's notes and say where they found it.</p>
               </div>
-              <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close tutor"><X className="w-4 h-4" /></button>
+              <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close tutor"><X className="w-4 h-4" /></button>
             </div>
 
             <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-[160px]">
@@ -105,7 +105,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
                 <div className="space-y-2">
                   <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Try asking</p>
                   {suggestions.map((s) => (
-                    <button key={s} onClick={() => ask(s)} className="block w-full text-left min-h-[44px] px-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 text-sm text-gray-800 dark:text-gray-100 hover:border-brand-200">
+                    <button key={s} onClick={() => ask(s)} className="block w-full text-left min-h-[44px] px-3 py-2 rounded-2xl border border-gray-200 dark:border-white/10 text-sm text-gray-800 dark:text-gray-100 hover:border-brand-200">
                       <Sparkles className="inline w-3.5 h-3.5 text-accent-500 mr-1.5" />{s}
                     </button>
                   ))}

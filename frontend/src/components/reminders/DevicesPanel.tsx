@@ -105,7 +105,7 @@ export const DevicesPanel: React.FC<{
                   onClick={() => remove(device)}
                   disabled={removing === device.subscription_id}
                   aria-label="Remove device"
-                  className="rounded-xl p-2 text-slate-500 transition dark:text-slate-300 hover:bg-danger-100 hover:text-danger-700 disabled:opacity-50 dark:hover:bg-danger-500/15"
+                  className="rounded-full p-2 text-slate-500 transition dark:text-slate-300 hover:bg-danger-100 hover:text-danger-700 disabled:opacity-50 dark:hover:bg-danger-500/15"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

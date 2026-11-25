@@ -168,7 +168,7 @@ const CheckInDetailModal: React.FC<Props> = ({ checkin, onClose, onChanged, show
               <button
                 type="button"
                 onClick={() => setRejecting(false)}
-                className="px-3 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl"
+                className="px-3 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
               >
                 Cancel
               </button>
@@ -176,7 +176,7 @@ const CheckInDetailModal: React.FC<Props> = ({ checkin, onClose, onChanged, show
                 type="button"
                 disabled={!!busy || !trimmed}
                 onClick={() => act("reject")}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-xl disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-full disabled:opacity-50"
               >
                 <ThumbsDown className="w-3.5 h-3.5" />
                 {busy === "reject" ? "Sending…" : "Send back"}
@@ -189,7 +189,7 @@ const CheckInDetailModal: React.FC<Props> = ({ checkin, onClose, onChanged, show
                   type="button"
                   disabled={!!busy}
                   onClick={() => setRejecting(true)}
-                  className="px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl disabled:opacity-50"
+                  className="px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full disabled:opacity-50"
                 >
                   Reject…
                 </button>
@@ -198,7 +198,7 @@ const CheckInDetailModal: React.FC<Props> = ({ checkin, onClose, onChanged, show
                 type="button"
                 disabled={!!busy || !replyChanged}
                 onClick={() => act("reply")}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-xl disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-full disabled:opacity-50"
               >
                 <Send className="w-3.5 h-3.5" />
                 {busy === "reply" ? "Sending…" : "Send reply"}
@@ -208,7 +208,7 @@ const CheckInDetailModal: React.FC<Props> = ({ checkin, onClose, onChanged, show
                   type="button"
                   disabled={!!busy}
                   onClick={() => act("approve")}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-xl disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-full disabled:opacity-50"
                 >
                   <Check className="w-3.5 h-3.5" />
                   {busy === "approve" ? "Approving…" : trimmed && replyChanged ? "Approve & reply" : "Approve"}

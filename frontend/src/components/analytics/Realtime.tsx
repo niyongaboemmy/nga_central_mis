@@ -69,7 +69,7 @@ export default function Realtime() {
               key={a}
               onClick={() => toggleApp(a)}
               aria-pressed={apps.includes(a)}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+              className={`px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                 apps.includes(a)
                   ? "border-brand-600 bg-brand-50 dark:bg-brand-900/30 text-text-primary-light dark:text-text-primary-dark"
                   : "border-border-light dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-surface-light dark:hover:bg-slate-800"
@@ -454,7 +454,7 @@ export const EventFeed: React.FC<{ events: LiveEvent[] }> = ({ events }) => {
               role="radio"
               aria-checked={group === c.key}
               onClick={() => setGroup(c.key)}
-              className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-medium border transition-colors ${
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium border transition-colors ${
                 group === c.key ? "border-brand-600 bg-brand-50 dark:bg-slate-700 text-text-primary-light dark:text-text-primary-dark" : "border-border-light dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-surface-light dark:hover:bg-slate-800"
               }`}
             >
@@ -464,7 +464,7 @@ export const EventFeed: React.FC<{ events: LiveEvent[] }> = ({ events }) => {
           ))}
         </div>
         <button
-          className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-medium border border-border-light dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-surface-light dark:hover:bg-slate-800"
+          className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium border border-border-light dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-surface-light dark:hover:bg-slate-800"
           onClick={() => setPaused((p) => (p ? null : events))}
           aria-pressed={!!paused}
         >

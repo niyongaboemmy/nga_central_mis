@@ -183,7 +183,7 @@ const SettingsPage: React.FC = () => {
                   aria-pressed={on}
                   onClick={() => setDraft((d) => ({ ...d, "documents.required": on ? docs.filter((x) => x !== k.kind) : [...docs, k.kind] }))}
                   className={cx(
-                    "relative flex flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-xs font-semibold transition-colors",
+                    "relative flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3 text-xs font-semibold transition-colors",
                     accent.focus,
                     on ? "bg-blue-50 text-blue-700 ring-2 ring-blue-600 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500" : "bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800/50 dark:text-gray-300 dark:hover:bg-gray-800/80",
                   )}

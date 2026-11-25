@@ -809,7 +809,7 @@ const MentoringSessionModal: React.FC<Props> = ({
                           type="button"
                           onClick={() => setWellbeingStatus(opt.value)}
                           title={opt.label}
-                          className={`flex-1 flex flex-col items-center py-2 rounded-xl border-2 text-xl transition-all ${
+                          className={`flex-1 flex flex-col items-center py-2 rounded-2xl border-2 text-xl transition-all ${
                             wellbeingStatus === opt.value
                               ? "border-rose-500 bg-rose-50 dark:bg-rose-900/30"
                               : "border-gray-200 dark:border-gray-600 hover:border-gray-300"

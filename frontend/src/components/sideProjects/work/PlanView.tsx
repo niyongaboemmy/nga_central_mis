@@ -220,7 +220,7 @@ const GenerateModal: React.FC<{ p: ProjectDetail; open: boolean; append: boolean
                 role="radio"
                 aria-checked={pick === t.key}
                 onClick={() => setPick(t.key)}
-                className={`flex w-full items-center justify-between gap-2 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+                className={`flex w-full items-center justify-between gap-2 rounded-full px-3 py-2.5 text-left text-sm font-semibold transition ${
                   pick === t.key ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-800 hover:bg-slate-100 dark:bg-gray-800/60 dark:text-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
@@ -273,7 +273,7 @@ const ItemMenu: React.FC<{ onEdit: () => void; onDelete: () => void; onAddFeatur
       {open && (
         <div role="menu" className="absolute right-0 top-8 z-30 w-40 overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-white p-1.5 dark:border-white/10 dark:bg-gray-900">
           {entries.map(([Icon, label, fn, danger]) => (
-            <button key={label} role="menuitem" type="button" onClick={(e) => (e.stopPropagation(), setOpen(false), fn())} className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm ${danger ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10" : "text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-800"}`}>
+            <button key={label} role="menuitem" type="button" onClick={(e) => (e.stopPropagation(), setOpen(false), fn())} className={`flex w-full items-center gap-2 rounded-full px-3 py-2 text-sm ${danger ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10" : "text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-800"}`}>
               <Icon className="h-4 w-4" /> {label}
             </button>
           ))}
@@ -415,7 +415,7 @@ const PlanView: React.FC<{ p: ProjectDetail; data: PlanData; team: Teammate[]; m
               <div className="space-y-1 pb-2 pl-4 pr-2 sm:pl-24">
                 {it.description && <p className="pb-1 text-xs text-slate-600 dark:text-gray-300">{it.description}</p>}
                 {ts.map((t) => (
-                  <button key={t.id} type="button" onClick={() => setDetail(t.id)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-white dark:hover:bg-gray-900">
+                  <button key={t.id} type="button" onClick={() => setDetail(t.id)} className="flex w-full items-center gap-2 rounded-full px-2 py-1.5 text-left text-xs hover:bg-white dark:hover:bg-gray-900">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${TASK_META[t.status].dot}`} aria-hidden />
                     <span className={`min-w-0 flex-1 truncate ${t.status === "DONE" ? "text-slate-500 line-through dark:text-gray-400" : "text-slate-700 dark:text-gray-200"}`}>{t.title}</span>
                     {t.pr && <PrChip pr={t.pr} compact />}

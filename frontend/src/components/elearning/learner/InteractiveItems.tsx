@@ -86,7 +86,7 @@ export const ExitTicketCard: React.FC<{ itemId: number; content: any; onDone?: (
             {q.options.map((o: string, j: number) => {
               const on = answers[q.id] === j;
               return (
-                <button key={j} role="radio" aria-checked={on} onClick={() => setAnswers({ ...answers, [q.id]: j })} className={`w-full text-left min-h-[48px] px-4 rounded-xl border text-sm transition-colors focus:outline-none focus-visible:shadow-glow ${on ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10 text-gray-900 dark:text-white" : "border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-100"}`}>
+                <button key={j} role="radio" aria-checked={on} onClick={() => setAnswers({ ...answers, [q.id]: j })} className={`w-full text-left min-h-[48px] px-4 rounded-full border text-sm transition-colors focus:outline-none focus-visible:shadow-glow ${on ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10 text-gray-900 dark:text-white" : "border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-100"}`}>
                   {o}
                 </button>
               );
@@ -99,7 +99,7 @@ export const ExitTicketCard: React.FC<{ itemId: number; content: any; onDone?: (
           <legend className="text-sm font-medium text-gray-900 dark:text-white">How sure are you?</legend>
           <div className="mt-2 grid grid-cols-3 gap-2" role="radiogroup">
             {CONFIDENCE.map(({ v, label, icon: Icon }) => (
-              <button key={v} role="radio" aria-checked={confidence === v} onClick={() => setConfidence(v)} className={`min-h-[64px] rounded-xl border flex flex-col items-center justify-center gap-1 text-xs font-medium focus:outline-none focus-visible:shadow-glow ${confidence === v ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10 text-gray-900 dark:text-white" : "border-gray-200 dark:border-white/10 text-slate-600 dark:text-slate-300"}`}>
+              <button key={v} role="radio" aria-checked={confidence === v} onClick={() => setConfidence(v)} className={`min-h-[64px] rounded-2xl border flex flex-col items-center justify-center gap-1 text-xs font-medium focus:outline-none focus-visible:shadow-glow ${confidence === v ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10 text-gray-900 dark:text-white" : "border-gray-200 dark:border-white/10 text-slate-600 dark:text-slate-300"}`}>
                 <Icon className="w-5 h-5" /> {label}
               </button>
             ))}
@@ -186,7 +186,7 @@ export const FlashcardDeck: React.FC<{ itemId: number; content: any; onDone?: ()
       {flipped && intervals && (
         <motion.div {...m("reveal")} className="grid grid-cols-4 gap-2" role="group" aria-label="How well did you remember?">
           {(["again", "hard", "good", "easy"] as Grade[]).map((g) => (
-            <button key={g} onClick={() => grade(g)} className={`min-h-[56px] rounded-xl text-sm font-semibold flex flex-col items-center justify-center focus:outline-none focus-visible:shadow-glow ${g === "again" ? "el-chip-danger" : g === "good" ? "bg-brand-600 text-white" : "el-chip"}`}>
+            <button key={g} onClick={() => grade(g)} className={`min-h-[56px] rounded-2xl text-sm font-semibold flex flex-col items-center justify-center focus:outline-none focus-visible:shadow-glow ${g === "again" ? "el-chip-danger" : g === "good" ? "bg-brand-600 text-white" : "el-chip"}`}>
               {GRADE_LABEL[g]}
               <span className="text-[10px] font-normal opacity-80">{intervals[g]}</span>
             </button>
@@ -295,7 +295,7 @@ export const PracticalTaskView: React.FC<{ itemId: number; content: any; onChang
               </div>
             ))}
             {photos.length < max && (
-              <button onClick={() => input.current?.click()} className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 dark:border-white/20 flex flex-col items-center justify-center gap-1 text-xs text-slate-600 dark:text-slate-300 focus:outline-none focus-visible:shadow-glow">
+              <button onClick={() => input.current?.click()} className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-300 dark:border-white/20 flex flex-col items-center justify-center gap-1 text-xs text-slate-600 dark:text-slate-300 focus:outline-none focus-visible:shadow-glow">
                 <Camera className="w-5 h-5" /> Add photo
               </button>
             )}
@@ -348,7 +348,7 @@ export const DailyReview: React.FC<{ due: DueCard[]; onClose: () => void }> = ({
       <motion.div {...m("reveal")} className="w-full sm:max-w-md bg-white dark:bg-[#0b0b0f] rounded-t-3xl sm:rounded-3xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-base font-semibold text-gray-900 dark:text-white">Today's review</p>
-          <button onClick={onClose} aria-label="Close" className="w-10 h-10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} aria-label="Close" className="w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center"><X className="w-5 h-5" /></button>
         </div>
         {!cur ? (
           <div className="text-center py-6">
@@ -366,7 +366,7 @@ export const DailyReview: React.FC<{ due: DueCard[]; onClose: () => void }> = ({
             {flipped && intervals && (
               <div className="grid grid-cols-4 gap-2" role="group" aria-label="How well did you remember?">
                 {(["again", "hard", "good", "easy"] as Grade[]).map((g) => (
-                  <button key={g} onClick={() => grade(g)} className={`min-h-[56px] rounded-xl text-sm font-semibold flex flex-col items-center justify-center ${g === "again" ? "el-chip-danger" : g === "good" ? "bg-brand-600 text-white" : "el-chip"}`}>
+                  <button key={g} onClick={() => grade(g)} className={`min-h-[56px] rounded-2xl text-sm font-semibold flex flex-col items-center justify-center ${g === "again" ? "el-chip-danger" : g === "good" ? "bg-brand-600 text-white" : "el-chip"}`}>
                     {GRADE_LABEL[g]}
                     <span className="text-[10px] font-normal opacity-80">{intervals[g]}</span>
                   </button>

@@ -444,7 +444,7 @@ const SchemeManualEntry: React.FC<Props> = ({
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <button
               onClick={() => setShowWizard((v) => !v)}
-              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-full transition-all ${
                 showWizard
                   ? "bg-violet-600/25 text-violet-300 border border-violet-500/40"
                   : "text-gray-400 hover:text-white border border-white/10 hover:bg-white/5"
@@ -456,7 +456,7 @@ const SchemeManualEntry: React.FC<Props> = ({
             <button
               onClick={handleSave}
               disabled={saving || totalWeeks === 0}
-              className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white rounded-lg shadow-lg shadow-emerald-500/20 transition-all"
+              className="flex items-center gap-2 px-4 py-1.5 text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white rounded-full shadow-lg shadow-emerald-500/20 transition-all"
             >
               {saving
                 ? <><Loader2 className="w-4 h-4 animate-spin" />{savedCount}/{totalWeeks}</>
@@ -512,13 +512,13 @@ const SchemeManualEntry: React.FC<Props> = ({
                   <div>
                     <label className="block text-[11px] text-gray-500 mb-1 uppercase tracking-wide">Total weeks</label>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => setWizardWeeks((v) => Math.max(1, v - 1))} className="w-7 h-7 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-gray-400 hover:text-white transition-colors text-lg leading-none">−</button>
+                      <button onClick={() => setWizardWeeks((v) => Math.max(1, v - 1))} className="w-7 h-7 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-gray-400 hover:text-white transition-colors text-lg leading-none">−</button>
                       <span className="w-8 text-center text-sm font-bold text-white">{wizardWeeks}</span>
-                      <button onClick={() => setWizardWeeks((v) => Math.min(52, v + 1))} className="w-7 h-7 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-gray-400 hover:text-white transition-colors text-lg leading-none">+</button>
+                      <button onClick={() => setWizardWeeks((v) => Math.min(52, v + 1))} className="w-7 h-7 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-gray-400 hover:text-white transition-colors text-lg leading-none">+</button>
                     </div>
                   </div>
                   <button onClick={applyWizard} disabled={!wizardStart}
-                    className="flex items-center gap-2 px-4 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm font-semibold rounded-lg transition-all">
+                    className="flex items-center gap-2 px-4 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white text-sm font-semibold rounded-full transition-all">
                     <Wand2 className="w-4 h-4" /> Fill {wizardWeeks} weeks
                   </button>
                 </div>
@@ -617,7 +617,7 @@ const SchemeManualEntry: React.FC<Props> = ({
 
                   <button onClick={() => toggleCollapse(group.id)}
                     title={group.collapsed ? "Expand" : "Collapse"}
-                    className="p-1.5 text-gray-600 hover:text-gray-300 hover:bg-white/5 rounded-lg transition-all">
+                    className="p-1.5 text-gray-600 hover:text-gray-300 hover:bg-white/5 rounded-full transition-all">
                     {group.collapsed
                       ? <ChevronDown className="w-4 h-4" />
                       : <ChevronUp className="w-4 h-4" />}
@@ -626,7 +626,7 @@ const SchemeManualEntry: React.FC<Props> = ({
                   {groups.length > 1 && (
                     <button onClick={() => removeGroup(group.id)}
                       title="Remove this learning outcome"
-                      className="p-1.5 text-gray-700 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-all">
+                      className="p-1.5 text-gray-700 hover:text-red-400 hover:bg-red-900/20 rounded-full transition-all">
                       <X className="w-4 h-4" />
                     </button>
                   )}
@@ -678,12 +678,12 @@ const SchemeManualEntry: React.FC<Props> = ({
                                   <td className="w-14 px-1 align-top pt-1">
                                     <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <button onClick={() => duplicateRow(group.id, row.id)} title="Duplicate week"
-                                        className="p-1.5 text-gray-600 hover:text-blue-400 hover:bg-blue-900/30 rounded transition-all">
+                                        className="p-1.5 text-gray-600 hover:text-blue-400 hover:bg-blue-900/30 rounded-full transition-all">
                                         <Copy className="w-3.5 h-3.5" />
                                       </button>
                                       <button onClick={() => removeRow(group.id, row.id)} title="Remove week"
                                         disabled={group.rows.length === 1}
-                                        className="p-1.5 text-gray-600 hover:text-red-400 hover:bg-red-900/30 rounded transition-all disabled:opacity-20 disabled:cursor-not-allowed">
+                                        className="p-1.5 text-gray-600 hover:text-red-400 hover:bg-red-900/30 rounded-full transition-all disabled:opacity-20 disabled:cursor-not-allowed">
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
                                     </div>
@@ -748,7 +748,7 @@ const SchemeManualEntry: React.FC<Props> = ({
         <button
           onClick={handleSave}
           disabled={saving || totalWeeks === 0}
-          className="flex items-center gap-2 px-5 py-1.5 text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white rounded-lg shadow-lg shadow-emerald-500/20 transition-all"
+          className="flex items-center gap-2 px-5 py-1.5 text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white rounded-full shadow-lg shadow-emerald-500/20 transition-all"
         >
           {saving
             ? <><Loader2 className="w-4 h-4 animate-spin" />Saving {savedCount}/{totalWeeks}…</>
@@ -767,11 +767,11 @@ const SchemeManualEntry: React.FC<Props> = ({
               <p className="text-sm text-gray-400 mb-5">You have unsaved content. Going back will lose your work.</p>
               <div className="flex gap-3">
                 <button onClick={() => setConfirmDiscard(false)}
-                  className="flex-1 py-2 text-sm font-medium text-gray-300 border border-white/10 rounded-xl hover:bg-white/5 transition-all">
+                  className="flex-1 py-2 text-sm font-medium text-gray-300 border border-white/10 rounded-full hover:bg-white/5 transition-all">
                   Keep editing
                 </button>
                 <button onClick={onCancel}
-                  className="flex-1 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 rounded-xl transition-all">
+                  className="flex-1 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 rounded-full transition-all">
                   Discard
                 </button>
               </div>

@@ -37,7 +37,7 @@ export const OpenInAppGuide: React.FC<{ compact?: boolean }> = ({ compact = fals
           <button
             type="button"
             onClick={copy}
-            className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-0.5 font-mono text-xs font-semibold text-brand-800 ring-1 ring-brand-200 transition hover:bg-brand-50 dark:bg-slate-900/60 dark:text-brand-100 dark:ring-brand-600/40"
+            className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-mono text-xs font-semibold text-brand-800 ring-1 ring-brand-200 transition hover:bg-brand-50 dark:bg-slate-900/60 dark:text-brand-100 dark:ring-brand-600/40"
           >
             {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} chrome://apps
           </button>{" "}

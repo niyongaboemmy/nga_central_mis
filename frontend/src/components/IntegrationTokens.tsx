@@ -121,7 +121,7 @@ const IntegrationTokens: React.FC = () => {
             setName("");
             setModalOpen(true);
           }}
-          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-full transition-colors"
         >
           <Plus className="w-4 h-4" />
           New token
@@ -162,7 +162,7 @@ const IntegrationTokens: React.FC = () => {
                 <button
                   onClick={() => setToRevoke(t)}
                   title="Revoke"
-                  className="p-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                  className="p-2 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
                 >
                   <ShieldOff className="w-4 h-4" />
                 </button>
@@ -207,7 +207,7 @@ const IntegrationTokens: React.FC = () => {
               </code>
               <button
                 onClick={() => copy(created)}
-                className="p-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                className="p-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white transition-colors"
                 title="Copy"
               >
                 <Copy className="w-4 h-4" />
@@ -216,7 +216,7 @@ const IntegrationTokens: React.FC = () => {
             <div className="flex justify-end">
               <button
                 onClick={() => setModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 text-sm font-semibold"
+                className="px-5 py-2.5 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 text-sm font-semibold"
               >
                 Done
               </button>
@@ -244,14 +244,14 @@ const IntegrationTokens: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 text-sm font-semibold"
+                className="px-5 py-2.5 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200 text-sm font-semibold"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={creating || !name.trim()}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold inline-flex items-center gap-2"
+                className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold inline-flex items-center gap-2"
               >
                 {creating && <Loader2 className="w-4 h-4 animate-spin" />}
                 Create token

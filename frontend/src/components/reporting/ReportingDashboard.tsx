@@ -268,7 +268,7 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
                 type="button"
                 onClick={() => setActivePreset(preset)}
                 aria-pressed={activePreset === preset}
-                className={`px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase cursor-pointer transition-all duration-200 ${
+                className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase cursor-pointer transition-all duration-200 ${
                   activePreset === preset
                     ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-white border border-blue-500 dark:border-blue-400 shadow-sm scale-[1.02]"
                     : "text-gray-400 border border-transparent hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50"
@@ -301,7 +301,7 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
               <button
                 onClick={handleFilter}
                 disabled={loading}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all disabled:opacity-50 shadow-lg shadow-blue-500/20"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-1.5 rounded-full text-[10px] font-black uppercase transition-all disabled:opacity-50 shadow-lg shadow-blue-500/20"
               >
                 Apply
               </button>
@@ -323,7 +323,7 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
                   type="button"
                   onClick={() => setDownloadFormat(f)}
                   aria-pressed={downloadFormat === f}
-                  className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase cursor-pointer transition-all duration-200 ${
+                  className={`px-3 py-1 rounded-full text-[10px] font-black uppercase cursor-pointer transition-all duration-200 ${
                     downloadFormat === f
                       ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-white border border-blue-500 dark:border-blue-400 shadow-sm"
                       : "text-gray-400 border border-transparent hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50"
@@ -342,7 +342,7 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
                   ? "No reports in this range to download"
                   : `Download your lesson reports for this range as a ${downloadFormat.toUpperCase()}`
               }
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md shadow-blue-500/20 transition-all duration-200 hover:scale-105 active:scale-95 disabled:hover:scale-100 disabled:from-gray-300 disabled:to-gray-300 disabled:dark:from-gray-700 disabled:dark:to-gray-700 disabled:shadow-none disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md shadow-blue-500/20 transition-all duration-200 hover:scale-105 active:scale-95 disabled:hover:scale-100 disabled:from-gray-300 disabled:to-gray-300 disabled:dark:from-gray-700 disabled:dark:to-gray-700 disabled:shadow-none disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {rollupLoading ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />

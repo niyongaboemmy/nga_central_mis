@@ -386,7 +386,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               </div>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 hover:bg-white/20 rounded-full transition-colors"
               >
                 <X className="w-5 h-5 text-white" />
               </button>

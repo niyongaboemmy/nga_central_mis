@@ -544,7 +544,7 @@ export function TabBar<T extends string>({
                           setMoreOpen(false);
                           onChange(t.value);
                         }}
-                        className={cx("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium", on ? accent.soft : "text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800/70")}
+                        className={cx("flex w-full items-center gap-2 rounded-full px-3 py-2 text-left text-sm font-medium", on ? accent.soft : "text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800/70")}
                       >
                         {Icon && <Icon className="h-4 w-4" aria-hidden />}
                         <span className="flex-1">{t.label}</span>

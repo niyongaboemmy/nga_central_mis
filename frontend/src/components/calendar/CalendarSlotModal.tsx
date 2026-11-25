@@ -466,14 +466,14 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
                 <button
                   type="button"
                   onClick={() => onEntryKindChange?.("lesson")}
-                  className="flex-1 py-2 rounded-lg text-gray-500 dark:text-gray-400"
+                  className="flex-1 py-2 rounded-full text-gray-500 dark:text-gray-400"
                 >
                   Lesson
                 </button>
                 <button
                   type="button"
                   onClick={() => onEntryKindChange?.("activity")}
-                  className="flex-1 py-2 rounded-lg bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow"
+                  className="flex-1 py-2 rounded-full bg-white dark:bg-gray-700 text-emerald-600 dark:text-emerald-400 shadow"
                 >
                   Activity
                 </button>
@@ -697,14 +697,14 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
                 <button
                   type="button"
                   onClick={() => onEntryKindChange?.("lesson")}
-                  className="flex-1 py-2 rounded-lg bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow"
+                  className="flex-1 py-2 rounded-full bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow"
                 >
                   Lesson
                 </button>
                 <button
                   type="button"
                   onClick={() => onEntryKindChange?.("activity")}
-                  className="flex-1 py-2 rounded-lg text-gray-500 dark:text-gray-400"
+                  className="flex-1 py-2 rounded-full text-gray-500 dark:text-gray-400"
                 >
                   Activity
                 </button>

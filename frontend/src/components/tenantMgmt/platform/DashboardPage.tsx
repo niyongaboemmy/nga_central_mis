@@ -190,7 +190,7 @@ const DashboardPage: React.FC = () => {
                         type="button"
                         onClick={() => nav(`/platform/applications/${it.applicationId}`)}
                         aria-label={`${it.schoolName}: ${act.label}`}
-                        className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/50"
+                        className="flex w-full items-center gap-3 rounded-full px-2 py-3 text-left transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/50"
                       >
                         {body}
                       </button>
@@ -231,7 +231,7 @@ const DashboardPage: React.FC = () => {
                 <ul className="space-y-1" aria-label="Schools near their limits">
                   {derived.nearLimits.map(({ t, h }) => (
                     <li key={t.tid}>
-                      <button type="button" onClick={() => nav(`/platform/schools/${t.tid}`)} className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/50">
+                      <button type="button" onClick={() => nav(`/platform/schools/${t.tid}`)} className="flex w-full items-center gap-3 rounded-full px-2 py-1.5 text-left transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/50">
                         <Ring value={h.ratio} size={36} stroke={4} tone={limitTone(h.ratio)} label={`${h.label} ${Math.round(h.ratio * 100)}%`}>
                           <span className="text-[10px] font-bold tabular-nums text-gray-700 dark:text-gray-200">{Math.round(h.ratio * 100)}</span>
                         </Ring>
@@ -299,7 +299,7 @@ const DashboardPage: React.FC = () => {
                 <li key={s} className="relative">
                   {i < TRACKER_STEPS.length - 1 && <span className="absolute left-[1.1rem] top-9 h-3 w-px bg-gray-200 dark:bg-gray-700/50" aria-hidden />}
                   {canApps ? (
-                    <button type="button" onClick={() => nav(`/platform/applications?step=${s}`)} aria-label={`${STEP_LABELS[s]}: ${c}`} className="flex w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/50">
+                    <button type="button" onClick={() => nav(`/platform/applications?step=${s}`)} aria-label={`${STEP_LABELS[s]}: ${c}`} className="flex w-full items-center gap-3 rounded-full px-1 py-1 text-left transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/50">
                       {row}
                     </button>
                   ) : (
@@ -355,7 +355,7 @@ const DashboardPage: React.FC = () => {
             <ul className="space-y-1" aria-label="Renewals in the next 30 days">
               {derived.renewals.map(({ t, d }) => (
                 <li key={t.tid}>
-                  <button type="button" onClick={() => nav(`/platform/schools/${t.tid}`)} className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/50">
+                  <button type="button" onClick={() => nav(`/platform/schools/${t.tid}`)} className="flex w-full items-center gap-3 rounded-full px-2 py-1.5 text-left transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/50">
                     <DaysRing days={d} total={30} size={48} caption="days" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-gray-900 dark:text-white">{t.name}</span>

@@ -108,7 +108,7 @@ const ResultTable: React.FC<{
         <button
           type="button"
           onClick={copy}
-          className="inline-flex items-center gap-1 h-6 px-1.5 rounded hover:bg-slate-200/70 dark:hover:bg-white/10"
+          className="inline-flex items-center gap-1 h-6 px-1.5 rounded-full hover:bg-slate-200/70 dark:hover:bg-white/10"
           title="Copy as CSV (pastes into a spreadsheet)"
         >
           {copied ? (

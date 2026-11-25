@@ -130,7 +130,7 @@ const ReviewSheet: React.FC<Props> = ({ section, onClose }) => {
         <div className="flex items-center gap-2">
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex-1 truncate">Review · {section.title.split(" — ")[0]}</p>
           {total > 0 && <span className="text-[11px] text-gray-500 tabular-nums">{index + 1}/{total} · {remaining} to go</span>}
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close review"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close review"><X className="w-4 h-4" /></button>
         </div>
 
         {cards === null ? (

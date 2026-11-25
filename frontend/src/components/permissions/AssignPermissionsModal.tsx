@@ -177,7 +177,7 @@ const AssignPermissionsModal: React.FC<AssignPermissionsModalProps> = ({
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors shrink-0"
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition-colors shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -220,7 +220,7 @@ const AssignPermissionsModal: React.FC<AssignPermissionsModalProps> = ({
                 <div className="space-y-1">
                   <button
                     onClick={() => setActiveCategory("all")}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-full text-xs transition-colors ${
                       activeCategory === "all"
                         ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
                         : "hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-300"
@@ -237,7 +237,7 @@ const AssignPermissionsModal: React.FC<AssignPermissionsModalProps> = ({
                       onClick={() =>
                         setActiveCategory(activeCategory === cat ? "all" : cat)
                       }
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-full text-xs transition-colors ${
                         activeCategory === cat
                           ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
                           : "hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-300"

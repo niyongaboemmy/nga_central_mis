@@ -199,7 +199,7 @@ const ActivityTab: React.FC<ActivityTabProps> = ({
 
           <button
             onClick={fetchActivities}
-            className="h-9 w-9 bg-blue-500 hover:bg-blue-600 text-white rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center shrink-0"
+            className="h-9 w-9 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-sm transition-all active:scale-95 flex items-center justify-center shrink-0"
             title="Search"
           >
             <Search className="w-4 h-4" />
@@ -251,7 +251,7 @@ const ActivityTab: React.FC<ActivityTabProps> = ({
             <button
               onClick={handleToggleUserStatus}
               disabled={changingStatus}
-              className={`h-11 px-6 rounded-xl font-bold text-sm transition-all active:scale-95 flex items-center gap-2 ${
+              className={`h-11 px-6 rounded-full font-bold text-sm transition-all active:scale-95 flex items-center gap-2 ${
                 user.user.status === "ACTIVE"
                   ? "bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-900/20 dark:text-rose-400"
                   : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400"
@@ -476,7 +476,7 @@ const ActivityTab: React.FC<ActivityTabProps> = ({
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="p-2 border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 transition-all font-medium text-sm flex items-center gap-1"
+              className="p-2 border border-gray-100 dark:border-gray-800 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 transition-all font-medium text-sm flex items-center gap-1"
             >
               <ChevronLeft className="w-4 h-4" />
               Prev
@@ -494,7 +494,7 @@ const ActivityTab: React.FC<ActivityTabProps> = ({
                   <button
                     key={pageNum}
                     onClick={() => setPage(pageNum)}
-                    className={`w-10 h-10 rounded-xl text-sm font-bold transition-all ${
+                    className={`w-10 h-10 rounded-full text-sm font-bold transition-all ${
                       page === pageNum
                         ? "bg-blue-500 text-white shadow-lg shadow-blue-500/25"
                         : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-500"
@@ -508,7 +508,7 @@ const ActivityTab: React.FC<ActivityTabProps> = ({
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="p-2 border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 transition-all font-medium text-sm flex items-center gap-1"
+              className="p-2 border border-gray-100 dark:border-gray-800 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-30 transition-all font-medium text-sm flex items-center gap-1"
             >
               Next
               <ChevronRight className="w-4 h-4" />

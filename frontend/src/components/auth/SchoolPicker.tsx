@@ -37,7 +37,7 @@ const SchoolPicker: React.FC<SchoolPickerProps> = ({ schools, busy = false, onCh
               disabled={busy}
               onClick={() => onChoose(s, remember)}
               aria-label={`Sign in to ${s.name}`}
-              className="w-full flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60"
+              className="w-full flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-60"
             >
               <SchoolMark name={s.name} logoUrl={s.logoUrl} size="md" />
               <span className="flex-1 min-w-0">

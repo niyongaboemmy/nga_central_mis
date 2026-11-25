@@ -116,7 +116,7 @@ const ReferenceFiles: React.FC<{ courseId: number; assetIds: number[]; onChange:
                 {r.status === "uploading" ? `uploading ${formatBytes(r.size)}` : r.status === "reading" ? "reading…" : r.status === "no-text" ? "no readable text (scan?)" : "ready"}
               </span>
               {r.asset_id > 0 && (
-                <button aria-label={`Stop using ${r.name}`} onClick={() => { setRefs((rs) => rs.filter((x) => x.asset_id !== r.asset_id)); onChange(assetIds.filter((x) => x !== r.asset_id)); }} className="w-7 h-7 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center">
+                <button aria-label={`Stop using ${r.name}`} onClick={() => { setRefs((rs) => rs.filter((x) => x.asset_id !== r.asset_id)); onChange(assetIds.filter((x) => x !== r.asset_id)); }} className="w-7 h-7 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center">
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}

@@ -121,7 +121,7 @@ const AddItemPalette: React.FC<Props> = ({ courseId, sectionTitle, open, onClose
                 className="flex-1 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
                 aria-label="Search content to add"
               />
-              <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close">
+              <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
             </div>

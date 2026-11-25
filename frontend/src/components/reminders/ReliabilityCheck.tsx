@@ -39,7 +39,7 @@ export const ReliabilityCheck: React.FC<{ platform: PlatformInfo; pushOn: boolea
           type="button"
           onClick={run}
           disabled={!pushOn}
-          className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           <Send className="h-4 w-4" /> {pushOn ? "Start the check" : "Turn on notifications first"}
         </button>
@@ -50,10 +50,10 @@ export const ReliabilityCheck: React.FC<{ platform: PlatformInfo; pushOn: boolea
           <span className="flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-slate-100">
             <HelpCircle className="h-4 w-4 text-brand-500" /> Did the notification arrive?
           </span>
-          <button type="button" onClick={() => setStage("ok")} className="rounded-xl bg-success-500 px-3 py-1.5 text-sm font-semibold text-white">
+          <button type="button" onClick={() => setStage("ok")} className="rounded-full bg-success-500 px-3 py-1.5 text-sm font-semibold text-white">
             Yes
           </button>
-          <button type="button" onClick={() => setStage("missing")} className="rounded-xl bg-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-800 dark:bg-slate-700 dark:text-white">
+          <button type="button" onClick={() => setStage("missing")} className="rounded-full bg-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-800 dark:bg-slate-700 dark:text-white">
             No
           </button>
         </div>

@@ -175,7 +175,7 @@ const MentorReportsView: React.FC<Props> = ({ onBack }) => {
             <button
               key={p}
               onClick={() => setPreset(p)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold capitalize transition-all ${
                 preset === p
                   ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-white border border-blue-500 dark:border-blue-400 shadow-sm"
                   : "text-gray-500 dark:text-gray-200 border border-transparent hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700/60"
@@ -221,7 +221,7 @@ const MentorReportsView: React.FC<Props> = ({ onBack }) => {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
               tab === t
                 ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-white shadow-sm"
                 : "text-gray-500 dark:text-gray-200 hover:text-gray-700 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700/60"

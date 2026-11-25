@@ -480,7 +480,7 @@ const LimitInput: React.FC<{ label: string; value: number | null; onChange: (v: 
         aria-label={`${label}: unlimited`}
         title="Unlimited"
         onClick={() => onChange(unlimited ? last : null)}
-        className={cx("flex h-7 w-7 items-center justify-center rounded-lg transition-colors", unlimited ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700/60")}
+        className={cx("flex h-7 w-7 items-center justify-center rounded-full transition-colors", unlimited ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700/60")}
       >
         <InfinityIcon className="h-4 w-4" aria-hidden />
       </button>

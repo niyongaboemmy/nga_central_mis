@@ -131,7 +131,7 @@ const RolesTab: React.FC<RolesTabProps> = ({
           {hasPermission(PermConstants.CHANGE_USER_ROLES) && (
             <button
               onClick={openChangeRoleModal}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors mx-auto"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors mx-auto"
             >
               <Plus className="w-4 h-4" />
               Assign Role

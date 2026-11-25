@@ -368,7 +368,7 @@ export const RecentNotesPanel: React.FC<{
             <li key={n.note_id}>
               <button
                 onClick={() => onOpen(n.note_id)}
-                className="-mx-2 flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-gray-50 focus:outline-none focus-visible:bg-gray-50 dark:hover:bg-white/[0.05] dark:focus-visible:bg-white/[0.05]"
+                className="-mx-2 flex w-full items-center gap-3 rounded-full px-2 py-2.5 text-left hover:bg-gray-50 focus:outline-none focus-visible:bg-gray-50 dark:hover:bg-white/[0.05] dark:focus-visible:bg-white/[0.05]"
               >
                 <SubjectTile subject={n.subject_name} size="sm" />
                 <span className="min-w-0 flex-1">

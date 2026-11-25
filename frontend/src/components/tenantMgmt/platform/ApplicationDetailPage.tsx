@@ -564,7 +564,7 @@ const AssignDialog: React.FC<{ open: boolean; current: number | null; onClose: (
         <ul className="mt-3 max-h-72 space-y-1 overflow-y-auto">
           {current !== null && (
             <li>
-              <button type="button" onClick={() => onPick(null)} className="flex w-full items-center gap-3 rounded-xl p-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-400/10">
+              <button type="button" onClick={() => onPick(null)} className="flex w-full items-center gap-3 rounded-full p-2 text-left text-sm text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-400/10">
                 <X className="h-4 w-4" aria-hidden />
                 Unassign
               </button>
@@ -576,7 +576,7 @@ const AssignDialog: React.FC<{ open: boolean; current: number | null; onClose: (
                 type="button"
                 aria-pressed={s.id === current}
                 onClick={() => onPick(s.id)}
-                className={cx("flex w-full items-center gap-3 rounded-xl p-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800", s.id === current && "bg-blue-50 dark:bg-blue-500/10")}
+                className={cx("flex w-full items-center gap-3 rounded-full p-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800", s.id === current && "bg-blue-50 dark:bg-blue-500/10")}
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">{initials(s.name)}</span>
                 <span className="flex-1 font-medium text-gray-900 dark:text-white">{s.name}</span>

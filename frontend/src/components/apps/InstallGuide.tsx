@@ -17,7 +17,7 @@ export const InstallGuide: React.FC<{ os: "macos" | "windows" }> = ({ os }) => {
       role="tab"
       aria-selected={tab === t}
       onClick={() => setTab(t)}
-      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold transition ${
         tab === t
           ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
           : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"

@@ -423,7 +423,7 @@ const SchemeDetails: React.FC = () => {
             </button>
             <button
               onClick={handleClearCache}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-bold transition-all border border-gray-200 dark:border-gray-700"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-bold transition-all border border-gray-200 dark:border-gray-700"
               title="Refresh from Server"
             >
               <RefreshCw className="w-4 h-4" />
@@ -1075,7 +1075,7 @@ const SchemeDetails: React.FC = () => {
                                 </h3>
                                 <button
                                   onClick={() => toggleExpanded(entry.entry_id)}
-                                  className="text-gray-400 hover:text-gray-600 p-1 rounded transition-colors"
+                                  className="text-gray-400 hover:text-gray-600 p-1 rounded-full transition-colors"
                                 >
                                   {isExpanded ? (
                                     <ChevronUp className="w-4 h-4" />
@@ -1273,7 +1273,7 @@ const SchemeDetails: React.FC = () => {
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       onClick={() => setValidationStatus("APPROVED")}
-                      className={`flex flex-col items-center gap-1.5 p-3.5 rounded-xl border-2 transition-all hover:-translate-y-0.5 ${
+                      className={`flex flex-col items-center gap-1.5 p-3.5 rounded-2xl border-2 transition-all hover:-translate-y-0.5 ${
                         validationStatus === "APPROVED"
                           ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 shadow-sm shadow-emerald-500/10"
                           : "bg-gray-50 border-transparent text-gray-500 dark:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700"
@@ -1288,7 +1288,7 @@ const SchemeDetails: React.FC = () => {
                     </button>
                     <button
                       onClick={() => setValidationStatus("REJECTED")}
-                      className={`flex flex-col items-center gap-1.5 p-3.5 rounded-xl border-2 transition-all hover:-translate-y-0.5 ${
+                      className={`flex flex-col items-center gap-1.5 p-3.5 rounded-2xl border-2 transition-all hover:-translate-y-0.5 ${
                         validationStatus === "REJECTED"
                           ? "bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-900/20 shadow-sm shadow-rose-500/10"
                           : "bg-gray-50 border-transparent text-gray-500 dark:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700"

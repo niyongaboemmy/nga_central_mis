@@ -111,7 +111,7 @@ const Navbar: React.FC<NavbarProps> = ({
   // }> = ({ isActive, onClick, children }) => (
   //   <button
   //     onClick={onClick}
-  //     className={`px-3 py-1.5 text-sm rounded-lg transition-all duration-200 font-medium flex items-center space-x-2 relative ${
+  //     className={`px-3 py-1.5 text-sm rounded-full transition-all duration-200 font-medium flex items-center space-x-2 relative ${
   //       isActive
   //         ? "text-blue-600 dark:text-blue-400"
   //         : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
@@ -137,7 +137,7 @@ const Navbar: React.FC<NavbarProps> = ({
                 <div className="relative" ref={systemsMenuRef}>
                   <button
                     onClick={() => setIsSystemsMenuOpen(!isSystemsMenuOpen)}
-                    className="p-2 mr-1 rounded-xl text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200"
+                    className="p-2 mr-1 rounded-full text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200"
                     title="Systems"
                   >
                     <LayoutGrid className="w-6 h-6" />
@@ -280,7 +280,7 @@ const Navbar: React.FC<NavbarProps> = ({
               )}
               <button
                 onClick={onToggleSidebar || toggleMobileMenu}
-                className="inline-flex items-center justify-center p-2 rounded-lg text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200 focus:outline-none"
+                className="inline-flex items-center justify-center p-2 rounded-full text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200 focus:outline-none"
                 aria-label="Toggle menu"
               >
                 {onToggleSidebar ? (
@@ -376,7 +376,7 @@ const Navbar: React.FC<NavbarProps> = ({
                       onNavigateToHome();
                       closeMobileMenu();
                     }}
-                    className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 font-medium flex items-center space-x-3 ${
+                    className={`w-full text-left px-4 py-3 rounded-full transition-all duration-200 font-medium flex items-center space-x-3 ${
                       isActive("/")
                         ? "text-blue-600 dark:text-blue-400"
                         : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
@@ -407,7 +407,7 @@ const Navbar: React.FC<NavbarProps> = ({
                       onNavigateToAbout();
                       closeMobileMenu();
                     }}
-                    className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 font-medium flex items-center space-x-3 ${
+                    className={`w-full text-left px-4 py-3 rounded-full transition-all duration-200 font-medium flex items-center space-x-3 ${
                       isActive("/about")
                         ? "text-blue-600 dark:text-blue-400"
                         : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
@@ -438,7 +438,7 @@ const Navbar: React.FC<NavbarProps> = ({
                       onNavigateToContact();
                       closeMobileMenu();
                     }}
-                    className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 font-medium flex items-center space-x-3 ${
+                    className={`w-full text-left px-4 py-3 rounded-full transition-all duration-200 font-medium flex items-center space-x-3 ${
                       isActive("/contact")
                         ? "text-blue-600 dark:text-blue-400"
                         : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
@@ -476,7 +476,7 @@ const Navbar: React.FC<NavbarProps> = ({
                   handleLogout();
                   closeMobileMenu();
                 }}
-                className="w-full text-left px-4 py-3 mt-4 font-medium rounded-xl transition-all duration-200 transform hover:scale-[1.02] flex items-center space-x-2 text-red-600 dark:text-red-400"
+                className="w-full text-left px-4 py-3 mt-4 font-medium rounded-full transition-all duration-200 transform hover:scale-[1.02] flex items-center space-x-2 text-red-600 dark:text-red-400"
               >
                 <svg
                   className="w-5 h-5"
@@ -501,7 +501,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     onNavigateToLogin();
                     closeMobileMenu();
                   }}
-                  className={`w-full text-left px-4 py-3 mt-4 font-medium rounded-xl transition-all duration-200 transform hover:scale-[1.02] flex items-center space-x-2 ${
+                  className={`w-full text-left px-4 py-3 mt-4 font-medium rounded-full transition-all duration-200 transform hover:scale-[1.02] flex items-center space-x-2 ${
                     isActive("/login")
                       ? "text-blue-600 dark:text-blue-400"
                       : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"

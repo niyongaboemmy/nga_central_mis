@@ -91,7 +91,7 @@ const MoreSubjectsMenu: React.FC<Props> = ({ subjects, onPick }) => {
                     onPick(subject);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.06]"
+                  className="flex w-full items-center gap-2.5 rounded-full px-2.5 py-2 text-left text-[13px] text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.06]"
                 >
                   <SubjectIcon subjectName={subject} className="h-4 w-4 flex-shrink-0 text-gray-400" />
                   <span className="min-w-0 flex-1 truncate" title={subject}>

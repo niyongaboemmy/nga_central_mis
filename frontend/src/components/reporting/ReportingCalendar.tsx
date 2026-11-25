@@ -184,19 +184,19 @@ const ReportingCalendar: React.FC<ReportingCalendarProps> = ({
         <div className="flex items-center space-x-3 bg-gray-100 dark:bg-gray-900/50 p-1.5 rounded-2xl">
           <button
             onClick={prevMonth}
-            className="p-2 hover:bg-white dark:hover:bg-gray-600 rounded-xl transition-all"
+            className="p-2 hover:bg-white dark:hover:bg-gray-600 rounded-full transition-all"
           >
             <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>
           <button
             onClick={() => setCurrentDate(new Date())}
-            className="px-4 py-2 hover:bg-white dark:hover:bg-gray-600 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 transition-all"
+            className="px-4 py-2 hover:bg-white dark:hover:bg-gray-600 rounded-full text-sm font-medium text-gray-700 dark:text-gray-200 transition-all"
           >
             Today
           </button>
           <button
             onClick={nextMonth}
-            className="p-2 hover:bg-white dark:hover:bg-gray-600 rounded-xl transition-all"
+            className="p-2 hover:bg-white dark:hover:bg-gray-600 rounded-full transition-all"
           >
             <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-300" />
           </button>

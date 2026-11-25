@@ -199,7 +199,7 @@ const CompetencyMap: React.FC = () => {
                                     <button type="button" onClick={() => set({ student: s.user_id })} data-state={st}
                                       aria-label={`${s.name}, ${c.criteria_number}: ${STATE_META[st].label}${best !== null && best !== undefined ? ` (best ${Math.round(best)}%)` : ""}`}
                                       title={`${c.criteria_number}: ${STATE_META[st].label}${best !== null && best !== undefined ? ` · best ${Math.round(best)}%` : ""}`}
-                                      className={`block h-6 w-7 rounded ${STATE_META[st].cell} focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`} />
+                                      className={`block h-6 w-7 rounded-full ${STATE_META[st].cell} focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500`} />
                                   </td>
                                 );
                               }),

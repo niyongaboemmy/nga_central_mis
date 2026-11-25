@@ -394,7 +394,7 @@ const ProgramUsers: React.FC = () => {
                         <button
                           onClick={() => handlePageChange(pagination.page - 1)}
                           disabled={pagination.page === 1}
-                          className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                          className="p-2 rounded-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
                         >
                           <ChevronLeft className="w-4 h-4" />
                         </button>
@@ -404,7 +404,7 @@ const ProgramUsers: React.FC = () => {
                         <button
                           onClick={() => handlePageChange(pagination.page + 1)}
                           disabled={pagination.page === pagination.totalPages}
-                          className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                          className="p-2 rounded-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </button>

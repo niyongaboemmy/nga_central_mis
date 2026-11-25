@@ -210,7 +210,7 @@ const VideoSlot: React.FC<{ draft: DraftItem; onSaved: () => void }> = ({ draft,
         <div className="mt-3 flex flex-col sm:flex-row gap-2">
           <label className="sr-only" htmlFor={`v-${draft.item_id}`}>YouTube or Vimeo link</label>
           <input id={`v-${draft.item_id}`} inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Paste a YouTube or Vimeo link" className="el-input flex-1" />
-          <button disabled={!url.trim() || saving} onClick={save} className="min-h-[44px] px-4 rounded-xl bg-brand-600 text-white text-sm font-semibold disabled:opacity-50">
+          <button disabled={!url.trim() || saving} onClick={save} className="min-h-[44px] px-4 rounded-full bg-brand-600 text-white text-sm font-semibold disabled:opacity-50">
             <LinkIcon className="w-4 h-4 inline mr-1" /> Add link
           </button>
         </div>

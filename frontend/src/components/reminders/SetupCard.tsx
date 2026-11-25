@@ -200,7 +200,7 @@ export const SetupCard: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={() => setInstallOpen(true)}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-200 px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 dark:border-brand-600/40 dark:text-brand-200 dark:hover:bg-brand-600/10"
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-brand-200 px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 dark:border-brand-600/40 dark:text-brand-200 dark:hover:bg-brand-600/10"
                 >
                   <Download className="h-4 w-4" /> How to install
                 </button>
@@ -234,7 +234,7 @@ export const SetupCard: React.FC<Props> = ({
                   type="button"
                   onClick={turnOff}
                   disabled={busy !== null}
-                  className="mt-3 w-full rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-60 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className="mt-3 w-full rounded-full px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-60 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   {busy === "off" ? "Turning off…" : "Turn off on this device"}
                 </button>
@@ -243,7 +243,7 @@ export const SetupCard: React.FC<Props> = ({
                   type="button"
                   onClick={pushStatus === "needs-install" ? () => setInstallOpen(true) : turnOn}
                   disabled={busy !== null || pushStatus === "unsupported"}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-200 disabled:opacity-60"
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-200 disabled:opacity-60"
                 >
                   <BellRing className="h-4 w-4" />
                   {busy === "push" ? "Waiting for your answer…" : pushStatus === "needs-install" ? "Install to continue" : "Turn on notifications"}
@@ -263,7 +263,7 @@ export const SetupCard: React.FC<Props> = ({
                 type="button"
                 onClick={sendTest}
                 disabled={!pushOn || busy !== null}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <Send className="h-4 w-4" /> {busy === "test" ? "Sending…" : "Send test notification"}
               </button>

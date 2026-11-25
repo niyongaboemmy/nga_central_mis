@@ -245,7 +245,7 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           <p className="text-gray-500 dark:text-gray-400 mb-4">{error}</p>
           <button
             onClick={handleDownload}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            className="px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors"
           >
             Download File
           </button>
@@ -267,7 +267,7 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           <div className="flex gap-2 mb-4">
             <button
               onClick={() => setZoom(Math.max(0.25, zoom - 0.25))}
-              className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 dark:text-white transition-colors"
+              className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 dark:text-white transition-colors"
               title="Zoom Out"
             >
               <FiZoomOut className="w-4 h-4" />
@@ -277,14 +277,14 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             </span>
             <button
               onClick={() => setZoom(Math.min(3, zoom + 0.25))}
-              className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 dark:text-white transition-colors"
+              className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 dark:text-white transition-colors"
               title="Zoom In"
             >
               <FiZoomIn className="w-4 h-4" />
             </button>
             <button
               onClick={() => setRotation((rotation + 90) % 360)}
-              className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 dark:text-white transition-colors"
+              className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 dark:text-white transition-colors"
               title="Rotate"
             >
               <FiRotateCcw className="w-4 h-4" />
@@ -373,7 +373,7 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         </div>
         <button
           onClick={handleDownload}
-          className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+          className="px-6 py-3 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors flex items-center gap-2"
         >
           <FiDownload className="w-4 h-4" />
           Download File
@@ -423,14 +423,14 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleDownload}
-              className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
               title="Download"
             >
               <FiDownload className="w-5 h-5" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
               title="Close"
             >
               <FiX className="w-5 h-5" />

@@ -324,7 +324,7 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
                     e.stopPropagation();
                     onPlanClick(plan);
                   }}
-                  className="p-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
+                  className="p-1 rounded-full bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
                   title="Edit Plan"
                 >
                   <FileText className="w-3 h-3" />
@@ -334,7 +334,7 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
                     e.stopPropagation();
                     if (plan.id) onDeletePlan(plan.id);
                   }}
-                  className="p-1 rounded-md bg-red-600 text-white hover:bg-red-700 shadow-sm transition-colors"
+                  className="p-1 rounded-full bg-red-600 text-white hover:bg-red-700 shadow-sm transition-colors"
                   title="Delete Plan"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -468,19 +468,19 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
             <div className="flex items-center gap-1">
               <button
                 onClick={prevMonth}
-                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
+                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setCurrentDate(new Date())}
-                className="px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                className="px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
               >
                 Today
               </button>
               <button
                 onClick={nextMonth}
-                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
+                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>

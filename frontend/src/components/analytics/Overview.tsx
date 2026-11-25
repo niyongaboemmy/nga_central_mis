@@ -77,7 +77,7 @@ export default function Overview() {
               <div key={k.key} className="an-rise rounded-2xl border border-white/60 dark:border-slate-700/30 bg-white/70 dark:bg-slate-800/50 px-3 py-3 min-w-0 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft">
                 <div className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1">
                   <span className="truncate">{k.label}</span>
-                  <button type="button" className="shrink-0 rounded focus-visible:ring-2 focus-visible:ring-brand-600" title={DEFS[k.key]} aria-label={`How is ${k.label} calculated? ${DEFS[k.key]}`}>
+                  <button type="button" className="shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-brand-600" title={DEFS[k.key]} aria-label={`How is ${k.label} calculated? ${DEFS[k.key]}`}>
                     <Info className="w-3 h-3" aria-hidden />
                   </button>
                 </div>

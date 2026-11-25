@@ -58,7 +58,7 @@ const OfficeHoursBandCells: React.FC<OfficeHoursBandCellsProps> = ({ label, entr
                 <button
                   type="button"
                   onClick={() => onAdd(backendDay)}
-                  className={`flex w-full items-center justify-center gap-1 rounded-lg px-1 py-1 ${text} font-semibold text-slate-500 opacity-70 transition hover:bg-white hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700/50`}
+                  className={`flex w-full items-center justify-center gap-1 rounded-full px-1 py-1 ${text} font-semibold text-slate-500 opacity-70 transition hover:bg-white hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700/50`}
                   aria-label={`Add office hours on ${["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"][backendDay]}`}
                 >
                   <Plus className="h-3 w-3" aria-hidden /> {dense ? "" : "Office hours"}

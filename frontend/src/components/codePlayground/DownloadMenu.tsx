@@ -59,7 +59,7 @@ const DownloadMenu: React.FC<DownloadMenuProps> = ({ downloadLabel, onDownload, 
       type="button"
       role="menuitem"
       onClick={() => choose(fn)}
-      className="w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-slate-100 dark:hover:bg-white/10 focus:bg-slate-100 dark:focus:bg-white/10 outline-none"
+      className="w-full flex items-start gap-3 px-3 py-2.5 rounded-full text-left hover:bg-slate-100 dark:hover:bg-white/10 focus:bg-slate-100 dark:focus:bg-white/10 outline-none"
       data-testid={testId}
     >
       <span className="mt-0.5 text-brand-600 dark:text-brand-200">{icon}</span>
@@ -83,7 +83,7 @@ const DownloadMenu: React.FC<DownloadMenuProps> = ({ downloadLabel, onDownload, 
         aria-expanded={open}
         title="Download or save to Documents"
         aria-label="Download or save code"
-        className="inline-flex items-center justify-center gap-1 h-8 min-w-[32px] px-2 rounded-lg text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition-colors"
+        className="inline-flex items-center justify-center gap-1 h-8 min-w-[32px] px-2 rounded-full text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition-colors"
         data-testid="playground-download"
       >
         <Download className="w-4 h-4" />

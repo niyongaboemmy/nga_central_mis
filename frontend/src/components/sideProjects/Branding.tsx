@@ -123,10 +123,10 @@ export const EditableLogo: React.FC<{ projectId: number; logoAssetId: number | n
           </button>
           {menu && (
             <div role="menu" className="absolute left-0 top-[calc(100%+4px)] z-30 w-40 overflow-hidden rounded-2xl border border-slate-900/[0.07] bg-white p-1.5 dark:border-white/10 dark:bg-gray-900">
-              <button role="menuitem" type="button" onClick={() => (setMenu(false), up.pick())} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-800">
+              <button role="menuitem" type="button" onClick={() => (setMenu(false), up.pick())} className="flex w-full items-center gap-2 rounded-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-800">
                 <Camera className="h-4 w-4" /> New logo
               </button>
-              <button role="menuitem" type="button" onClick={() => (setMenu(false), up.remove())} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">
+              <button role="menuitem" type="button" onClick={() => (setMenu(false), up.remove())} className="flex w-full items-center gap-2 rounded-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">
                 <Trash2 className="h-4 w-4" /> Remove
               </button>
             </div>

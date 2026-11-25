@@ -248,7 +248,7 @@ const SchemeOfWorkPreviewModal: React.FC<SchemeOfWorkPreviewModalProps> = ({
                       <button
                         key={plan.id}
                         onClick={() => onLessonPlanClick?.(plan)}
-                        className="w-full flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-800/40 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-100 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 rounded-xl transition-all group hover:-translate-y-0.5"
+                        className="w-full flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-800/40 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-gray-100 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700 rounded-full transition-all group hover:-translate-y-0.5"
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">

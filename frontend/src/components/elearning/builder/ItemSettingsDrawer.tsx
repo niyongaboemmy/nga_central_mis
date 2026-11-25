@@ -399,16 +399,16 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
               <button
                 onClick={() => setBriefOpen((o) => !o)}
                 aria-pressed={briefOpen}
-                className="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl el-chip"
+                className="lg:hidden w-10 h-10 flex items-center justify-center rounded-full el-chip"
                 aria-label="What this week teaches"
               >
                 <Info className="w-4 h-4" />
               </button>
             )}
-            <button onClick={() => setWide((w) => !w)} className="hidden sm:flex w-10 h-10 items-center justify-center rounded-xl el-chip" aria-label={wide ? "Shrink" : "Full screen"}>
+            <button onClick={() => setWide((w) => !w)} className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full el-chip" aria-label={wide ? "Shrink" : "Full screen"}>
               {wide ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
-            <button onClick={requestClose} className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close">
+            <button onClick={requestClose} className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -597,7 +597,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                     <li key={qi} className="rounded-xl border border-gray-200 dark:border-white/10 p-3 space-y-2">
                       <div className="flex gap-2">
                         <input className={input} placeholder={`Question ${qi + 1}`} value={q.prompt} onChange={(e) => setQuestions((qs) => qs.map((x, i) => (i === qi ? { ...x, prompt: e.target.value } : x)))} />
-                        <button onClick={() => setQuestions((qs) => qs.filter((_, i) => i !== qi))} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-danger-500" aria-label="Remove question"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => setQuestions((qs) => qs.filter((_, i) => i !== qi))} className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:text-danger-500" aria-label="Remove question"><Trash2 className="w-4 h-4" /></button>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
                         <SelectField
@@ -690,7 +690,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                         role="radio"
                         aria-checked={rule === r}
                         onClick={() => setRule(r)}
-                        className={`min-h-[44px] px-3 rounded-xl text-sm border text-left ${rule === r ? "border-brand-500 el-chip-brand" : "border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200"}`}
+                        className={`min-h-[44px] px-3 rounded-full text-sm border text-left ${rule === r ? "border-brand-500 el-chip-brand" : "border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200"}`}
                       >
                         {copy.builder.completionRules[r]}
                         {r === "MIN_SCORE" && rule === "MIN_SCORE" && (

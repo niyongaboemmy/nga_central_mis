@@ -56,7 +56,7 @@ const FindBar: React.FC<Props> = ({
         onClick={() => step(-1)}
         disabled={count === 0}
         aria-label="Previous match"
-        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
+        className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
       >
         <ChevronLeft className="w-4 h-4" />
       </button>
@@ -64,14 +64,14 @@ const FindBar: React.FC<Props> = ({
         onClick={() => step(1)}
         disabled={count === 0}
         aria-label="Next match"
-        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
+        className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
       >
         <ChevronRight className="w-4 h-4" />
       </button>
       {onAskAI && !tooShort && (
         <button
           onClick={onAskAI}
-          className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+          className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
         >
           <Sparkles className="w-3.5 h-3.5" /> Ask AI instead
         </button>
@@ -79,7 +79,7 @@ const FindBar: React.FC<Props> = ({
       <button
         onClick={onClose}
         aria-label="Close find"
-        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+        className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
       >
         <X className="w-4 h-4" />
       </button>

@@ -191,7 +191,7 @@ const HomePage: React.FC = () => {
           <button
             type="button"
             onClick={refresh}
-            className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
           >
             <RefreshCw className="w-4 h-4" aria-hidden /> Try again
           </button>
@@ -289,7 +289,7 @@ const HomePage: React.FC = () => {
             onClick={refresh}
             disabled={refreshing}
             aria-label="Refresh Home"
-            className="grid place-items-center w-10 h-10 rounded-xl border border-border-light dark:border-border-dark/60 hover:bg-surface-light dark:hover:bg-surface-dark disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="grid place-items-center w-10 h-10 rounded-full border border-border-light dark:border-border-dark/60 hover:bg-surface-light dark:hover:bg-surface-dark disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden />
           </button>

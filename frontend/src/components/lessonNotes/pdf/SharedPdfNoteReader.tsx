@@ -213,7 +213,7 @@ const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel, embedde
             <div className="max-w-[1400px] mx-auto px-3 sm:px-5 py-2 flex items-center gap-2">
               <button
                 onClick={onBack || (() => navigate("/shared-lesson-notes"))}
-                className="flex items-center gap-1 px-2 py-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex-shrink-0"
+                className="flex items-center gap-1 px-2 py-2 rounded-full text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex-shrink-0"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">{backLabel || "Library"}</span>
@@ -273,14 +273,14 @@ const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel, embedde
                   onClick={download}
                   disabled={!blob}
                   title="Download PDF"
-                  className="hidden sm:block p-2 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
+                  className="hidden sm:block p-2 rounded-full text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
                 >
                   <Download className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setFocusMode(true)}
                   title="Focus mode"
-                  className="hidden sm:block p-2 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="hidden sm:block p-2 rounded-full text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
                   <Maximize2 className="w-4 h-4" />
                 </button>

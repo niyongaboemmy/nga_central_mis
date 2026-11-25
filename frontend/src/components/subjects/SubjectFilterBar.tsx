@@ -92,7 +92,7 @@ const MultiSelect = ({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
+        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border transition-colors ${
           selected.length > 0
             ? "bg-blue-600 text-white border-blue-600"
             : "bg-white dark:bg-gray-800/30 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700/40 hover:border-gray-300 dark:hover:border-gray-600"
@@ -125,7 +125,7 @@ const MultiSelect = ({
                   key={opt.id}
                   type="button"
                   onClick={() => toggle(opt.id)}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-full text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
                 >
                   <span
                     className={`w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 ${
@@ -168,7 +168,7 @@ const Segmented = <T extends string>({
         type="button"
         onClick={() => onChange(opt.value)}
         aria-pressed={value === opt.value}
-        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
           value === opt.value
             ? "bg-blue-600 text-white shadow-sm"
             : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
@@ -287,7 +287,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
               type="button"
               onClick={() => onChange({ search: "" })}
               aria-label="Clear search"
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <X className="w-4 h-4" />
             </button>
@@ -299,7 +299,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
             type="button"
             onClick={() => setShowFilters((v) => !v)}
             aria-expanded={showFilters}
-            className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-sm font-medium border transition-colors ${
+            className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium border transition-colors ${
               showFilters || activeCount > 0
                 ? "bg-blue-600 text-white border-blue-600"
                 : "bg-white dark:bg-gray-800/30 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700/40 hover:border-gray-300 dark:hover:border-gray-600"
@@ -320,7 +320,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
               onClick={() => onViewChange("grid")}
               aria-label="Grid view"
               aria-pressed={view === "grid"}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-2 rounded-full transition-colors ${
                 view === "grid"
                   ? "bg-blue-600 text-white"
                   : "text-gray-500 dark:text-gray-400"
@@ -333,7 +333,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
               onClick={() => onViewChange("list")}
               aria-label="List view"
               aria-pressed={view === "list"}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-2 rounded-full transition-colors ${
                 view === "list"
                   ? "bg-blue-600 text-white"
                   : "text-gray-500 dark:text-gray-400"

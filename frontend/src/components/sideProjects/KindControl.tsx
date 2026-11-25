@@ -70,7 +70,7 @@ const KindControl: React.FC<{ p: ProjectDetail; canChange: boolean; onChanged: (
                 role="menuitemradio"
                 aria-checked={on}
                 onClick={() => pick(k)}
-                className="flex w-full items-start gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-gray-700/50"
+                className="flex w-full items-start gap-2.5 rounded-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-gray-700/50"
               >
                 <K.icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500 dark:text-gray-400" aria-hidden />
                 <span className="min-w-0 flex-1">

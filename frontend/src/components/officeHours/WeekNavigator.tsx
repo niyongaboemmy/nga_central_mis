@@ -91,7 +91,7 @@ const WeekNavigator: React.FC<WeekNavigatorProps> = ({ weeks, value, onChange, t
               disabled={disabled}
               onClick={() => onChange(w.start)}
               title={`Week of ${shortDate(w.start, true)}${counts ? ` · ${n} student${n === 1 ? "" : "s"}` : ""}`}
-              className={`flex min-w-[4.5rem] snap-start flex-col items-center rounded-xl border px-2.5 py-1.5 text-xs transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40 ${
+              className={`flex min-w-[4.5rem] snap-start flex-col items-center rounded-2xl border px-2.5 py-1.5 text-xs transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40 ${
                 selected
                   ? "border-blue-600 bg-blue-600 text-white shadow-sm"
                   : past

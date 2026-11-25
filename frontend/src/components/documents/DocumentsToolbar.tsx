@@ -71,7 +71,7 @@ const IconButton: React.FC<{
     title={label}
     aria-label={label}
     aria-pressed={active}
-    className={`grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg transition-colors ${
+    className={`grid h-9 w-9 flex-shrink-0 place-items-center rounded-full transition-colors ${
       active
         ? "el-chip-brand"
         : "text-gray-500 hover:bg-gray-200/70 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
@@ -181,7 +181,7 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
               <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-gray-300 dark:text-gray-600" />
               <button
                 onClick={() => onBreadcrumbClick(index)}
-                className={`max-w-[160px] truncate rounded-lg px-2 py-1.5 text-xs transition-colors ${
+                className={`max-w-[160px] truncate rounded-2xl px-2 py-1.5 text-xs transition-colors ${
                   index === breadcrumbs.length - 1
                     ? "font-semibold text-gray-800 dark:text-gray-100"
                     : "text-gray-500 hover:bg-gray-200/70 dark:text-gray-400 dark:hover:bg-white/[0.08]"

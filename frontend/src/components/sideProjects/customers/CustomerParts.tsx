@@ -279,7 +279,7 @@ export const CustomerPicker: React.FC<{ value: Customer | { id: number; name: st
             )}
           </ul>
           <div className="border-t border-slate-900/[0.05] p-1.5 dark:border-white/[0.06]">
-            <button type="button" onClick={() => (setRegister(true), setOpen(false))} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10">
+            <button type="button" onClick={() => (setRegister(true), setOpen(false))} className="flex w-full items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10">
               <Plus className="h-4 w-4" /> Register {q ? `“${q}”` : "a new customer"}
             </button>
           </div>

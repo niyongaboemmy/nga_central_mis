@@ -155,7 +155,7 @@ const AccessGate: React.FC<{ onUnlocked: (expiresAt: number) => void }> = ({
           <button
             type="submit"
             disabled={loading || !password}
-            className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium transition-colors"
+            className="w-full py-2.5 rounded-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium transition-colors"
           >
             {loading ? "Verifying..." : "Unlock Database Management"}
           </button>
@@ -500,7 +500,7 @@ const DatabaseManagement: React.FC = () => {
               setSelectedTable(null);
               setTab("query");
             }}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium mb-2 transition-colors ${
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium mb-2 transition-colors ${
               tab === "query" || tab === "history"
                 ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
                 : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
@@ -517,7 +517,7 @@ const DatabaseManagement: React.FC = () => {
                 <button
                   key={t.name}
                   onClick={() => selectTable(t.name)}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-full text-sm transition-colors ${
                     selectedTable === t.name
                       ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
                       : "hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
@@ -575,7 +575,7 @@ const DatabaseManagement: React.FC = () => {
                       </div>
                       <button
                         onClick={() => selectedTable && loadTableData(selectedTable, page)}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
                         title="Refresh"
                       >
                         <RefreshCw className="w-4 h-4 text-gray-500" />
@@ -589,7 +589,7 @@ const DatabaseManagement: React.FC = () => {
                               ),
                             )
                           }
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           Add row
@@ -622,13 +622,13 @@ const DatabaseManagement: React.FC = () => {
                       <div className="flex gap-2 mt-3">
                         <button
                           onClick={handleAddRow}
-                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+                          className="px-3 py-1.5 text-xs font-medium rounded-full bg-blue-600 hover:bg-blue-700 text-white"
                         >
                           Save row
                         </button>
                         <button
                           onClick={() => setNewRow(null)}
-                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                          className="px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
                         >
                           Cancel
                         </button>
@@ -710,14 +710,14 @@ const DatabaseManagement: React.FC = () => {
                       <button
                         disabled={page <= 1}
                         onClick={() => selectedTable && loadTableData(selectedTable, page - 1)}
-                        className="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 disabled:opacity-40"
+                        className="px-2 py-1 rounded-full border border-gray-200 dark:border-gray-700 disabled:opacity-40"
                       >
                         Prev
                       </button>
                       <button
                         disabled={page * limit >= total}
                         onClick={() => selectedTable && loadTableData(selectedTable, page + 1)}
-                        className="px-2 py-1 rounded border border-gray-200 dark:border-gray-700 disabled:opacity-40"
+                        className="px-2 py-1 rounded-full border border-gray-200 dark:border-gray-700 disabled:opacity-40"
                       >
                         Next
                       </button>
@@ -799,14 +799,14 @@ const DatabaseManagement: React.FC = () => {
                 <div className="p-4 flex flex-wrap gap-3">
                   <button
                     onClick={() => selectedTable && exportTable(selectedTable, "csv")}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
                   >
                     <Download className="w-4 h-4" />
                     Export as CSV
                   </button>
                   <button
                     onClick={() => selectedTable && exportTable(selectedTable, "sql")}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium"
+                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium"
                   >
                     <Download className="w-4 h-4" />
                     Export as SQL dump
@@ -843,7 +843,7 @@ const DatabaseManagement: React.FC = () => {
                     </span>
                     <button
                       onClick={() => setAiPanelOpen((o) => !o)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                         aiPanelOpen
                           ? "bg-blue-600 text-white"
                           : "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
@@ -881,7 +881,7 @@ const DatabaseManagement: React.FC = () => {
                         <button
                           onClick={handleAiGenerate}
                           disabled={aiGenerating || !aiPrompt.trim()}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
                           {aiGenerating ? "Generating..." : "Generate SQL"}
@@ -918,13 +918,13 @@ const DatabaseManagement: React.FC = () => {
                       <div className="flex gap-2">
                         <button
                           onClick={() => executeQuery(true)}
-                          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white"
+                          className="px-3 py-1.5 text-xs font-semibold rounded-full bg-red-600 hover:bg-red-700 text-white"
                         >
                           Run anyway
                         </button>
                         <button
                           onClick={() => setPendingConfirm(false)}
-                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                          className="px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
                         >
                           Cancel
                         </button>
@@ -936,7 +936,7 @@ const DatabaseManagement: React.FC = () => {
                     <button
                       onClick={() => executeQuery(false)}
                       disabled={queryRunning || !queryText.trim()}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium"
+                      className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium"
                     >
                       <Play className="w-4 h-4" />
                       {queryRunning ? "Running..." : "Run query"}

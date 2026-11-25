@@ -195,7 +195,7 @@ const Actions: React.FC<{
             role="menuitem"
             type="button"
             onClick={(e) => (e.stopPropagation(), setOpen(false), onEdit())}
-            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-700/50"
+            className="flex w-full items-center gap-2 rounded-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-700/50"
           >
             <Pencil className="h-4 w-4" /> Edit
           </button>
@@ -203,7 +203,7 @@ const Actions: React.FC<{
             role="menuitem"
             type="button"
             onClick={(e) => (e.stopPropagation(), setOpen(false), onDelete())}
-            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+            className="flex w-full items-center gap-2 rounded-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
           >
             <Trash2 className="h-4 w-4" /> Delete
           </button>
@@ -224,7 +224,7 @@ const WorkChips: React.FC<{ work: ReportWork[]; onPickItem?: (itemId: number) =>
             type="button"
             onClick={() => onPickItem?.(w.itemId)}
             title={w.taskId ? `Task in ${w.itemTitle}` : w.phaseTitle ? `Feature in ${w.phaseTitle}` : "Feature"}
-            className="inline-flex max-w-[18rem] items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-800 transition hover:bg-blue-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/20"
+            className="inline-flex max-w-[18rem] items-center gap-1.5 rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-800 transition hover:bg-blue-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-blue-500/10 dark:text-blue-200 dark:hover:bg-blue-500/20"
           >
             {w.taskId ? <ListChecks className="h-3 w-3 shrink-0" aria-hidden /> : <CircleDot className="h-3 w-3 shrink-0" aria-hidden />}
             <span className="truncate">{w.taskTitle ?? w.itemTitle}</span>
@@ -426,7 +426,7 @@ const CompactRow: React.FC<{
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex min-w-0 flex-1 items-center gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
+        className="flex min-w-0 flex-1 items-center gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-full"
         aria-label={`Expand report of ${fmt(r.workDate, { day: "numeric", month: "long" })}`}
       >
         <span className="w-14 shrink-0 text-xs font-semibold tabular-nums text-slate-500 dark:text-gray-400">
@@ -912,7 +912,7 @@ const ReportsFeed: React.FC<{
                           return n;
                         })
                       }
-                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-gray-800/40"
+                      className="flex w-full items-center gap-2 rounded-full px-3 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-gray-800/40"
                     >
                       <ChevronDown
                         className={`h-4 w-4 text-slate-400 transition-transform ${isClosed ? "-rotate-90" : ""}`}

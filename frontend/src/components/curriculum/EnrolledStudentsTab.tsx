@@ -284,7 +284,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
           <button
             onClick={exportToExcel}
             disabled={filteredStudents.length === 0}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 rounded-full transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
           >
             <FileSpreadsheet className="w-4 h-4" />
             Download Excel
@@ -297,7 +297,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                 setShowAddPanel((v) => !v);
                 if (showAddPanel) { setAddQuery(""); setAddResults([]); }
               }}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-all shadow-sm ${
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-full transition-all shadow-sm ${
                 showAddPanel
                   ? "bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700/30"
                   : "bg-blue-600 hover:bg-blue-700 text-white border border-blue-600"

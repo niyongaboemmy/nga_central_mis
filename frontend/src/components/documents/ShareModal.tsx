@@ -774,7 +774,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                               <button
                                 key={p}
                                 onClick={() => onLinkPermissionChange(p)}
-                                className={`flex-1 px-3 py-2 rounded-xl text-xs font-medium border-2 transition-all ${
+                                className={`flex-1 px-3 py-2 rounded-full text-xs font-medium border-2 transition-all ${
                                   linkPermission === p
                                     ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                                     : "border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300"
