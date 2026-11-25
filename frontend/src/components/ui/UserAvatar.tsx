@@ -89,7 +89,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ name, avatar, src, userId, size
       <span
         {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": name })}
         data-fallback="person"
-        className={`${box} bg-blue-600 text-white`}
+        className={`${box} bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-300`}
         style={style}
       >
         <UserRound style={{ width: Math.round(size * 0.55), height: Math.round(size * 0.55) }} strokeWidth={1.75} aria-hidden />

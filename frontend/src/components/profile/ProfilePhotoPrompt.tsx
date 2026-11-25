@@ -203,7 +203,7 @@ const ProfilePhotoPrompt: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => input.current?.click()}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30"
+                          className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-1.5 text-sm font-semibold text-white transition focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30"
                         >
                           <Camera className="w-4 h-4" />
                           Add photo
@@ -211,7 +211,7 @@ const ProfilePhotoPrompt: React.FC = () => {
                         <button
                           type="button"
                           onClick={notNow}
-                          className="rounded-xl px-3 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 transition"
+                          className="rounded-full px-3.5 py-1.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 transition"
                         >
                           Not now
                         </button>

@@ -73,6 +73,8 @@ const ageFrom = (iso: string): number | null => {
   return age >= 0 && age < 130 ? age : null;
 };
 
+/** List rows that act as buttons: pills, like every other button. */
+const pillRow = surface.insetHover.replace("rounded-xl", "rounded-full");
 const labelCls = "mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300";
 const inputWithIcon = `${surface.input} pl-10`;
 
@@ -107,7 +109,7 @@ const Fact: React.FC<{
   onCopy?: (value: string, label: string) => void;
 }> = ({ icon, label, value, mono, onCopy }) => (
   <div className={`group flex items-center gap-3 px-2 py-2.5 ${surface.insetHover}`}>
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700/40 dark:text-gray-300">
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700/40 dark:text-gray-300">
       {icon}
     </span>
     <div className="min-w-0 flex-1">
@@ -122,7 +124,7 @@ const Fact: React.FC<{
         onClick={() => onCopy(value, label)}
         aria-label={`Copy ${label.toLowerCase()}`}
         title={`Copy ${label.toLowerCase()}`}
-        className={`shrink-0 rounded-lg p-1.5 text-gray-400 opacity-100 transition hover:bg-gray-100 hover:text-gray-700 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 dark:hover:bg-gray-700/50 dark:hover:text-gray-200 ${accent.focus}`}
+        className={`shrink-0 rounded-full p-1.5 text-gray-400 opacity-100 transition hover:bg-gray-100 hover:text-gray-700 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 dark:hover:bg-gray-700/50 dark:hover:text-gray-200 ${accent.focus}`}
       >
         <Copy className="h-4 w-4" aria-hidden />
       </button>
@@ -292,9 +294,9 @@ const Profile: React.FC = () => {
     },
   ].filter(Boolean) as { key: string; icon: React.ReactNode; title: string; hint: string; to?: string; onClick?: () => void }[];
 
-  const tileCls = `group flex items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50 ${accent.focus}`;
+  const tileCls = `group flex items-center gap-3 rounded-full p-2 pr-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50 ${accent.focus}`;
   const tileIcon =
-    "grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white dark:bg-blue-500/15 dark:text-blue-300";
+    "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white dark:bg-blue-500/15 dark:text-blue-300";
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 pb-16 pt-6 md:px-6">
@@ -340,7 +342,7 @@ const Profile: React.FC = () => {
             <button
               type="button"
               onClick={() => focusField("pf-first")}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${accent.solid} ${accent.focus}`}
+              className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${accent.solid} ${accent.focus}`}
             >
               <UserRound className="h-4 w-4" aria-hidden />
               Edit details
@@ -348,7 +350,7 @@ const Profile: React.FC = () => {
             <button
               type="button"
               onClick={() => setPasswordOpen(true)}
-              className={`inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700/40 dark:text-gray-200 dark:hover:bg-gray-800/50 ${accent.focus}`}
+              className={`inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700/40 dark:text-gray-200 dark:hover:bg-gray-800/50 ${accent.focus}`}
             >
               <KeyRound className="h-4 w-4" aria-hidden />
               Change password
@@ -386,7 +388,7 @@ const Profile: React.FC = () => {
                     return (
                       <label
                         key={g.value || "none"}
-                        className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-3.5 py-2 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 ${
+                        className={`inline-flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500 ${
                           on
                             ? accent.selected + " font-semibold text-blue-700 dark:text-blue-300"
                             : "bg-gray-50 text-gray-700 hover:bg-gray-100 dark:bg-gray-900/50 dark:text-gray-300 dark:hover:bg-gray-800/60"
@@ -477,7 +479,7 @@ const Profile: React.FC = () => {
                   type="button"
                   onClick={() => setForm(initial)}
                   disabled={saving}
-                  className={`rounded-xl px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-white/70 dark:text-gray-300 dark:hover:bg-gray-800/60 ${accent.focus}`}
+                  className={`rounded-full px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-white/70 dark:text-gray-300 dark:hover:bg-gray-800/60 ${accent.focus}`}
                 >
                   Discard
                 </button>
@@ -485,7 +487,7 @@ const Profile: React.FC = () => {
               <button
                 type="submit"
                 disabled={!dirty || saving}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${accent.solid} ${accent.focus}`}
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${accent.solid} ${accent.focus}`}
               >
                 {saving && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden />}
                 {saving ? "Saving…" : "Save changes"}
@@ -558,7 +560,7 @@ const Profile: React.FC = () => {
                     <button
                       type="button"
                       onClick={s.go}
-                      className={`group flex w-full items-center gap-2.5 px-2 py-1.5 text-left text-sm font-medium text-gray-900 dark:text-gray-100 ${surface.insetHover} ${accent.focus}`}
+                      className={`group flex w-full items-center gap-2.5 px-2 py-1.5 text-left text-sm font-medium text-gray-900 dark:text-gray-100 ${pillRow} ${accent.focus}`}
                     >
                       <span className="h-5 w-5 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600" aria-hidden />
                       <span className="flex-1">{s.cta}</span>
@@ -591,8 +593,8 @@ const Profile: React.FC = () => {
 
           <Card title="Security">
             <div className="-mx-2 space-y-1">
-              <Link to="/me/activity" className={`flex w-full items-center gap-3 px-2 py-2.5 ${surface.insetHover} ${accent.focus}`}>
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gray-100 text-gray-500 dark:bg-gray-700/40 dark:text-gray-300">
+              <Link to="/me/activity" className={`flex w-full items-center gap-3 px-2 py-2.5 ${pillRow} ${accent.focus}`}>
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700/40 dark:text-gray-300">
                   <ShieldCheck className="h-4 w-4" aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
