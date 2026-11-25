@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { eq, and, or, inArray, notInArray, notLike } from "drizzle-orm";
 import { Role, Permission, RolePermission, UserRole } from "../db/schema";
+import { AccessPermission } from "../db/accessSchema";
 import {
   ValidationError,
   NotFoundError,
@@ -12,6 +13,22 @@ import { recordActivity } from "../utils/activityLogger";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
 import { isV2OnlyCapability, V2_ONLY_CAPABILITIES } from "../access/v2Only";
+import { responseTenant } from "../tenancy/claims";
+import { packageFilter } from "../services/tenantMgmt/tenantAdminRoles";
+
+/**
+ * What the current school's package allows, by perm_id (everything for the primary school).
+ * The legacy Permission model has no app / cap_key, so they are read through the v2 model
+ * of the same table: a Task Mentor or Tendo permission is judged against that app.
+ */
+const schoolAllows = async (): Promise<(permId: number) => boolean> => {
+  const t = responseTenant();
+  if (t.isPrimary) return () => true;
+  const allows = await packageFilter(t.tid, false);
+  const meta = await db.select({ perm_id: AccessPermission.perm_id, name: AccessPermission.name, app: AccessPermission.app, cap_key: AccessPermission.cap_key }).from(AccessPermission);
+  const ok = new Set(meta.filter((m) => allows(m)).map((m) => m.perm_id));
+  return (permId) => ok.has(permId);
+};
 
 /**
  * This legacy Roles & Permissions screen manages legacy MIS permissions only.
@@ -281,6 +298,12 @@ export const getPermissions = asyncHandler(async (req: any, res: any) => {
       .orderBy(Permission.name);
   }
 
+  // A school sees (and can hand out) only what its package allows: never PLATFORM_*,
+  // never a feature it hasn't got. Its roles still can't reach another school: every
+  // school's roles and permissions live in its own database.
+  const allows = await schoolAllows();
+  permissions = permissions.filter((p: any) => allows(p.perm_id));
+
   successResponse(res, "Permissions retrieved successfully", permissions);
 });
 
@@ -323,6 +346,9 @@ export const createPermission = asyncHandler(async (req: any, res: any) => {
   }
 
   const sanitizedName = sanitizeString(name);
+  if (!responseTenant().isPrimary && /^PLATFORM_/i.test(sanitizedName)) {
+    throw new ValidationError("PLATFORM_ permissions belong to the platform");
+  }
 
   // Check if permission already exists
   const existing = await db
@@ -526,6 +552,7 @@ export const assignPermissionsToRole = asyncHandler(
           .from(Permission)
           .where(inArray(Permission.perm_id, requested))
       : [];
+    const allows = await schoolAllows();
     const wanted = new Set(
       requestedRows.filter((p) => !isV2OnlyCapability(p.name)).map((p) => p.perm_id),
     );
@@ -534,7 +561,19 @@ export const assignPermissionsToRole = asyncHandler(
       .from(RolePermission)
       .innerJoin(Permission, eq(RolePermission.perm_id, Permission.perm_id))
       .where(and(eq(RolePermission.role_id, role_id), legacyOnly()));
-    const have = new Set(current.map((c) => c.perm_id));
+    // Links the package hides are not on the screen, so they are not part of the diff:
+    // saving a role never removes them (an upgrade makes them count again).
+    const have = new Set(current.filter((c) => allows(c.perm_id)).map((c) => c.perm_id));
+    // Only a link being ADDED must be inside the package; one the role already holds may be
+    // sent back unchanged (an older screen may still list it).
+    const already = new Set(current.map((c) => c.perm_id));
+    const outside = requestedRows.filter((p) => !allows(p.perm_id) && !already.has(p.perm_id));
+    if (outside.length) {
+      throw new ValidationError(
+        `Not in this school's package: ${outside.map((p) => p.name).join(", ")}`,
+      );
+    }
+    for (const id of [...wanted]) if (!allows(id)) wanted.delete(id); // held + hidden: left as is below
 
     const toRemove = [...have].filter((id) => !wanted.has(id));
     if (toRemove.length > 0) {
@@ -601,7 +640,9 @@ export const getRolePermissions = asyncHandler(async (req: any, res: any) => {
     .innerJoin(Permission, eq(RolePermission.perm_id, Permission.perm_id))
     .where(and(eq(RolePermission.role_id, role_id), legacyOnly()));
 
-  successResponse(res, "Role permissions retrieved successfully", permissions);
+  // Same view as the permission list: a school sees what its package allows.
+  const allows = await schoolAllows();
+  successResponse(res, "Role permissions retrieved successfully", permissions.filter((p) => allows(p.perm_id)));
 });
 
 // ==================== User-Role Assignment ====================

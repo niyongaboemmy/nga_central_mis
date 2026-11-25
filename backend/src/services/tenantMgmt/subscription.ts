@@ -176,6 +176,12 @@ export async function publishTenantChanged(tid: number, opts: { packageChanged?:
 export async function setTenantPackage(tid: number, code: string): Promise<void> {
   await controlPool().query("UPDATE Tenant SET package_code = ? WHERE tenant_id = ?", [code, tid]);
   await controlPool().query("UPDATE Subscription SET package_code = ? WHERE tenant_id = ? AND status = 'ACTIVE'", [code, tid]);
+  invalidateEntitlements(tid);
+  // A bigger package: the school's administrators gain what it adds. (A smaller one needs
+  // nothing here: the runtime package filter already stops what it no longer includes.)
+  await (await import("./tenantAdminRoles")).equipTenantAdminRoles(tid).catch((err) =>
+    logger.warn(`[tenantMgmt] equipping school admin roles for t${tid} failed: ${(err as Error)?.message ?? err}`),
+  );
 }
 
 /** GRACE / SUSPENDED -> ACTIVE (state machine), clearing the grace window. No-op when ACTIVE. */
