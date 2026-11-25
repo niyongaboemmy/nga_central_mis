@@ -322,7 +322,7 @@ const buildPDF = (plan: LessonPlan): jsPDF => {
     doc.setFontSize(8);
     doc.setTextColor(...GRAY);
     doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: "right" });
-    doc.text("NGA Central MIS — Lesson Plan", margin, pageHeight - 8);
+    doc.text("Amashuri — Lesson Plan", margin, pageHeight - 8);
   }
 
   return doc;

@@ -211,7 +211,7 @@ const DesktopBrowserSignIn: React.FC = () => {
       <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Sign in to the NGA app</h1>
       {phase === "error" && <p className="mt-3 text-sm text-red-600">{error}</p>}
       <p className="mt-2 mb-6 text-sm text-gray-500 dark:text-gray-400">
-        You're signed in to NGA MIS in this browser{user?.username ? ` as ${user.username}` : ""}.
+        You're signed in to Amashuri in this browser{user?.username ? ` as ${user.username}` : ""}.
       </p>
       <button
         onClick={handOff}

@@ -13,7 +13,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 /**
- * The browser's own answer to "is NGA MIS installed here right now?"
+ * The browser's own answer to "is Amashuri installed here right now?"
  * (navigator.getInstalledRelatedApps + manifest related_applications with
  * the app id; desktop Chrome 140+, Android). "unknown" where the browser
  * can't say (Safari, Firefox) -- then a remembered note is the fallback.
@@ -28,7 +28,7 @@ interface PwaState {
   /** Running in a browser tab (not the installed app window). */
   inBrowser: boolean;
   /**
-   * NGA MIS is installed, but "Open app" landed in a browser tab: Chrome's
+   * Amashuri is installed, but "Open app" landed in a browser tab: Chrome's
    * per-app "Open supported links" is off (Chrome 139+ turns it on by default
    * only for new installs). A page can't change it -- the person switches it
    * once in the app's Chrome settings, or uses the address bar's "Open in app".
@@ -107,7 +107,7 @@ export const usePwa = () => useSyncExternalStore(subscribePwa, getPwaState, getP
 const INSTALLED_KEY = "nga.pwa.installed";
 /**
  * An "Open app" link (…&nga_open=1) that lands in a browser TAB means Chrome
- * did not open NGA MIS in its app window: either it isn't installed (then
+ * did not open Amashuri in its app window: either it isn't installed (then
  * Chrome offers installation) or it is installed with "Open supported links"
  * off. Cleared when MIS runs as the app, on a fresh install, or once Chrome
  * no longer lists the app.
@@ -129,7 +129,7 @@ const dropKey = (key: string) => {
     /* ignore */
   }
 };
-/** The link that opens NGA MIS in its app window, and proves whether it can. */
+/** The link that opens Amashuri in its app window, and proves whether it can. */
 export const openAppUrl = () => `${window.location.origin}/home?source=pwa&nga_open=1`;
 const INSTALL_SNOOZE_KEY = "nga.pwa.installSnoozedUntil";
 const VISITS_KEY = "nga.pwa.visits";

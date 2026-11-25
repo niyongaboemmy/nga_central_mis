@@ -138,7 +138,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
             Super Admin Dashboard
           </h2>
           <p className="text-text-secondary-light dark:text-text-secondary-dark/70 text-sm">
-            Complete overview of the entire NGA Central MIS system
+            Complete overview of the entire Amashuri system
           </p>
         </motion.div>
 

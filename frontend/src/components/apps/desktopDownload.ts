@@ -36,7 +36,7 @@ export const primaryPlatform = (os: DeviceOs): DownloadPlatform | null =>
   os === "windows" ? "windows" : os === "macos" ? "macos" : null;
 
 /**
- * Offer to install NGA MIS as a web app (AutoInstallPrompt)? Only where NGA
+ * Offer to install Amashuri as a web app (AutoInstallPrompt)? Only where NGA
  * Desktop doesn't run (phones, tablets, Chromebooks, Linux): on Windows and
  * macOS the one desktop app replaces the four web-app installs.
  */
@@ -80,12 +80,12 @@ export const INSTALL_STEPS: Record<"macos" | "windows", string[]> = {
     "Open the downloaded NGA file and drag NGA onto Applications (don't open it from the download window).",
     "Open NGA from Applications. The first time, macOS says “NGA” Not Opened: click Done.",
     "Click Open Privacy & Security below (or open System Settings → Privacy & Security), scroll down and click Open Anyway next to NGA, then Open. Only once.",
-    "Sign in to NGA MIS once. Task Mentor, Tendo and Tupo sign in by themselves.",
+    "Sign in to Amashuri once. Task Mentor, Tendo and Tupo sign in by themselves.",
   ],
   windows: [
     "Run the downloaded NGA setup file.",
     "If Windows shows “Windows protected your PC”, click More info, then Run anyway.",
-    "Sign in to NGA MIS once. Task Mentor, Tendo and Tupo sign in by themselves.",
+    "Sign in to Amashuri once. Task Mentor, Tendo and Tupo sign in by themselves.",
   ],
 };
 

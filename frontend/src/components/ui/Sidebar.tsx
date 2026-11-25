@@ -631,7 +631,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
               );
             })}
             <div className="mt-1 border-t border-gray-100 px-2.5 pb-1 pt-2 text-[11px] text-gray-400 dark:border-gray-700/30 dark:text-gray-500">
-              {brand.isPrimary ? "NGA MIS v1.0" : `${brand.name} · MIS`}
+              {`Amashuri · ${brand.name}`}
             </div>
           </motion.div>
         )}

@@ -85,21 +85,7 @@ function rememberSchool(s: LastSchool): void {
   }
 }
 
-let defaultFavicon: string | null = null;
 /** Points the tab icon at `url`, or back to the build's own icon. */
-function setFavicon(url: string | null): void {
-  try {
-    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (!link) return;
-    if (defaultFavicon === null) defaultFavicon = link.getAttribute("href") || "/favicon.ico";
-    const next = url || defaultFavicon;
-    if (link.getAttribute("href") === next) return;
-    link.setAttribute("href", next);
-    if (url) link.removeAttribute("type");
-  } catch {
-    /* no document */
-  }
-}
 
 export function useTenantBranding(): TenantBranding {
   const { user } = useUser();
@@ -133,13 +119,11 @@ export function useTenantBranding(): TenantBranding {
     };
   }, [signedIn, slug, version]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The browser tab icon follows the school's logo too.
-  const logoUrl = data?.logo_url ?? null;
-  useEffect(() => {
-    setFavicon(signedIn ? logoUrl : null);
-  }, [signedIn, logoUrl]);
+  // The browser tab shows the Amashuri icon (index.html) for every school: the
+  // product is Amashuri; the school's logo is shown inside the app.
 
-  if (primary) return { isPrimary: true, name: "NGA MIS", logoUrl: data?.logo_url ?? null, primaryColor: data?.primary_color ?? null };
+  // The school's own name (the product name, Amashuri, is the top bar's).
+  if (primary) return { isPrimary: true, name: data?.name || tenant?.name || "New Generation Academy", logoUrl: data?.logo_url ?? null, primaryColor: data?.primary_color ?? null };
   return {
     isPrimary: false,
     name: data?.name || tenant!.name,

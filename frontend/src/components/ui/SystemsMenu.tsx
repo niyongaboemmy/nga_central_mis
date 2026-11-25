@@ -137,7 +137,7 @@ const SystemsMenu: React.FC<SystemsMenuProps> = ({
                     Apps
                   </h3>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                    NGA Central MIS Ecosystem
+                    Amashuri Ecosystem
                   </p>
                 </div>
               </div>

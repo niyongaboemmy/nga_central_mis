@@ -150,7 +150,7 @@ const ProfilePictureEditor: React.FC<Props> = (props) => {
         <p className="text-xs text-gray-500 dark:text-gray-400">
           {isCover
             ? "Drag to position and zoom to choose the strip shown across the top of your profile."
-            : "Drag to position, zoom to frame your face. Your picture is shown in NGA MIS, Task Mentor, Tendo and Tupo."}
+            : "Drag to position, zoom to frame your face. Your picture is shown in Amashuri, Task Mentor, Tendo and Tupo."}
         </p>
 
         {error && (

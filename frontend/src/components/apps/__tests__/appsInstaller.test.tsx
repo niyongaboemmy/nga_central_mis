@@ -69,7 +69,7 @@ describe("NGA app list", () => {
     ]);
   });
 
-  it("NGA MIS's own status follows the browser live -- a saved 'installed' can't outlive an uninstall", () => {
+  it("Amashuri's own status follows the browser live -- a saved 'installed' can't outlive an uninstall", () => {
     const removed = { installed: false, installCheck: "no" as const, canPrompt: true };
     expect(reconcileSelfStatus("already", removed)).toBe("todo");
     expect(reconcileSelfStatus("done", { ...removed, canPrompt: false })).toBe("todo");

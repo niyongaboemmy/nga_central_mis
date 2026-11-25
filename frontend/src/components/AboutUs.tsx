@@ -237,7 +237,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ onNavigateBack }) => {
               animate={{ opacity: 1, y: 0 }}
               className="inline-block px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-sm font-medium mb-4"
             >
-              About NGA Central MIS
+              About Amashuri
             </motion.span>
             <motion.h1
               initial={{ opacity: 0, y: 20 }}

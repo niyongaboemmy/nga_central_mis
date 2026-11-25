@@ -21,7 +21,7 @@ import { useToast } from "../../contexts/ToastContext";
  */
 
 const APPS: Array<{ key: AiApp; name: string; covers: string }> = [
-  { key: "mis", name: "NGA MIS", covers: "Lesson Studio, AI lesson notes and plans, scheme of work, curriculum import, mentorship insights, SQL assistant, course tutor" },
+  { key: "mis", name: "Amashuri", covers: "Lesson Studio, AI lesson notes and plans, scheme of work, curriculum import, mentorship insights, SQL assistant, course tutor" },
   { key: "tm", name: "Task Mentor", covers: "Question generator, rubrics, marking drafts, report comments, hints for students" },
   { key: "tmcode", name: "TMCode", covers: "AI chat, agent modes and inline code completion" },
   { key: "desktop", name: "NGA Desktop", covers: "Ask AI for staff and the AI Tutor for students" },
