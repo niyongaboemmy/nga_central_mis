@@ -74,7 +74,7 @@ const SchoolRow: React.FC<{ s: MySchool; onPick: (s: MySchool) => void }> = ({ s
       disabled={s.current}
       onClick={() => onPick(s)}
       className={cx(
-        "group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+        "group flex w-full items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
         s.current ? "cursor-default bg-blue-50 dark:bg-blue-500/10" : "hover:bg-gray-100 dark:hover:bg-gray-800/70",
       )}
     >
@@ -140,7 +140,7 @@ const SchoolSwitcher: React.FC<{ variant?: "chip" | "menu"; onPicked?: () => voi
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls={listId}
-          className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/70"
+          className="flex w-full items-center gap-3 rounded-full px-2 py-2 text-left transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/70"
         >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400" aria-hidden="true">
             <Repeat className="h-4 w-4" />
