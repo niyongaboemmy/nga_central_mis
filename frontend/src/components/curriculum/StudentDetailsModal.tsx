@@ -77,7 +77,7 @@ const StudentDetailsModal: React.FC<Props> = ({
                 <X className="w-4 h-4" />
               </button>
               <div className="flex flex-col items-center text-center">
-                <UserAvatar decorative userId={student.user_id} name={`${student.first_name} ${student.last_name}`} size={80} shape="rounded" ring />
+                <UserAvatar decorative userId={student.user_id} name={`${student.first_name} ${student.last_name}`} size={80} shape="rounded" ring fallback="person" />
                 <h2 className="mt-3 text-lg font-bold text-white">
                   {student.first_name} {student.last_name}
                 </h2>

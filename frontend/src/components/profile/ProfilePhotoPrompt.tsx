@@ -170,7 +170,7 @@ const ProfilePhotoPrompt: React.FC = () => {
                     transition={{ repeat: Infinity, duration: 14, ease: "linear" }}
                   />
                 )}
-                <UserAvatar name={name} avatar={saved} size={56} />
+                <UserAvatar name={name} avatar={saved} size={56} fallback="person" />
                 <motion.span
                   className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-white shadow ring-2 ring-white dark:ring-gray-900 ${
                     saved ? "bg-green-500" : "bg-blue-600"

@@ -303,7 +303,7 @@ const Profile: React.FC = () => {
         <ProfileCover cover={user.cover} editable onChange={() => refreshUser()} className="h-36 md:h-52" />
         <div className="flex flex-col gap-5 px-5 pb-6 sm:px-6 md:flex-row md:items-end">
           <div className="-mt-14 w-fit shrink-0 rounded-full bg-white p-1 dark:bg-gray-900 md:-mt-16">
-            <UserAvatar name={fullName} avatar={user.avatar} size={120} decorative />
+            <UserAvatar name={fullName} avatar={user.avatar} size={120} decorative fallback="person" />
           </div>
           <div className="min-w-0 flex-1 space-y-2">
             <div>

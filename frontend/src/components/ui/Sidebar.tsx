@@ -539,7 +539,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
             {...tipProps("Account")}
             className={`mt-1 rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${accountOpen ? "ring-2 ring-blue-500" : "hover:ring-2 hover:ring-gray-200 dark:hover:ring-gray-700"}`}
           >
-            <UserAvatar name={fullName} avatar={user?.avatar} size={34} decorative />
+            <UserAvatar name={fullName} avatar={user?.avatar} size={34} decorative fallback="person" />
           </button>
         </nav>
 
@@ -583,7 +583,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
             }}
           >
             <div className="flex items-center gap-3 px-2.5 pb-2.5 pt-2">
-              <UserAvatar name={fullName} avatar={user?.avatar} size={36} decorative />
+              <UserAvatar name={fullName} avatar={user?.avatar} size={36} decorative fallback="person" />
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{fullName}</div>
                 <div className="truncate text-xs text-gray-500 dark:text-gray-400">{roleLabel}</div>

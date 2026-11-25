@@ -1,18 +1,13 @@
 import React, { useEffect, useState } from "react";
+import { UserRound } from "lucide-react";
 import type { Avatar } from "../../api/users";
 import { useUserAvatar } from "../../lib/avatarDirectory";
 
-/** Same gradients for the same person everywhere, so initials still read as "them". */
-const GRADIENTS = [
-  "from-blue-500 to-indigo-600",
-  "from-sky-500 to-blue-600",
-  "from-emerald-500 to-teal-600",
-  "from-violet-500 to-purple-600",
-  "from-rose-500 to-pink-600",
-  "from-amber-500 to-orange-600",
-  "from-cyan-500 to-sky-600",
-  "from-fuchsia-500 to-violet-600",
-];
+/**
+ * Same shade for the same person everywhere, so initials still read as "them".
+ * Blue only and flat (NGA palette): five steps of the one system blue.
+ */
+const SHADES = ["bg-blue-500", "bg-blue-600", "bg-blue-700", "bg-blue-800", "bg-blue-900"];
 
 export function initialsOf(name: string | null | undefined): string {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean);
@@ -21,10 +16,10 @@ export function initialsOf(name: string | null | undefined): string {
   return letters.toUpperCase();
 }
 
-function gradientFor(name: string): string {
+export function shadeFor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  return GRADIENTS[Math.abs(hash) % GRADIENTS.length];
+  return SHADES[Math.abs(hash) % SHADES.length];
 }
 
 export interface UserAvatarProps {
@@ -47,9 +42,14 @@ export interface UserAvatarProps {
   shape?: "circle" | "rounded";
   /** Hidden from screen readers -- for avatars beside a visible name, so it isn't read twice. */
   decorative?: boolean;
+  /**
+   * Without a photo: "initials" (lists, where telling people apart matters) or
+   * "person", a person icon (one person's own view: profile, account menu, top bar).
+   */
+  fallback?: "initials" | "person";
 }
 
-const UserAvatar: React.FC<UserAvatarProps> = ({ name, avatar, src, userId, size = 32, className = "", ring = false, shape = "circle", decorative = false }) => {
+const UserAvatar: React.FC<UserAvatarProps> = ({ name, avatar, src, userId, size = 32, className = "", ring = false, shape = "circle", decorative = false, fallback = "initials" }) => {
   const looked = useUserAvatar(avatar || src ? null : userId);
   avatar = avatar ?? looked ?? null;
   const url = avatar ? (size <= 64 ? avatar.sm : size <= 256 ? avatar.md : avatar.lg) : src || null;
@@ -84,10 +84,23 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ name, avatar, src, userId, size
     );
   }
 
+  if (fallback === "person") {
+    return (
+      <span
+        {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": name })}
+        data-fallback="person"
+        className={`${box} bg-blue-600 text-white`}
+        style={style}
+      >
+        <UserRound style={{ width: Math.round(size * 0.55), height: Math.round(size * 0.55) }} strokeWidth={1.75} aria-hidden />
+      </span>
+    );
+  }
+
   return (
     <span
       {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": name })}
-      className={`${box} bg-gradient-to-br ${gradientFor(name || "?")} font-semibold text-white`}
+      className={`${box} ${shadeFor(name || "?")} font-semibold text-white`}
       style={{ ...style, fontSize: Math.max(10, Math.round(size * 0.4)) }}
     >
       {initialsOf(name)}
