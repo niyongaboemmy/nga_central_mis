@@ -26,6 +26,7 @@ import {
   Timer,
   Trash2,
   TriangleAlert,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -39,8 +40,9 @@ import { Btn, Card, IconBtn, ReasonDialog, Spinner, Stepper, Switch, TabBar, act
 import { InvoiceList } from "./BillingPage";
 import { PeriodChip } from "./SchoolsPage";
 import { useChartTheme } from "./chartTheme";
+import SchoolAdminsTab from "./SchoolAdminsTab";
 
-type Tab = "overview" | "package" | "apps" | "usage" | "billing" | "lifecycle" | "audit";
+type Tab = "overview" | "admins" | "package" | "apps" | "usage" | "billing" | "lifecycle" | "audit";
 type LAction = TenantDetail["allowedActions"][number];
 
 const SchoolDetailPage: React.FC = () => {
@@ -81,6 +83,7 @@ const SchoolDetailPage: React.FC = () => {
         onChange={setTab}
         tabs={[
           { value: "overview", label: "Overview", icon: Gauge, badge: d.provisioning?.status === "FAILED" ? 1 : 0 },
+          { value: "admins", label: "Admins", icon: Users },
           { value: "package", label: "Package", icon: PackageIcon },
           { value: "apps", label: "Apps", icon: LayoutGrid },
           { value: "usage", label: "Usage", icon: BarChart3 },
@@ -91,6 +94,7 @@ const SchoolDetailPage: React.FC = () => {
       />
       <div role="tabpanel">
         {tab === "overview" && <OverviewTab d={d} onRun={(run) => setD({ ...d, provisioning: run })} />}
+        {tab === "admins" && <SchoolAdminsTab d={d} />}
         {tab === "package" && <PackageTab d={d} onChange={setD} />}
         {tab === "apps" && <AppsTab d={d} onChange={setD} />}
         {tab === "usage" && <UsageTab d={d} />}

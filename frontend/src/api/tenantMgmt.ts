@@ -455,6 +455,22 @@ export interface TenantListItem {
   createdAt: string;
 }
 
+/** A school's administrator (GET /platform/tenants/:tid/admins). */
+export interface TenantAdmin {
+  userId: number;
+  name: string;
+  username: string;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  kind: "OWNER" | "ADMIN";
+  roles: string[];
+  mustChangePassword: boolean;
+  lockedUntil: string | null;
+  lastLoginAt: string | null;
+  createdAt: string | null;
+}
+
 export interface TenantDetail {
   tenant: TenantListItem & { timezone: string; country: string | null; activatedAt: string | null; suspendedAt: string | null; statusReason: string | null };
   entitlements: EffectiveEntitlements;
@@ -567,6 +583,13 @@ export const platformApi = {
   removeOverride: (tid: number, overrideId: number) => unwrap<TenantDetail>(api.delete(`/platform/tenants/${tid}/overrides/${overrideId}`)),
   setTenantApp: (tid: number, systemId: number, status: "ACTIVE" | "DISABLED") =>
     unwrap<TenantDetail>(api.put(`/platform/tenants/${tid}/apps/${systemId}`, { status })),
+  admins: (tid: number) => unwrap<TenantAdmin[]>(api.get(`/platform/tenants/${tid}/admins`)),
+  createAdmin: (tid: number, body: { firstName: string; lastName: string; email: string; phone?: string; kind: TenantAdmin["kind"]; reason: string }) =>
+    unwrap<{ admin: TenantAdmin; created: boolean; tempPassword: string | null; emailed: boolean }>(api.post(`/platform/tenants/${tid}/admins`, body)),
+  resetAdminPassword: (tid: number, userId: number, reason: string) =>
+    unwrap<{ admin: TenantAdmin; tempPassword: string; emailed: boolean }>(api.post(`/platform/tenants/${tid}/admins/${userId}/reset-password`, { reason })),
+  removeAdmin: (tid: number, userId: number, reason: string) =>
+    unwrap<{ ok: true }>(api.delete(`/platform/tenants/${tid}/admins/${userId}`, { data: { reason } })),
   provisioning: (runId: number) => unwrap<ProvisioningRun>(api.get(`/platform/provisioning/${runId}`)),
   retryProvisioning: (runId: number) => unwrap<ProvisioningRun>(api.post(`/platform/provisioning/${runId}/retry`)),
   /** support sessions this tenant granted (§6.9) */
