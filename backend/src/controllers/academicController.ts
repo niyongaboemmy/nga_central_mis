@@ -60,7 +60,7 @@ import {
   assignUniqueSubjectColors,
   nextSubjectColor,
 } from "../utils/subjectColors";
-import { runGradeImport, runSubjectImport } from "../services/academics/bulkImport";
+import { runClassGroupImport, runGradeImport, runSubjectImport } from "../services/academics/bulkImport";
 import {
   getTeacherAssignments,
   getTeacherRosterRows,
@@ -6863,4 +6863,25 @@ export const bulkImportSubjects = asyncHandler(async (req: any, res: any) => {
     }
   }
   successResponse(res, dryRun ? "Subjects checked" : "Subjects uploaded", summary);
+});
+
+export const bulkImportClassGroups = asyncHandler(async (req: any, res: any) => {
+  const dryRun = isDryRun(req.body?.dryRun);
+  const summary = await runClassGroupImport(req.body?.rows, dryRun);
+  if (!dryRun && summary.create > 0) {
+    await bumpStructuralHolders();
+    logger.info("Class groups bulk uploaded", { created: summary.create });
+    if (req.user?.userId) {
+      await recordActivity(
+        req.user.userId,
+        "CLASS_GROUP_BULK_IMPORT",
+        `Bulk uploaded class groups: ${summary.create} created`,
+        "ClassGroup",
+        undefined,
+        { created: summary.create, skipped: summary.skip, errors: summary.error },
+        req.user.userId,
+      );
+    }
+  }
+  successResponse(res, dryRun ? "Class groups checked" : "Class groups uploaded", summary);
 });

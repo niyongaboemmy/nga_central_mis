@@ -66,3 +66,19 @@ describe("checkFile", () => {
     expect(checkFile(f("grades.xlsx", 6 * 1024 * 1024))).toMatch(/5 MB/);
   });
 });
+
+describe("class groups sheet", () => {
+  it("maps class / grade headers people write", async () => {
+    const { CLASS_GROUP_COLUMNS } = await import("../ClassGroupsBulkUpload");
+    const out = parseSheet(
+      book({ "Class groups": [["Class group *", "GRADE NAME"], ["Class A", "spes year 1"], ["Class B", "SPES Year 1"]] }),
+      CLASS_GROUP_COLUMNS,
+      "Class groups",
+    );
+    expect(out.missingRequired).toEqual([]);
+    expect(out.rows).toEqual([
+      { line: 2, name: "Class A", grade: "spes year 1" },
+      { line: 3, name: "Class B", grade: "SPES Year 1" },
+    ]);
+  });
+});

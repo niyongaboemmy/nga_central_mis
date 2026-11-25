@@ -3,9 +3,9 @@ import request from "supertest";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import app from "../app";
 import { db } from "../db";
-import { CourseCategory, Grade, GradeSubject, Program, Subject } from "../db/schema";
+import { ClassGroup, CourseCategory, Grade, GradeSubject, Program, Subject } from "../db/schema";
 import { assignRole, createRoleWithPermissions, createUser, signToken } from "../test/fixtures";
-import { nameKey, planGradeImport, planSubjectImport } from "../services/academics/bulkImport";
+import { nameKey, planClassGroupImport, planGradeImport, planSubjectImport } from "../services/academics/bulkImport";
 
 /**
  * Excel bulk upload of grades and subjects: names compared lower-cased,
@@ -208,5 +208,63 @@ describe("POST /academics/subjects (module weight)", () => {
     expect(res.status).toBe(201);
     const [s] = await db.select().from(Subject).where(eq(Subject.code, `WT${tag}`));
     expect(s.module_weight).toBe(60);
+  });
+});
+
+describe("planClassGroupImport", () => {
+  const grades = [
+    { grade_id: 1, name: "Year 1", program_name: "SPES" },
+    { grade_id: 2, name: "Year 2", program_name: "SPES" },
+    { grade_id: 3, name: "Year 2", program_name: "CSA" },
+  ];
+  it("finds grades ignoring case, skips classes that exist, and reports problems per row", () => {
+    const plan = planClassGroupImport(
+      [
+        { line: 2, name: "Class A", grade: "YEAR 1" },
+        { line: 3, name: "class b", grade: " year  1 " },
+        { line: 4, name: "CLASS A", grade: "year 1" },
+        { line: 5, name: "Class A", grade: "Year 2" },
+        { line: 6, name: "Class A", grade: "year 2 (csa)" },
+        { line: 7, name: "Class C", grade: "Year 9" },
+        { line: 8, name: "", grade: "" },
+      ],
+      grades,
+      [{ grade_id: 1, name: "Class B" }],
+    );
+    expect(plan.map((p) => p.result.action)).toEqual(["create", "skip", "error", "error", "create", "error", "error"]);
+    expect(plan[0].insert).toEqual({ grade_id: 1, name: "Class A" });
+    expect(plan[1].result.warnings[0]).toMatch(/Already in Year 1/);
+    expect(plan[2].result.errors[0]).toMatch(/line 2/);
+    expect(plan[3].result.errors[0]).toMatch(/matches 2 grades/);
+    expect(plan[4].insert).toEqual({ grade_id: 3, name: "Class A" });
+    expect(plan[5].result.errors[0]).toMatch(/No grade called "Year 9"/);
+    expect(plan[6].result.errors).toEqual(["Class name is missing", "Grade is missing"]);
+  });
+});
+
+describe("POST /academics/class-groups/bulk-import", () => {
+  it("checks without saving, then creates only the valid, new classes", async () => {
+    const [g] = (await db.insert(Grade).values({ program_id: programId, name: `CG Grade ${tag}`, level_order: 921 })) as any;
+    const gradeId = Number(g.insertId);
+    await db.insert(ClassGroup).values({ grade_id: gradeId, name: `Old ${tag}` });
+    const rows = [
+      { line: 2, name: `New A ${tag}`, grade: `cg grade ${tag}`.toUpperCase() },
+      { line: 3, name: `old ${tag}`, grade: `CG Grade ${tag}` },
+      { line: 4, name: `New B ${tag}`, grade: "no such grade" },
+    ];
+    expect((await post("class-groups/bulk-import", teacher, { rows, dryRun: true })).status).toBe(403);
+
+    const dry = await post("class-groups/bulk-import", admin, { rows, dryRun: true });
+    expect(dry.status).toBe(200);
+    expect(dry.body.data).toMatchObject({ create: 1, skip: 1, error: 1 });
+    expect(await db.select().from(ClassGroup).where(eq(ClassGroup.grade_id, gradeId))).toHaveLength(1);
+
+    const done = await post("class-groups/bulk-import", admin, { rows, dryRun: false });
+    expect(done.body.data).toMatchObject({ dryRun: false, create: 1, skip: 1, error: 1 });
+    const names = (await db.select().from(ClassGroup).where(eq(ClassGroup.grade_id, gradeId))).map((c) => c.name).sort();
+    expect(names).toEqual([`New A ${tag}`, `Old ${tag}`]);
+
+    const again = await post("class-groups/bulk-import", admin, { rows: rows.slice(0, 1), dryRun: false });
+    expect(again.body.data).toMatchObject({ create: 0, skip: 1 });
   });
 });

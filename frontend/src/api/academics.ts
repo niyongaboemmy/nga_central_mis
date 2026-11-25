@@ -205,6 +205,10 @@ export const academicsBulkApi = {
         dryRun,
       })
       .then((r) => r.data.data),
+  classGroups: (rows: BulkSheetRow[], dryRun: boolean) =>
+    api
+      .post<{ data: BulkImportSummary }>("/academics/class-groups/bulk-import", { rows, dryRun })
+      .then((r) => r.data.data),
 };
 
 // Course Categories API
