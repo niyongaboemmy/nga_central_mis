@@ -44,6 +44,7 @@ import {
   assignSubjectColors,
   bulkImportGrades,
   bulkImportSubjects,
+  bulkImportClassGroups,
 
   // Grade-Subject Assignments
   getGradeSubjects,
@@ -356,6 +357,12 @@ router.get(
   authenticate,
   authorize("VIEW_ACADEMICS"),
   getClassGroupsOverview,
+);
+router.post(
+  "/class-groups/bulk-import",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  bulkImportClassGroups,
 );
 router.get("/class-groups/:id", authenticate, getClassGroup);
 router.get(

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
-import { CourseCategory, Grade, GradeSubject, Program, Subject } from "../../db/schema";
+import { ClassGroup, CourseCategory, Grade, GradeSubject, Program, Subject } from "../../db/schema";
 import { ValidationError } from "../../errors/CustomError";
 import { sanitizeString } from "../../utils/sanitization";
 import { nextSubjectColor } from "../../utils/subjectColors";
@@ -258,6 +258,29 @@ export interface GradeWithProgram {
   program_name: string;
 }
 
+/**
+ * Finds a grade by its name, compared in lower case with spaces collapsed. When two
+ * programs share a grade name, "Year 1 (SPES)" picks one.
+ */
+export function gradeResolver(grades: GradeWithProgram[]) {
+  const byName = new Map<string, GradeWithProgram[]>();
+  for (const g of grades) {
+    byName.set(nameKey(g.name), [...(byName.get(nameKey(g.name)) ?? []), g]);
+    byName.set(nameKey(`${g.name} (${g.program_name})`), [g]);
+  }
+  return (text: string): { grade?: GradeWithProgram; error?: string } => {
+    const matches = byName.get(nameKey(text)) ?? [];
+    if (matches.length === 1) return { grade: matches[0] };
+    if (matches.length === 0)
+      return { error: `No grade called "${text}". Grades: ${listNames(grades.map((g) => g.name))}` };
+    return {
+      error: `"${text}" matches ${matches.length} grades; write it as ${matches
+        .map((m) => `"${m.name} (${m.program_name})"`)
+        .join(" or ")}`,
+    };
+  };
+}
+
 export interface PlannedSubject {
   result: ImportRowResult;
   /** A new subject to insert (then linked to `gradeIds`). */
@@ -300,12 +323,7 @@ export function planSubjectImport(
   },
 ): PlannedSubject[] {
   const gradeName = new Map(ctx.grades.map((g) => [g.grade_id, g.name]));
-  const gradesByName = new Map<string, GradeWithProgram[]>();
-  for (const g of ctx.grades) {
-    gradesByName.set(nameKey(g.name), [...(gradesByName.get(nameKey(g.name)) ?? []), g]);
-    // "Year 1 (SPES)" picks one grade when two programs share a grade name.
-    gradesByName.set(nameKey(`${g.name} (${g.program_name})`), [g]);
-  }
+  const findGrade = gradeResolver(ctx.grades);
   const categoryByKey = new Map(ctx.categories.map((c) => [nameKey(c.name), c]));
   const subjectByCode = new Map(
     ctx.subjects.filter((s) => s.code).map((s) => [nameKey(s.code), s]),
@@ -364,15 +382,9 @@ export function planSubjectImport(
     const gradeIds = new Set<number>();
     if (ctx.targetGradeId) gradeIds.add(ctx.targetGradeId);
     for (const g of splitList(raw.grades)) {
-      const matches = gradesByName.get(nameKey(g)) ?? [];
-      if (matches.length === 1) gradeIds.add(matches[0].grade_id);
-      else if (matches.length === 0) err(`No grade called "${g}"`);
-      else
-        err(
-          `"${g}" matches ${matches.length} grades; write it as ${matches
-            .map((m) => `"${m.name} (${m.program_name})"`)
-            .join(" or ")}`,
-        );
+      const found = findGrade(g);
+      if (found.grade) gradeIds.add(found.grade.grade_id);
+      else err(found.error!);
     }
     if (gradeIds.size === 0) err("No grade: pick a grade above or fill the grades column");
 
@@ -502,6 +514,86 @@ export async function runSubjectImport(
         await tx.insert(GradeSubject).values(p.gradeIds.map((grade_id) => ({ grade_id, subject_id: subjectId! })));
       }
     });
+  }
+  return summarize(dryRun, plan.map((p) => p.result));
+}
+
+// ---------------------------------------------------------------------------
+// Class groups
+// ---------------------------------------------------------------------------
+
+export interface PlannedClassGroup {
+  result: ImportRowResult;
+  insert?: { grade_id: number; name: string };
+}
+
+/**
+ * Decide what every class group row does, without touching the database. The grade
+ * is found by name in lower case; a class group already in that grade (same name,
+ * case ignored) is skipped, never created twice.
+ */
+export function planClassGroupImport(
+  input: Record<string, unknown>[],
+  grades: GradeWithProgram[],
+  existing: { grade_id: number; name: string }[],
+): PlannedClassGroup[] {
+  const findGrade = gradeResolver(grades);
+  const taken = new Map(existing.map((c) => [`${c.grade_id}|${nameKey(c.name)}`, c.name]));
+  const seen = new Map<string, number>();
+
+  return input.map((raw, i) => {
+    const line = Number(raw.line) || i + 2;
+    const name = cell(raw.name);
+    const gradeText = cell(raw.grade);
+    const result: ImportRowResult = { line, label: name || "(no name)", action: "error", errors: [], warnings: [], changes: [] };
+
+    if (!name) result.errors.push("Class name is missing");
+    else if (name.length > 50) result.errors.push("Class name is longer than 50 characters");
+
+    let grade: GradeWithProgram | undefined;
+    if (!gradeText) result.errors.push("Grade is missing");
+    else {
+      const found = findGrade(gradeText);
+      if (found.grade) grade = found.grade;
+      else result.errors.push(found.error!);
+    }
+
+    if (grade && name) {
+      const key = `${grade.grade_id}|${nameKey(name)}`;
+      const dup = seen.get(key);
+      if (dup) result.errors.push(`Same class as line ${dup} (names are compared ignoring case)`);
+      else seen.set(key, line);
+    }
+    if (result.errors.length > 0) return { result };
+
+    const key = `${grade!.grade_id}|${nameKey(name)}`;
+    const already = taken.get(key);
+    if (already) {
+      result.action = "skip";
+      result.label = already;
+      result.warnings.push(`Already in ${grade!.name}`);
+      return { result };
+    }
+    taken.set(key, name);
+    result.action = "create";
+    result.changes.push(`New class in ${grade!.name} (${grade!.program_name})`);
+    return { result, insert: { grade_id: grade!.grade_id, name: sanitizeString(name) } };
+  });
+}
+
+export async function runClassGroupImport(rows: unknown, dryRun: boolean): Promise<ImportSummary> {
+  const input = checkRows(rows);
+  const [grades, existing] = await Promise.all([
+    db
+      .select({ grade_id: Grade.grade_id, name: Grade.name, program_name: Program.name })
+      .from(Grade)
+      .innerJoin(Program, eq(Grade.program_id, Program.program_id)),
+    db.select({ grade_id: ClassGroup.grade_id, name: ClassGroup.name }).from(ClassGroup),
+  ]);
+  const plan = planClassGroupImport(input, grades as GradeWithProgram[], existing);
+  if (!dryRun) {
+    const inserts = plan.filter((p) => p.insert).map((p) => p.insert!);
+    if (inserts.length) await db.transaction(async (tx) => { await tx.insert(ClassGroup).values(inserts); });
   }
   return summarize(dryRun, plan.map((p) => p.result));
 }

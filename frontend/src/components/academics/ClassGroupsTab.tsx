@@ -6,10 +6,12 @@ import {
   ClassGroupDependencyReport,
   classGroupsApi,
 } from "../../api/academics";
+import { FileSpreadsheet } from "lucide-react";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import Input from "../ui/Input";
 import PromoteStudentsModal from "./PromoteStudentsModal";
+import ClassGroupsBulkUpload from "./bulk/ClassGroupsBulkUpload";
 import { usePermissions } from "../../hooks/usePermissions";
 import { Permissions } from "../../constants/permissions";
 import SelectField from "../ui/SelectField";
@@ -60,6 +62,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
     [academicYears],
   );
 
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showPromoteModal, setShowPromoteModal] = useState(false);
   const [showPromoteByGradeModal, setShowPromoteByGradeModal] =
     useState(false);
@@ -315,6 +318,15 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
               Promote Students by Grade
             </Button>
           )}
+          <Button
+            variant="secondary"
+            onClick={() => setShowBulkUpload(true)}
+            title="Add many class groups from an Excel sheet"
+            className="whitespace-nowrap inline-flex items-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Upload Excel
+          </Button>
           <Button
             onClick={() => setShowCreateModal(true)}
             className="whitespace-nowrap"
@@ -780,6 +792,17 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
           </div>
         </div>
       </Modal>
+
+      {/* Mounted only while open: nothing to load or keep while it's closed. */}
+      {showBulkUpload && (
+        <ClassGroupsBulkUpload
+          isOpen
+          onClose={() => setShowBulkUpload(false)}
+          onDone={onRefresh}
+          grades={grades}
+          classGroups={data}
+        />
+      )}
 
       {/* Promote Students by Grade Modal (automatic, whole-year rollover) */}
       <PromoteStudentsModal
