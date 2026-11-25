@@ -330,7 +330,7 @@ export function buildNavAreas(ctx: NavContext): NavArea[] {
               icon: Globe2,
               requiredCapability: ["PLATFORM_TENANTS_VIEW", "PLATFORM_APPLICATIONS_REVIEW", "PLATFORM_BILLING_INVOICE", "PLATFORM_SUPPORT_ACCESS"],
             },
-            { label: "Schools", path: "/schools", icon: School, requiredPermission: Permissions.MANAGE_SCHOOLS },
+            { label: "School profile", path: "/schools", icon: School, requiredPermission: Permissions.MANAGE_SCHOOLS },
             { label: "Systems", path: "/systems", icon: Server, requiredPermission: Permissions.MANAGE_SYSTEMS },
             // Platform-owner tool, primary school only (MIS-ISO-1): PLATFORM_* caps never exist elsewhere.
             { label: "Database Management", path: "/database-management", icon: Database, requiredPermission: Permissions.DATABASE_MANAGEMENT, requiredCapability: "PLATFORM_PACKAGES_MANAGE" },

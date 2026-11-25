@@ -88,14 +88,31 @@ async function clashes(values: SchoolValues, exceptId?: number): Promise<{ field
   return null;
 }
 
-const activeCount = async (exceptId?: number) =>
-  (await db.select().from(School)).filter((r: any) => r.status === "ACTIVE" && r.school_id !== exceptId).length;
+// ─── One school record per account ──────────────────────────────────────────
+// Each school (tenant) has its own MIS database, and that database's School table
+// holds that school's identity. The app reads "the school" as the ACTIVE row with
+// the lowest id (branding, registration-number prefix, report cards), so a second
+// row is never a second school: it is a trap that silently takes over the name,
+// logo and registration code once the real row stops being active. New schools
+// join through the platform (application -> approval -> provisioning, which makes
+// a separate database); here a school only edits its own record.
 
-const LAST_ACTIVE =
-  "This is the school's only active record: sign-in, branding and report cards depend on it. Activate or add another school first.";
+/** The row everything reads as "the school": the active one with the lowest id. */
+const inUseId = (rows: any[]): number | null =>
+  [...rows].sort((a, b) => a.school_id - b.school_id).find((r) => r.status === "ACTIVE")?.school_id ?? null;
+
+export const ONE_RECORD =
+  "This school already has its record: edit it instead. A new school is a separate account that joins through the platform's application and approval.";
+export const IN_USE_STAYS_ACTIVE =
+  "This is the record everyone signed in here sees (name, logo, registration numbers, report cards), so it stays active.";
+export const NO_SECOND_ACTIVE =
+  "Only one school record can be active: it would take over this school's name, logo and registration numbers.";
 
 export const createSchool = async (req: Request, res: Response) => {
   try {
+    // Only the first record (a database that has none yet) can be created here.
+    if ((await db.select({ id: School.school_id }).from(School).limit(1)).length)
+      return res.status(409).json({ message: ONE_RECORD });
     const { values, errors } = readSchoolBody(req.body ?? {}, true);
     if (Object.keys(errors).length) return refuseInvalid(res, errors);
     const clash = await clashes(values);
@@ -143,8 +160,13 @@ export const updateSchool = async (req: Request, res: Response) => {
     if (!Object.keys(values).length) return res.status(400).json({ message: "Nothing to update" });
     const clash = await clashes(values, id);
     if (clash) return res.status(409).json({ message: clash.message, field: clash.field });
-    if (values.status && values.status !== "ACTIVE" && existing.status === "ACTIVE" && !(await activeCount(id)))
-      return res.status(409).json({ message: LAST_ACTIVE, field: "status" });
+    if (values.status && values.status !== existing.status) {
+      const rows = await db.select().from(School);
+      if (existing.status === "ACTIVE" && inUseId(rows) === id)
+        return res.status(409).json({ message: IN_USE_STAYS_ACTIVE, field: "status" });
+      if (values.status === "ACTIVE" && inUseId(rows) !== null)
+        return res.status(409).json({ message: NO_SECOND_ACTIVE, field: "status" });
+    }
     await db.update(School).set(values as any).where(eq(School.school_id, id));
     const [fresh] = await db.select().from(School).where(eq(School.school_id, id));
     res.status(200).json({ message: "School updated", data: withLogoState(fresh) });
@@ -414,7 +436,7 @@ export const deleteSchool = async (req: Request, res: Response) => {
     const [existing] = await db.select().from(School).where(eq(School.school_id, id));
     if (!existing) return res.status(404).json({ message: "School not found" });
     if (existing.status !== "ACTIVE") return res.status(200).json({ message: "School is already inactive" });
-    if (!(await activeCount(id))) return res.status(409).json({ message: LAST_ACTIVE });
+    if (inUseId(await db.select().from(School)) === id) return res.status(409).json({ message: IN_USE_STAYS_ACTIVE });
     await db.update(School).set({ status: "INACTIVE" }).where(eq(School.school_id, id));
     res.status(200).json({ message: "School deactivated" });
   } catch (error) {
