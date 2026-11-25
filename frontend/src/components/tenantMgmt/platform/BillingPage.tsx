@@ -418,18 +418,25 @@ const BillingInsights: React.FC<{ onOpen: (pane: "confirm" | "invoices", status?
     for (let k = 5; k >= 0; k--) months.push(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - k, 1)).toISOString().slice(0, 7));
     const paid = new Map(months.map((m) => [m, 0]));
     for (const i of list) if (i.status === "PAID" && i.paidAt && paid.has(monthKey(i.paidAt))) paid.set(monthKey(i.paidAt), paid.get(monthKey(i.paidAt))! + (Number(i.amount) || 0));
+    // Totals come from the server when it sends them: the invoice list is capped at 500 rows,
+    // and the dashboard uses the same figures, so the two screens always agree.
+    const b = overview?.billing;
+    const serverMonthly = overview?.collectedMonthly;
     return {
-      outstanding: open.reduce((t, i) => t + (Number(i.amount) || 0), 0),
-      overdueCount: overdue.length,
-      monthly: months.map((m) => ({ month: m, collected: paid.get(m) ?? 0 })),
-      ageing: {
-        notDue: open.filter((i) => pastDue(i) <= 0 && i.status !== "OVERDUE").length,
-        d30: overdue.filter((i) => pastDue(i) <= 30).length,
-        d60: overdue.filter((i) => pastDue(i) > 30 && pastDue(i) <= 60).length,
-        d61: overdue.filter((i) => pastDue(i) > 60).length,
-      },
+      outstanding: b ? b.outstanding : open.reduce((t, i) => t + (Number(i.amount) || 0), 0),
+      openCount: b ? b.openInvoices : open.length,
+      overdueCount: b ? b.overdueInvoices : overdue.length,
+      monthly: serverMonthly ? serverMonthly.map((m) => ({ month: m.month, collected: m.amount })) : months.map((m) => ({ month: m, collected: paid.get(m) ?? 0 })),
+      ageing: b
+        ? b.ageing
+        : {
+            notDue: open.filter((i) => pastDue(i) <= 0 && i.status !== "OVERDUE").length,
+            d30: overdue.filter((i) => pastDue(i) <= 30).length,
+            d60: overdue.filter((i) => pastDue(i) > 30 && pastDue(i) <= 60).length,
+            d61: overdue.filter((i) => pastDue(i) > 60).length,
+          },
     };
-  }, [all]);
+  }, [all, overview]);
 
   if (!all)
     return (
@@ -440,14 +447,14 @@ const BillingInsights: React.FC<{ onOpen: (pane: "confirm" | "invoices", status?
       </div>
     );
   const collectedTotal = data.monthly.reduce((t, m) => t + m.collected, 0);
-  const openCount = data.ageing.notDue + data.ageing.d30 + data.ageing.d60 + data.ageing.d61;
+  const openCount = data.openCount;
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {can("confirm") && <StatTile icon={Wallet} label="Payments to confirm" value={overview?.paymentsToConfirm ?? 0} attention onClick={() => onOpen("confirm")} />}
         <StatTile icon={HandCoins} label="Outstanding" value={data.outstanding} format={money} hint={`${openCount} open`} onClick={() => onOpen("invoices", "ISSUED")} />
         <StatTile icon={AlertTriangle} label="Overdue" value={data.overdueCount} attention onClick={() => onOpen("invoices", "OVERDUE")} />
-        <StatTile icon={CircleDollarSign} label="Collected this term" value={overview?.revenueThisTerm ?? 0} format={money} tone="emerald" onClick={() => onOpen("invoices", "PAID")} />
+        <StatTile icon={CircleDollarSign} label="Collected" value={overview?.revenueThisTerm ?? 0} format={money} hint={`confirmed payments · last ${overview?.revenueWindowMonths ?? 4} months`} tone="emerald" onClick={() => onOpen("invoices", "PAID")} />
       </div>
       <div className="grid gap-4 lg:grid-cols-5">
         <Panel title="Collected" aside="last 6 months" icon={CircleDollarSign} className="lg:col-span-3">

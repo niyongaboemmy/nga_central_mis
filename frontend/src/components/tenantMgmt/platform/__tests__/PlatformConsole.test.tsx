@@ -168,9 +168,31 @@ describe("dashboard", () => {
     expect(within(plans).getByRole("button", { name: /Starter/ })).toHaveTextContent("1");
     expect(within(plans).getByRole("button", { name: /Gold/ })).toHaveTextContent("1");
     // students across live schools only (the suspended one is left out)
-    expect(within(screen.getByRole("button", { name: /across live schools/ })).getByText("390")).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: /active accounts/ })).getByText("390")).toBeInTheDocument();
     const busiest = screen.getByRole("list", { name: "Most active schools this week" });
     expect(within(busiest).getAllByRole("button")[0]).toHaveTextContent("Roomy School");
+  });
+
+  it("counts the primary school in the totals and judges limits by each school's effective limits", async () => {
+    api.overview.mockResolvedValue({ ...overview(ALL_CAPS), tenants: { ACTIVE: 2, GRACE: 0, SUSPENDED: 0, ARCHIVED: 0, PENDING: 0 } });
+    api.tenants.mockResolvedValue([
+      // the primary school: real students, no limits
+      { ...school(1, "Primary Academy", "starter", 500, "ACTIVE", 120), isPrimary: true, limits: { students: null, staff: null, storageGb: null } },
+      // starter allows 300, but an override raised it to 1000: 290 is not near the limit
+      { ...school(2, "Raised Limit School", "starter", 290, "ACTIVE", 30), limits: { students: 1000, staff: null, storageGb: null } },
+    ]);
+    render(
+      <MemoryRouter initialEntries={["/platform/dashboard"]}>
+        <Routes>
+          <Route path="/platform/*" element={<PlatformConsole />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await within(await screen.findByRole("button", { name: /active accounts/ })).findByText("790")).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: /used an app or signed in/ })).getByText("150")).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: /Live schools/ })).getByText("2")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Schools near their limits" })).toBeNull();
+    expect(screen.getByText("Every school has room to grow.")).toBeInTheDocument();
   });
 
   it("the old /platform/overview address opens the dashboard", async () => {
@@ -240,8 +262,8 @@ describe("overview", () => {
     // counts shown, but not clickable without review / billing caps
     expect(screen.queryByRole("button", { name: /To review/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /to confirm/i })).toBeNull();
-    // schools tiles stay actionable with PLATFORM_TENANTS_VIEW
-    expect(screen.getByRole("button", { name: /grace/i })).toBeInTheDocument();
+    // schools tiles stay actionable with PLATFORM_TENANTS_VIEW (the In grace segment and the Live schools tile)
+    expect(screen.getAllByRole("button", { name: /grace/i }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("tab", { name: /Applications/ })).toBeNull();
     expect(screen.queryByRole("tab", { name: /Billing/ })).toBeNull();
     expect(screen.queryByRole("tab", { name: /Packages/ })).toBeNull();
