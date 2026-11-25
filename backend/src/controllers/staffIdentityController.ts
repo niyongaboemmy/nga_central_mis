@@ -59,8 +59,27 @@ export const linkMyAttendanceGoogle = asyncHandler(async (req: any, res: any) =>
   successResponse(res, "Google account linked", await readAttendanceGoogle(req.user.userId));
 });
 
-/** DELETE /users/me/attendance-google */
+/**
+ * PUT /users/me/attendance-google { email } -- type the Gmail you check in with, no Google
+ * pop-up. Unverified until that Google account signs in once on the check-in page.
+ */
+export const setMyAttendanceGoogle = asyncHandler(async (req: any, res: any) => {
+  const raw = req.body?.email;
+  const email = raw === null || raw === undefined || String(raw).trim() === "" ? null : normEmail(raw);
+  if (!email) throw new ValidationError("Enter the Gmail you use on your phone");
+  if (!EMAIL_RE.test(email) || email.length > 255) throw new ValidationError("Enter a valid e-mail address");
+  try {
+    await setAttendanceGoogleEmail(req.user.userId, email);
+  } catch (err) {
+    if (err instanceof GoogleLinkConflict) return errorResponse(res, err.message, 409);
+    throw err;
+  }
+  successResponse(res, "Gmail saved for attendance", await readAttendanceGoogle(req.user.userId));
+});
+
+/** DELETE /users/me/attendance-google -- forget both the typed Gmail and the linked Google account */
 export const unlinkMyAttendanceGoogle = asyncHandler(async (req: any, res: any) => {
+  await setAttendanceGoogleEmail(req.user.userId, null);
   await unlinkGoogle(req.user.userId);
   successResponse(res, "Google account unlinked", await readAttendanceGoogle(req.user.userId));
 });

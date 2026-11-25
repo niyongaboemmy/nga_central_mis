@@ -19,6 +19,7 @@ import {
 import { UserWithProfile } from "../../api/users";
 import { InfoItem } from "./TabShared";
 import SelectField from "../ui/SelectField";
+import AttendanceGoogleAdmin from "./AttendanceGoogleAdmin";
 
 interface EditedInfo {
   username?: string;
@@ -359,6 +360,10 @@ const InfoTab: React.FC<InfoTabProps> = ({
           )}
         </div>
       </section>
+
+      {canManageUsers && !isStudent && (
+        <AttendanceGoogleAdmin userId={user.user.user_id} amashuriEmail={user.user.email} />
+      )}
 
       {/* Personal Information Section */}
       <section>

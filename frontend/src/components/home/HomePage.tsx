@@ -25,6 +25,7 @@ import { NextUpHero, TodayCard } from "./TodaySections";
 import { CommsCard, GlanceTiles, QuickActions, SourceHealth, type UpdateEntry, UpdatesCard } from "./SideCards";
 import { Skeleton } from "./ui";
 import SetupChecklistCard from "../tenantMgmt/account/SetupChecklistCard";
+import AttendanceGmailNotice from "../profile/AttendanceGmailNotice";
 
 // ─── Home ───────────────────────────────────────────────────────────────────
 //
@@ -297,6 +298,8 @@ const HomePage: React.FC = () => {
       </header>
 
       <SetupChecklistCard />
+
+      {!data.viewer.preview_of && <AttendanceGmailNotice />}
 
       <p className="sr-only" aria-live="polite">
         {blockingCount > 0 ? `${blockingCount} ${blockingCount === 1 ? "item needs" : "items need"} you now.` : "Nothing urgent."}
