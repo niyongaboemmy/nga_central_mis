@@ -3,6 +3,8 @@
  *
  * Codes are stored as TINYINT in every analytics table (migration 095).
  */
+import { withRegistrationSiteOrigins } from "../../config/registrationSite";
+
 export const APPS = ["mis", "tm", "tendo", "tupo"] as const;
 export type AppKey = (typeof APPS)[number];
 
@@ -40,12 +42,14 @@ export const activitySourceClients = (): Map<string, AppKey> => {
   return out;
 };
 
-/** Browser origins allowed to post activity (anonymous traffic must come from one). */
+/**
+ * Browser origins allowed to post activity (anonymous traffic must come from one).
+ * The registration site (amashuri.com, REGISTRATION_SITE_URL) is always included (GAP-B).
+ */
 export const activityOrigins = (): string[] =>
-  (
-    process.env.ACTIVITY_ORIGINS ||
-    "https://mis.amashuri.com,https://taskmentor.amashuri.com,https://tendo.amashuri.com,https://tupo.amashuri.com,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
-  )
-    .split(",")
-    .map((s) => s.trim().replace(/\/$/, ""))
-    .filter(Boolean);
+  withRegistrationSiteOrigins(
+    (
+      process.env.ACTIVITY_ORIGINS ||
+      "https://mis.amashuri.com,https://taskmentor.amashuri.com,https://tendo.amashuri.com,https://tupo.amashuri.com,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    ).split(","),
+  );

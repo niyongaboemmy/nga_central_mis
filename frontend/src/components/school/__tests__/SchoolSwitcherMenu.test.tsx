@@ -12,7 +12,7 @@ vi.mock("../../../contexts/UserContext", () => ({ useUser: () => ({ user: { user
 vi.mock("../../../contexts/ToastContext", () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 vi.mock("../../../lib/schoolSwitch", async (orig) => {
   const m: any = await orig();
-  return { ...m, mySchools: () => Promise.resolve([A, B]) };
+  return { ...m, mySchools: () => Promise.resolve([A, B]), mySchoolsInfo: () => Promise.resolve({ schools: [A, B], unlinkedCount: 0 }) };
 });
 
 import SchoolSwitcher, { SchoolSwitchHost, roleLabel } from "../SchoolSwitcher";

@@ -2,6 +2,8 @@
  * One person, several schools (TENANT_SWITCHING_PLAN.md §4.3–4.4, Appendix A).
  *
  *  - mySchools() / switchSchool(): the MIS endpoints.
+ *  - mySchoolsInfo() / linkSchool(): an e-mail match in another school is only counted
+ *    (unlinkedCount) until the person adds it with that school's password (GAP-A).
  *  - The selected school is the MIS session's; the readable `nga_school` cookie
  *    ("<tid>.<sid>") tells every NGA app which one it is.
  *  - After a switch: store the new token, tell the other MIS tabs
@@ -44,20 +46,69 @@ export class SwitchError extends Error {
   }
 }
 
-let cache: { at: number; schools: MySchool[] } | null = null;
+export interface MySchoolsInfo {
+  schools: MySchool[];
+  /** Accounts with this e-mail in other schools that are not linked yet: a count, never names. */
+  unlinkedCount: number;
+}
+
+let cache: { at: number; info: MySchoolsInfo } | null = null;
 const TTL = 60_000;
 
+/** Fired when the list changes (a school was added); useMySchoolsInfo refetches. */
+export const MY_SCHOOLS_CHANGED = "nga:my-schools-changed";
+
+let inflight: Promise<MySchoolsInfo> | null = null;
+
+/** The chip, the menu and the host mount together: one request serves them all. */
+export async function mySchoolsInfo(force = false): Promise<MySchoolsInfo> {
+  if (!force && cache && Date.now() - cache.at < TTL) return cache.info;
+  if (inflight) return inflight;
+  inflight = (async () => {
+    try {
+      const res = await api.get("/auth/my-schools");
+      const data = res.data?.data ?? {};
+      const info: MySchoolsInfo = { schools: data.schools ?? [], unlinkedCount: Number(data.unlinkedCount) || 0 };
+      cache = { at: Date.now(), info };
+      return info;
+    } finally {
+      inflight = null;
+    }
+  })();
+  return inflight;
+}
+
 export async function mySchools(force = false): Promise<MySchool[]> {
-  if (!force && cache && Date.now() - cache.at < TTL) return cache.schools;
-  const res = await api.get("/auth/my-schools");
-  const schools: MySchool[] = res.data?.data?.schools ?? [];
-  cache = { at: Date.now(), schools };
-  return schools;
+  return (await mySchoolsInfo(force)).schools;
 }
 
 export const forgetMySchools = () => {
   cache = null;
+  inflight = null;
 };
+
+/**
+ * Add another school whose account uses this e-mail, proven by THAT school's password.
+ * The server tries it against every unlinked match and never says which one failed.
+ */
+export async function linkSchool(password: string): Promise<MySchool> {
+  try {
+    const res = await api.post("/auth/link-school", { password });
+    const school: MySchool | undefined = res.data?.data?.school;
+    if (!school) throw new SwitchError("UNKNOWN", "The school was not added. Please try again.");
+    forgetMySchools();
+    try {
+      window.dispatchEvent(new CustomEvent(MY_SCHOOLS_CHANGED));
+    } catch {
+      /* no window (tests) */
+    }
+    return school;
+  } catch (err: any) {
+    if (err instanceof SwitchError) throw err;
+    const code = err?.response?.data?.code;
+    throw new SwitchError(code ?? "UNKNOWN", err?.response?.data?.message ?? "Could not add the school. Please try again.");
+  }
+}
 
 /** Switch this session; on success the new token is stored (the caller reloads). */
 export async function switchSchool(tenant: string | number, password?: string): Promise<{ tid: number; name: string }> {

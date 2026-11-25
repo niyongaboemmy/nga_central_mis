@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { withRegistrationSiteOrigins } from "./registrationSite";
 
 // Load environment variables
 dotenv.config();
@@ -203,6 +204,10 @@ const productionConfig: Config = {
 const envType = process.env.ENV_TYPE || "development";
 
 const config = envType === "production" ? productionConfig : developmentConfig;
+
+// The registration site (amashuri.com, REGISTRATION_SITE_URL) is always an allowed
+// origin, whatever CORS_ORIGIN says (GAP-B, config/registrationSite.ts).
+config.cors.origin = withRegistrationSiteOrigins(config.cors.origin);
 
 // Validate required environment variables (fail fast).
 assertRequiredSecrets(process.env);
