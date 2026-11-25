@@ -8,6 +8,7 @@
  *   - runAsPlatform() for control-plane-only code,
  *   - the env knobs read in one place.
  */
+import { countFallback } from "./fallbacks";
 import {
   PRIMARY_TENANT_ID,
   TenantContextMissing,
@@ -28,7 +29,21 @@ let modeOverride: TenancyMode | null = null;
  */
 export function tenancyMode(): TenancyMode {
   if (modeOverride) return modeOverride;
+  if (strictActive()) return "enforce";
   return String(process.env.TENANCY_MODE || "").toLowerCase() === "enforce" ? "enforce" : "shadow";
+}
+
+/**
+ * Automatic strict mode (TENANT_SWITCHING_PLAN.md Appendix A.6): once the control
+ * plane says MIS ran seven clean days, tokens without `tid` are refused and data
+ * access without a tenant context throws. TENANCY_STRICT=off is the kill switch.
+ */
+let strictFlag = false;
+export function setStrictMode(on: boolean): void {
+  strictFlag = on;
+}
+export function strictActive(): boolean {
+  return strictFlag && String(process.env.TENANCY_STRICT || "").toLowerCase() !== "off";
 }
 
 /** Tests only: force a mode (null restores the env value). */
@@ -41,6 +56,7 @@ export function setTenancyMode(mode: TenancyMode | null): void {
  * Default 1; "none" (or "0"/"off") rejects such tokens (401 TENANT_REQUIRED).
  */
 export function legacyDefaultTid(): number | null {
+  if (strictActive()) return null;
   const raw = String(process.env.TENANCY_LEGACY_DEFAULT_TID ?? "").trim().toLowerCase();
   if (raw === "") return PRIMARY_TENANT_ID;
   if (raw === "none" || raw === "off" || raw === "0" || raw === "null") return null;
@@ -138,6 +154,7 @@ export function resolveDataTid(what = "database access"): number {
   const t = currentTenantOrNull();
   if (t && t !== PLATFORM_CTX) return t.tid;
   if (t === PLATFORM_CTX) throw new TenantContextMissing(`${what} (inside runAsPlatform)`);
+  countFallback("no_context", what);
   if (tenancyMode() === "enforce") throw new TenantContextMissing(what);
   shadowWarn(what);
   return PRIMARY_TENANT_ID;

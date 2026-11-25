@@ -58,6 +58,12 @@ router.get("/overview", guard(ANY), asyncHandler(async (req: any, res) => {
   ok(res, await console_.overview(PLATFORM_CAP_LIST.filter((c) => holds(req, c))));
 }));
 
+// Automatic strict tenancy: per app, the last 8 days of fallbacks + the flag.
+router.get("/tenancy/health", guard(C.view), asyncHandler(async (_req: any, res) => {
+  const { tenancyHealth } = await import("../services/tenancy/strictMode");
+  ok(res, await tenancyHealth());
+}));
+
 router.get("/staff", guard(ANY), asyncHandler(async (_req, res) => ok(res, await console_.platformStaff())));
 
 // ---------------------------------------------------------------------------

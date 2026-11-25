@@ -80,7 +80,8 @@ api.interceptors.response.use(
       if (
         token &&
         !error.config?.url?.includes("/auth/login") &&
-        !error.config?.url?.includes("/auth/verify-otp")
+        !error.config?.url?.includes("/auth/verify-otp") &&
+        !error.config?.url?.includes("/auth/switch-school")
       ) {
         // Token expired or invalid - redirect to login
         localStorage.removeItem("token");

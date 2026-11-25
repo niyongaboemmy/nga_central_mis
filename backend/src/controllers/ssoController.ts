@@ -8,6 +8,13 @@ import { db, primaryDb } from "../db";
 import { PRIMARY_TENANT_ID, parseTid, runWithTenant } from "../vendor/nga-tenancy";
 import { responseTenant, tenantBlock, tenantClaims } from "../tenancy/claims";
 import { tenantFromClaims } from "../tenancy/express";
+import { isSessionId } from "../tenancy/schoolCookie";
+
+/** The browser session id an SSO code carries ("<tid>.<hex>.s<sid>"), else null. */
+const codeSid = (code: string): string | null => {
+  const m = /\.s([A-Za-z0-9_-]{8,32})$/.exec(code);
+  return m ? m[1] : null;
+};
 import { systemRefusal } from "../tenancy/systems";
 import { hashClientSecret } from "../utils/ssoClientSecret";
 import { eq, and } from "drizzle-orm";
@@ -99,7 +106,15 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
   // "<tid>.<hex>". Primary-tenant codes keep the legacy bare-hex shape.
   const tenantNow = responseTenant();
   const rawCode = crypto.randomBytes(32).toString("hex");
-  const code = tenantNow.tid === PRIMARY_TENANT_ID ? rawCode : `${tenantNow.tid}.${rawCode}`;
+  // The browser session (`sid`) rides along as "<tid>.<hex>.s<sid>" so the
+  // spoke's MIS token names it too (school switch -> only this device's spoke
+  // sessions end, TENANT_SWITCHING_PLAN.md §4.2). Without a sid: legacy shapes.
+  const sid = isSessionId(req.user?.sid) ? req.user.sid : null;
+  const code = sid
+    ? `${tenantNow.tid}.${rawCode}.s${sid}`
+    : tenantNow.tid === PRIMARY_TENANT_ID
+      ? rawCode
+      : `${tenantNow.tid}.${rawCode}`;
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minute expiration
 
   await db.insert(SSOCode).values({
@@ -273,6 +288,8 @@ const exchangeCodeInTenant = async (req: any, res: any, code: string, client_id:
       tokenVersion: user[0].token_version || 0,
       // Token contract v2 (packages/tenancy/CONTRACT.md §2).
       ...tenantClaims(),
+      // The MIS browser session this code was issued from (see authorizeSSO).
+      ...(codeSid(code) ? { sid: codeSid(code) } : {}),
     },
     config.jwtSecret,
     // iss/aud identify who minted the token and which client it was minted

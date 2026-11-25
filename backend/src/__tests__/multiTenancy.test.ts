@@ -220,7 +220,8 @@ describe("(c)(d) sign-in resolver and token contract v2", () => {
     expect(res.status).toBe(200);
     expect(res.body.data.tempToken).toBeUndefined();
     expect(res.body.choose.map((c: any) => c.tid)).toEqual([1, 2]);
-    expect(res.body.data.choose[1]).toEqual({ tid: 2, name: t2.name, slug: SLUG2 });
+    expect(res.body.data.choose[1]).toMatchObject({ tid: 2, slug: SLUG2 });
+    expect(res.body.data.choose[1]).toHaveProperty("logoUrl");
   });
 
   it("accepts an explicit tenant (slug or tid)", async () => {
@@ -430,6 +431,17 @@ describe("(e)(f) SSO apps and service auth per tenant", () => {
     const two = res.body.tenants.find((t: any) => t.tid === 2);
     expect(two).toEqual({ tid: 2, slug: SLUG2, name: t2.name, status: "ACTIVE", isPrimary: false, timezone: t2.timezone, pkg: t2.pkg });
     expect(res.body.tenants.find((t: any) => t.tid === 1)).toMatchObject({ tid: 1, isPrimary: true });
+  });
+
+  it("GET /platform/tenants/active carries the strict-mode flags; spokes report fallbacks with the same credentials", async () => {
+    const res = await request(app).get("/platform/tenants/active").set("Authorization", basic);
+    expect(res.body.tenancy.strict).toEqual(expect.objectContaining({ mis: expect.any(Boolean), taskmentor: expect.any(Boolean), tendo: expect.any(Boolean), tupo: expect.any(Boolean) }));
+    const day = new Date().toISOString().slice(0, 10);
+    const ok = await request(app).post("/platform/tenancy/fallbacks").set("Authorization", basic).send({ app: "tendo", day, counts: { no_context: 0 } });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    const bad = await request(app).post("/platform/tenancy/fallbacks").set("Authorization", basic).send({ app: "nope", day, counts: {} });
+    expect(bad.status).toBe(400);
+    expect((await request(app).post("/platform/tenancy/fallbacks").send({ app: "tendo", day, counts: {} })).status).toBe(401);
   });
 
   it("applies the X-NGA-Tenant rules to Basic client credentials", async () => {

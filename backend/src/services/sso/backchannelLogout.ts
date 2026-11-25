@@ -22,15 +22,20 @@ import { loadSigningKey, ssoIssuer } from "./signingKey";
  * tokens -- front-channel logout silently fails. Server-to-server is reliable
  * and works even when the other apps aren't open.
  *
- * MIS tokens carry no session id, and signing out of MIS already ends every
- * MIS session of the user (token_version), so the logout_token identifies the
- * user (`sub`) and the apps end all of that user's sessions: one consistent
- * meaning everywhere.
+ * Signing out of MIS ends every MIS session of the user (token_version), so a
+ * plain logout_token identifies the user (`sub`) and the apps end all of that
+ * user's sessions in that school.
+ *
+ * A school switch (TENANT_SWITCHING_PLAN.md §4.2) ends one browser session only:
+ * its logout_token also carries `sid` (the MIS session id, also in the spokes'
+ * MIS tokens since the switch work). An app that knows sids ends only the
+ * sessions whose MIS token has that sid; an older app ignores it and ends all
+ * of the user's sessions in that school -- safe, just broader.
  */
 
 export const LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout";
 
-export const buildLogoutToken = (misUserId: number, clientId: string, now = Date.now(), tid: number = responseTenant().tid) => {
+export const buildLogoutToken = (misUserId: number, clientId: string, now = Date.now(), tid: number = responseTenant().tid, sid: string | null = null) => {
   const key = loadSigningKey();
   if (!key) return null;
   const iat = Math.floor(now / 1000);
@@ -44,6 +49,7 @@ export const buildLogoutToken = (misUserId: number, clientId: string, now = Date
       sub: String(misUserId),
       // Contract §2: MIS user ids repeat across tenants -- spokes revoke on (tid, sub).
       tid,
+      ...(sid ? { sid } : {}),
       events: { [LOGOUT_EVENT]: {} },
     },
     key.privateKey,
@@ -77,13 +83,13 @@ export interface LogoutDelivery {
 }
 
 /** Deliver to one app, retrying transient failures (never throws). */
-const deliver = async (system: { name: string; client_id: string | null; backchannel_logout_uri: string | null }, misUserId: number, retryDelays: number[], tid: number) => {
+const deliver = async (system: { name: string; client_id: string | null; backchannel_logout_uri: string | null }, misUserId: number, retryDelays: number[], tid: number, sid: string | null = null) => {
   const result: LogoutDelivery = { system: system.name, status: null, attempts: 0 };
   for (let i = 0; i <= retryDelays.length; i++) {
     if (i > 0) await sleep(retryDelays[i - 1]);
     result.attempts++;
     // A fresh token per attempt (new jti, fresh iat).
-    const token = buildLogoutToken(misUserId, system.client_id!, Date.now(), tid);
+    const token = buildLogoutToken(misUserId, system.client_id!, Date.now(), tid, sid);
     if (!token) return result;
     try {
       result.status = await post(system.backchannel_logout_uri!, new URLSearchParams({ logout_token: token }).toString());
@@ -100,7 +106,7 @@ const deliver = async (system: { name: string; client_id: string | null; backcha
  * Tell every connected app that `misUserId` signed out. Runs in the
  * background (the user's logout never waits on another app).
  */
-export const notifyLogout = async (misUserId: number, opts: { retryDelays?: number[] } = {}): Promise<LogoutDelivery[]> => {
+export const notifyLogout = async (misUserId: number, opts: { retryDelays?: number[]; sid?: string | null } = {}): Promise<LogoutDelivery[]> => {
   if (!loadSigningKey()) return [];
   // The tenant is read now: the deliveries below outlive the request.
   const tenant = responseTenant();
@@ -111,7 +117,7 @@ export const notifyLogout = async (misUserId: number, opts: { retryDelays?: numb
   // Only the apps this school uses hold sessions of its users.
   const systems = await filterAssignedSystems(all, tenant);
   const results = await Promise.all(
-    systems.filter((s) => s.backchannel_logout_uri).map((s) => deliver(s, misUserId, opts.retryDelays ?? [1000, 4000], tenant.tid)),
+    systems.filter((s) => s.backchannel_logout_uri).map((s) => deliver(s, misUserId, opts.retryDelays ?? [1000, 4000], tenant.tid, opts.sid ?? null)),
   );
   const failed = results.filter((r) => r.status === null || r.status >= 300);
   if (failed.length) {
