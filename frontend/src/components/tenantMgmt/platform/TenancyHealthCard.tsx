@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { platformApi } from "../../../api/tenantMgmt";
-import { Card, cx, errorText } from "./platformShared";
+import { Pill } from "../kit";
+import { Card, Skeleton, cx, errorText, sectionTitle } from "./platformShared";
 
 const APP_NAMES: Record<string, string> = { mis: "MIS", taskmentor: "Task Mentor", tendo: "Tendo", tupo: "Tupo" };
 
@@ -20,15 +21,17 @@ const TenancyHealthCard: React.FC = () => {
   return (
     <Card>
       <div className="mb-3 flex items-center gap-2">
-        <ShieldCheck className="h-4 w-4 text-brand-600 dark:text-brand-200" aria-hidden />
-        <h2 className="text-sm font-bold text-slate-900 dark:text-white">School safety</h2>
-        <span className="text-xs text-slate-600 dark:text-gray-300">· requests that name no school</span>
+        <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden />
+        <h2 className={sectionTitle}>School safety</h2>
+        <span className="text-xs text-gray-600 dark:text-gray-300">· requests that name no school</span>
       </div>
       {error && <p className="text-sm text-red-600 dark:text-red-300">{error}</p>}
       {!rows && !error && (
-        <ul className="space-y-2" aria-busy="true">
+        <ul className="space-y-2" role="status" aria-busy="true" aria-label="Loading school safety">
           {[0, 1, 2, 3].map((i) => (
-            <li key={i} className="h-8 animate-pulse rounded-xl bg-slate-100 dark:bg-gray-800" />
+            <li key={i}>
+              <Skeleton className="h-8" />
+            </li>
           ))}
         </ul>
       )}
@@ -38,7 +41,7 @@ const TenancyHealthCard: React.FC = () => {
             const clean = r.days.filter((d, i) => i < r.days.length - 1 && d.reported && d.fallbacks === 0).length;
             return (
               <li key={r.app} className="flex flex-wrap items-center gap-3">
-                <span className="w-24 text-sm font-semibold text-slate-900 dark:text-white">{APP_NAMES[r.app] ?? r.app}</span>
+                <span className="w-24 text-sm font-semibold text-gray-900 dark:text-white">{APP_NAMES[r.app] ?? r.app}</span>
                 <span className="flex gap-1" role="img" aria-label={`${APP_NAMES[r.app] ?? r.app}, last ${r.days.length} days`}>
                   {r.days.map((d) => (
                     <span
@@ -46,14 +49,14 @@ const TenancyHealthCard: React.FC = () => {
                       title={`${d.day}: ${!d.reported ? "no report" : d.fallbacks === 0 ? "clean" : `${d.fallbacks} without a school`}`}
                       className={cx(
                         "h-4 w-4 rounded",
-                        !d.reported ? "bg-slate-200 dark:bg-gray-700" : d.fallbacks === 0 ? "bg-brand-500" : "bg-red-500",
+                        !d.reported ? "bg-gray-200 dark:bg-gray-800" : d.fallbacks === 0 ? "bg-blue-500" : "bg-red-500",
                       )}
                     />
                   ))}
                 </span>
-                <span className={cx("ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold", r.strict ? "bg-brand-100 text-brand-800 dark:bg-brand-500/20 dark:text-brand-200" : "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-200")}>
+                <Pill tone={r.strict ? "blue" : "gray"} className="ml-auto">
                   {r.strict ? "Strict" : `Learning · ${clean}/7 clean days`}
-                </span>
+                </Pill>
               </li>
             );
           })}
