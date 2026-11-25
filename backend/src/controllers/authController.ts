@@ -69,6 +69,13 @@ const withSignInTenant = async (
 ): Promise<void> => {
   const r = await resolveLoginTenants(identifier, req.body?.tenant);
   if (r.kind === "refused") {
+    // MIS-ISO-7: found by the identifier alone, a PENDING / ARCHIVED school is named
+    // only once the credentials match there -- otherwise anyone could learn which
+    // schools an e-mail belongs to.
+    if (!r.explicit && r.tenant) {
+      const proven = narrow ? await runWithTenant(r.tenant, narrow).catch(() => false) : false;
+      if (!proven) throw new AuthenticationError("Invalid credentials");
+    }
     sendRefusal(res, r.refusal);
     return;
   }
@@ -270,7 +277,11 @@ export const completeLogin = async (
   res: any,
   loginMethod: "OTP_EMAIL" | "GOOGLE_OAUTH" | "DESKTOP_BROWSER" | "SCHOOL_SWITCH",
   req?: any,
+  opts: { amr?: "google" | "pwd" } = {},
 ) => {
+  // How this session was proven (MIS-ISO-2): switch-school accepts "same Google
+  // account" only from a session that Google sign-in itself opened.
+  const amr = loginMethod === "GOOGLE_OAUTH" ? "google" : loginMethod === "OTP_EMAIL" ? "pwd" : loginMethod === "SCHOOL_SWITCH" ? opts.amr : undefined;
   // Get user permissions
   const permissions = await getEffectivePermissions(userId);
 
@@ -428,6 +439,7 @@ export const completeLogin = async (
       // This browser session (TENANT_SWITCHING_PLAN.md §4.2): carried into the
       // spokes' MIS tokens so a school switch ends only this device's sessions.
       sid,
+      ...(amr ? { amr } : {}),
     },
     config.jwtSecret,
     { expiresIn: "24h" },
@@ -549,7 +561,8 @@ export const googleLogin = asyncHandler(async (req: any, res: any) => {
   const sanitizedEmail = sanitizeString(payload.email);
   const googleSub = payload.sub;
 
-  await withSignInTenant(req, res, sanitizedEmail, () => googleLoginInTenant(req, res, sanitizedEmail, googleSub));
+  // The e-mail is Google-verified: it proves the identity for every school it matches.
+  await withSignInTenant(req, res, sanitizedEmail, () => googleLoginInTenant(req, res, sanitizedEmail, googleSub), async () => true);
 });
 
 const googleLoginInTenant = async (req: any, res: any, sanitizedEmail: string, googleSub: string) => {

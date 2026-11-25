@@ -67,7 +67,7 @@ const SwitchSchoolPage: React.FC = () => {
                   <SchoolMark name={s.name} logoUrl={s.logoUrl} size="lg" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-slate-900 dark:text-white">{s.name}</span>
-                    <span className="block truncate text-xs text-slate-600 dark:text-slate-300">{s.current ? "Current school" : s.roles.join(", ") || s.slug}</span>
+                    <span className="block truncate text-xs text-slate-600 dark:text-slate-300">{s.current ? "Current school" : s.slug}</span>
                   </span>
                   {s.current && <Check className="h-5 w-5 text-blue-600 dark:text-blue-300" aria-hidden="true" />}
                 </button>

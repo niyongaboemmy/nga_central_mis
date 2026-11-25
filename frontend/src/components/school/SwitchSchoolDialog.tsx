@@ -82,7 +82,7 @@ const SwitchSchoolDialog: React.FC<Props> = ({ from, to, next = "/home", onClose
               <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">{to.name}</span>
             </div>
           </div>
-          {to.roles.length > 0 && <p className="text-xs text-slate-600 dark:text-slate-300">Your role there: {to.roles.join(", ")}</p>}
+          {to.current && !!to.roles?.length && <p className="text-xs text-slate-600 dark:text-slate-300">Your role there: {to.roles.join(", ")}</p>}
           <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             Save your work first. Every NGA app on this device moves to {to.name}; your other devices stay where they are.

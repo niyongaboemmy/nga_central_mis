@@ -3,14 +3,18 @@ import { remindersApi, type Agenda, type ReminderConfig, type ReminderOverview, 
 import { getPushStatus, type PushStatus } from "../../reminders/push";
 import { usePwa } from "../../reminders/pwa";
 import { API_BASE_URL } from "../../services/api";
+import { agendaCacheId, cachedAgenda, shouldUseOfflineAgenda } from "./agendaCache";
 
 /** Hand the worker what it needs to refresh the offline agenda on its own. */
 const shareAgendaSource = async (agenda: Agenda | null) => {
   if (typeof navigator === "undefined" || !navigator.serviceWorker?.controller) return;
   const token = localStorage.getItem("token");
   const worker = navigator.serviceWorker.controller;
-  if (token) worker.postMessage({ type: "nga:agenda-source", apiBase: API_BASE_URL, token });
-  if (agenda) worker.postMessage({ type: "nga:agenda-cache", body: JSON.stringify(agenda) });
+  // Stored per school + person (WEB-ISO-7); nothing without a known identity.
+  const id = agendaCacheId();
+  if (!id) return;
+  if (token) worker.postMessage({ type: "nga:agenda-source", apiBase: API_BASE_URL, token, id });
+  if (agenda) worker.postMessage({ type: "nga:agenda-cache", body: JSON.stringify(agenda), id });
   try {
     const reg: any = await navigator.serviceWorker.ready;
     if (reg.periodicSync) {
@@ -21,16 +25,6 @@ const shareAgendaSource = async (agenda: Agenda | null) => {
     }
   } catch {
     /* periodic sync is an enhancement only */
-  }
-};
-
-/** Last agenda the worker cached, for opening the page offline. */
-const cachedAgenda = async (): Promise<Agenda | null> => {
-  try {
-    const res = await fetch("/__nga/agenda.json");
-    return res.ok ? ((await res.json()) as Agenda) : null;
-  } catch {
-    return null;
   }
 };
 
@@ -69,8 +63,10 @@ export const useReminders = () => {
       void shareAgendaSource(ag);
     } catch (e: any) {
       if (!mounted.current) return;
-      const cached = await cachedAgenda();
-      if (cached) {
+      // Offline copy only when the server could not be reached (WEB-ISO-7): a 401/403/5xx
+      // must never bring back an agenda cached for whoever used this browser before.
+      const cached = shouldUseOfflineAgenda(e) ? await cachedAgenda() : null;
+      if (cached && mounted.current) {
         setAgenda(cached);
         setOffline(true);
       }

@@ -83,7 +83,7 @@ const SchoolRow: React.FC<{ s: MySchool; onPick: (s: MySchool) => void }> = ({ s
         <span className="line-clamp-2 break-words text-sm font-medium leading-snug text-gray-900 dark:text-white" title={s.name}>
           {s.name}
         </span>
-        {s.roles.length > 0 && <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">{s.roles.map(roleLabel).join(" · ")}</span>}
+        {!!s.roles?.length && <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">{s.roles.map(roleLabel).join(" · ")}</span>}
       </span>
       {s.current ? (
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white">

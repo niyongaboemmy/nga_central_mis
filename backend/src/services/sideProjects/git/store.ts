@@ -195,7 +195,8 @@ export async function resolveCoauthors(message: string, exclude: number | null):
 const stateSecret = () => process.env.GITHUB_STATE_SECRET || process.env.JWT_SECRET || "nga-git-dev";
 
 export function signState(payload: Record<string, unknown>, ttlSeconds = 15 * 60): string {
-  const body = Buffer.from(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + ttlSeconds })).toString("base64url");
+  const now = Math.floor(Date.now() / 1000);
+  const body = Buffer.from(JSON.stringify({ ...payload, iat: now, exp: now + ttlSeconds })).toString("base64url");
   const sig = crypto.createHmac("sha256", stateSecret()).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
@@ -228,6 +229,17 @@ export async function routeInstallation(installationId: number, tid: number, log
     if (rows[0] && Number(rows[0].tenant_id) !== tid) fail(409, "INSTALLATION_ELSEWHERE", "This GitHub installation is already connected to another school");
   } catch (e) {
     if (isControlPlaneMissing(e)) return; // single-tenant installs: everything is the primary tenant
+    throw e;
+  }
+}
+
+/** The tenant an installation is routed to, or null (also without a control plane). */
+export async function installationRouteTid(installationId: number): Promise<number | null> {
+  try {
+    const [rows]: any = await controlPool().query(`SELECT tenant_id FROM GitHubInstallationRoute WHERE installation_id = ?`, [installationId]);
+    return rows[0] ? Number(rows[0].tenant_id) : null;
+  } catch (e) {
+    if (isControlPlaneMissing(e)) return null;
     throw e;
   }
 }

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { scopeTid } from "../../tenancy/scoped";
 import { promises as fsp } from "fs";
 import { generateStructuredContent, orderedProviders, friendlyAIErrorMessage } from "../aiProviders";
 import { isCoolingDown, isParkedDead } from "../aiProviders/registry";
@@ -94,6 +95,8 @@ export interface Turn { role: "user" | "ai"; text: string; at: string }
 interface Session {
   id: string;
   userId: number;
+  /** The school (MIS-ISO-7): user ids repeat across schools. */
+  tid: number;
   touched: number;
   files: SetupFile[];
   prompt: string;
@@ -134,14 +137,14 @@ export function providers() {
 export function createSession(userId: number) {
   sweep();
   const id = crypto.randomBytes(12).toString("hex");
-  sessions.set(id, { id, userId, touched: Date.now(), files: [], prompt: "", turns: [], draft: null, provider: null });
+  sessions.set(id, { id, userId, tid: scopeTid("AI setup"), touched: Date.now(), files: [], prompt: "", turns: [], draft: null, provider: null });
   return { id, maxFiles: MAX_FILES };
 }
 
 function sessionOf(userId: number, id: string): Session {
   sweep();
   const found = sessions.get(String(id));
-  if (!found || found.userId !== userId) return fail(404, "SESSION_GONE", "This AI setup has expired. Start again");
+  if (!found || found.userId !== userId || found.tid !== scopeTid("AI setup")) return fail(404, "SESSION_GONE", "This AI setup has expired. Start again");
   found.touched = Date.now();
   return found;
 }

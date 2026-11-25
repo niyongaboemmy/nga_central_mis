@@ -483,6 +483,16 @@ export interface TenantAdmin {
 }
 
 /** A person's account in a school (platform search across schools). */
+/** A person copied into another school (MIS-ISO-2): own one-time password, never the source's. */
+export interface CrossSchoolCopy {
+  userId: number;
+  username: string;
+  roles: string[];
+  emailed: boolean;
+  /** Shown once to platform staff. */
+  tempPassword?: string;
+}
+
 export interface PersonElsewhere {
   tid: number;
   schoolName: string;
@@ -632,7 +642,7 @@ export const platformApi = {
   people: (q: string, forTid?: number) => unwrap<PersonElsewhere[]>(api.get("/platform/people", { params: { q, forTid } })),
   tenantRoles: (tid: number) => unwrap<Array<{ roleId: number; name: string; description: string | null }>>(api.get(`/platform/tenants/${tid}/roles`)),
   assignPerson: (tid: number, body: { sourceTid: number; sourceUserId: number; roleIds: number[]; reason: string }) =>
-    unwrap<{ userId: number; username: string; roles: string[] }>(api.post(`/platform/tenants/${tid}/people`, body)),
+    unwrap<CrossSchoolCopy>(api.post(`/platform/tenants/${tid}/people`, body)),
   provisioning: (runId: number) => unwrap<ProvisioningRun>(api.get(`/platform/provisioning/${runId}`)),
   retryProvisioning: (runId: number) => unwrap<ProvisioningRun>(api.post(`/platform/provisioning/${runId}/retry`)),
   /** support sessions this tenant granted (§6.9) */

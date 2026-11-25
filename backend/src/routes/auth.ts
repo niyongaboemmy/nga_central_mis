@@ -17,6 +17,7 @@ import {
 } from "../controllers/authController";
 import { authenticate, authenticateFor, authenticateIdentityRead } from "../middleware/auth";
 import { getMySchools, switchSchool } from "../controllers/schoolSwitchController";
+import { databaseToolGuard } from "./databaseRoutes";
 
 const router = express.Router();
 
@@ -42,6 +43,7 @@ router.post("/forgot-password", forgotPassword);
 router.post("/verify-reset-otp", verifyResetOTPTicket, authenticateFor.resetRequest, verifyResetOTP);
 router.post("/reset-password", authenticateFor.resetConfirm, resetPassword);
 router.post("/change-password", authenticate, changePassword);
-router.post("/confirm-db-access", authenticate, confirmDbAccess);
+// The DB tool's step-up: primary tenant + platform owner only, like the tool (MIS-ISO-1).
+router.post("/confirm-db-access", ...databaseToolGuard, confirmDbAccess);
 
 export default router;

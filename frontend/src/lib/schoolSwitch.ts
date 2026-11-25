@@ -11,6 +11,7 @@
  */
 import api from "../services/api";
 import { setToken } from "../utils/auth";
+import { SCHOOL_CHOICE_KEY } from "./tenant";
 
 export interface MySchool {
   tid: number;
@@ -19,7 +20,8 @@ export interface MySchool {
   logoUrl: string | null;
   status: string;
   current: boolean;
-  roles: string[];
+  /** Only for the current school: the server never reveals another school's roles (MIS-ISO-5). */
+  roles?: string[];
 }
 
 export type SwitchErrorCode =
@@ -152,8 +154,27 @@ export function watchSchoolChanges(currentTid: () => number | null, onChange: ()
 // The sign-in picker's memory ("Remember on this device")
 // ---------------------------------------------------------------------------
 
-const REMEMBER_KEY = "nga.schoolChoice";
-const idKey = (identifier: string) => identifier.trim().toLowerCase();
+const REMEMBER_KEY = SCHOOL_CHOICE_KEY;
+/**
+ * The identifier is stored hashed (WEB-ISO-9): a shared device must not list the
+ * e-mails that signed in on it. Synchronous (the sign-in form reads it while typing),
+ * so a 53-bit cyrb53 hash -- not a secret, just not the e-mail itself. Cleared on
+ * sign-out (forgetIdentity).
+ */
+export function hashIdentifier(identifier: string): string {
+  const str = `nga.schoolChoice:${identifier.trim().toLowerCase()}`;
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return `h:${(4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)}`;
+}
+const idKey = hashIdentifier;
 
 export function rememberedSchool(identifier: string): string | null {
   try {
@@ -167,6 +188,8 @@ export function rememberedSchool(identifier: string): string | null {
 export function rememberSchool(identifier: string, slug: string | null): void {
   try {
     const map = JSON.parse(localStorage.getItem(REMEMBER_KEY) || "{}");
+    // Entries written before hashing held the e-mail itself: drop them.
+    for (const k of Object.keys(map)) if (!k.startsWith("h:")) delete map[k];
     if (slug) map[idKey(identifier)] = slug;
     else delete map[idKey(identifier)];
     localStorage.setItem(REMEMBER_KEY, JSON.stringify(map));

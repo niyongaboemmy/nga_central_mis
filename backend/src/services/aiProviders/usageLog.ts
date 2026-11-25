@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { AIUsageLog } from "../../db/schema";
 import logger from "../../utils/logger";
+import { tenantLocal } from "../../tenancy/scoped";
 
 export interface AIUsageRow {
   feature: string;
@@ -25,9 +26,14 @@ export interface AIUsageRow {
   occurred_at: Date;
 }
 
-let disabled = false;
-// Migration 122 not applied yet: write the original columns only.
-let legacyColumns = false;
+// Per school (MIS-ISO-6): each school has its own database and migration level, so
+// one school missing the table (or migration 122) must not switch logging off -- or
+// to the legacy columns -- for every other school in this process.
+const flags = tenantLocal(() => ({
+  disabled: false,
+  // Migration 122 not applied yet: write the original columns only.
+  legacyColumns: false,
+}));
 
 /**
  * One row per provider attempt (LESSON_STUDIO plan §7.4). Fire-and-forget: logging must
@@ -35,8 +41,10 @@ let legacyColumns = false;
  * applied) logging switches itself off for the life of the process.
  */
 export function logAIUsage(row: AIUsageRow): void {
-  if (disabled) return;
-  if (legacyColumns) return void writeLegacy(row).catch(onWriteError);
+  const st = flags();
+  if (st.disabled) return;
+  const onWriteError = (error: any) => onWriteErrorFor(st, error);
+  if (st.legacyColumns) return void writeLegacy(row).catch(onWriteError);
   db.insert(AIUsageLog)
     .values({
       feature: row.feature.slice(0, 60),
@@ -59,7 +67,7 @@ export function logAIUsage(row: AIUsageRow): void {
     })
     .catch((error: any) => {
       if (error?.code === "ER_BAD_FIELD_ERROR") {
-        legacyColumns = true;
+        st.legacyColumns = true;
         logger.warn("[ai] AIUsageLog has no app/route columns — apply migration 122; logging without them meanwhile");
         return writeLegacy(row).catch(onWriteError);
       }
@@ -67,9 +75,9 @@ export function logAIUsage(row: AIUsageRow): void {
     });
 }
 
-function onWriteError(error: any): void {
+function onWriteErrorFor(st: { disabled: boolean }, error: any): void {
   if (error?.code === "ER_NO_SUCH_TABLE") {
-    disabled = true;
+    st.disabled = true;
     logger.warn("[ai] AIUsageLog table missing — usage logging disabled until migration 096 is applied");
     return;
   }
@@ -88,6 +96,12 @@ function writeLegacy(row: AIUsageRow) {
             ${row.actor_user_id ?? null}, ${row.course_id ?? null}, ${row.run_id ?? null}, ${row.occurred_at})`);
 }
 
+/** For the current school. */
 export function isUsageLogDisabled(): boolean {
-  return disabled;
+  return flags().disabled;
+}
+
+/** Tests only: forget every school's flags. */
+export function resetUsageLogFlags(): void {
+  flags.resetAll();
 }

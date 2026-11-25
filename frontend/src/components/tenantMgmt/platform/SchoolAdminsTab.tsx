@@ -4,7 +4,7 @@ import { ArrowLeftRight, Check, Copy, Crown, KeyRound, Lock, Mail, Phone, Rotate
 import { PersonResults, PersonResultsSkeleton, PersonSearchField, PickedPerson } from "../../people/PersonElsewhere";
 import Modal from "../../ui/Modal";
 import { EmptyState, Pill } from "../kit";
-import { platformApi, type PersonElsewhere, type TenantAdmin, type TenantDetail } from "../../../api/tenantMgmt";
+import { platformApi, type CrossSchoolCopy, type PersonElsewhere, type TenantAdmin, type TenantDetail } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
 import { Btn, Field, IconBtn, ReasonDialog, Skeleton, SkeletonRows, accent, act, ago, cx, errorText, fmtDateTime, initials, inputCls, surface, toast, usePlatform } from "./platformShared";
 
@@ -120,9 +120,10 @@ const SchoolAdminsTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
         tid={t.tid}
         schoolName={t.name}
         onClose={() => setAssigning(false)}
-        onDone={() => {
+        onDone={(r, person) => {
           setAssigning(false);
           load();
+          if (r.tempPassword) setCreds({ name: person.name, email: person.email, username: r.username, password: r.tempPassword, emailed: r.emailed });
         }}
       />
 
@@ -357,7 +358,7 @@ const AddAdminDialog: React.FC<{
 // ---------------------------------------------------------------------------
 
 /** Someone of another school, given a role in this one (backend: crossSchool.ts). */
-const AssignPersonDialog: React.FC<{ open: boolean; tid: number; schoolName: string; onClose: () => void; onDone: () => void }> = ({
+const AssignPersonDialog: React.FC<{ open: boolean; tid: number; schoolName: string; onClose: () => void; onDone: (r: CrossSchoolCopy, person: PersonElsewhere) => void }> = ({
   open,
   tid,
   schoolName,
@@ -435,7 +436,7 @@ const AssignPersonDialog: React.FC<{ open: boolean; tid: number; schoolName: str
           setBusy(false);
           if (!r) return;
           toast(`${picked.name} added to ${schoolName} as ${r.roles.join(", ")}`, "success");
-          onDone();
+          onDone(r, picked);
         }}
       >
         {!picked ? (
@@ -444,7 +445,7 @@ const AssignPersonDialog: React.FC<{ open: boolean; tid: number; schoolName: str
             {searching ? (
               <PersonResultsSkeleton />
             ) : results === null ? (
-              <p className="text-sm text-gray-600 dark:text-gray-300">Search every school. The person keeps their password and signs in to both schools.</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Search every school. The person gets a one-time password for this school by e-mail; their password elsewhere does not change.</p>
             ) : results.length === 0 ? (
               <p className="text-sm text-gray-600 dark:text-gray-300">No one matches “{q.trim()}”.</p>
             ) : (

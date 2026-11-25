@@ -1,4 +1,5 @@
 import type { AiRouteMeta } from "./ai/personal/run";
+import { scopeTid } from "../tenancy/scoped";
 
 export type CurriculumImportJobStatus =
   | "parsing"
@@ -23,6 +24,8 @@ export interface ImportedElement {
 
 export interface CurriculumImportJobState {
   userId: number;
+  /** The school that created the job (MIS-ISO-7): user ids repeat across schools. */
+  tid?: number;
   subjectId: number;
   status: CurriculumImportJobStatus;
   stepIndex: number;
@@ -56,6 +59,7 @@ export const createImportJob = (
 ): void => {
   jobs.set(jobId, {
     userId,
+    tid: scopeTid("AI job"),
     subjectId,
     status: "parsing",
     stepIndex: STEP_INDEX.parsing,
@@ -84,7 +88,11 @@ export const updateImportJob = (
 
 export const getImportJob = (
   jobId: string,
-): CurriculumImportJobState | undefined => jobs.get(jobId);
+): CurriculumImportJobState | undefined => {
+  // Another school's job with a colliding id is not this person's (MIS-ISO-7).
+  const job = jobs.get(jobId);
+  return job && job.tid === scopeTid("AI job") ? job : undefined;
+};
 
 export const deleteImportJob = (jobId: string): void => {
   jobs.delete(jobId);
