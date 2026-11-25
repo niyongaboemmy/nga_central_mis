@@ -145,4 +145,36 @@ describe("Profile page", () => {
     await userEvent.click(screen.getByRole("button", { name: /change password/i }));
     expect(screen.getByRole("dialog")).toHaveTextContent("Change password form");
   });
+
+  it("scores profile strength from what is saved and jumps to what is missing", async () => {
+    // Name, photo, gender, date of birth and address are set; the cover is not.
+    render(<Profile />, { wrapper: MemoryRouter });
+    expect(screen.getByRole("progressbar", { name: /profile strength/i })).toHaveAttribute("aria-valuenow", "83");
+    expect(screen.getByRole("button", { name: /add a cover image/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add your address/i })).not.toBeInTheDocument();
+  });
+
+  it("picks gender from the pills", async () => {
+    render(<Profile />, { wrapper: MemoryRouter });
+    expect(screen.getByRole("radio", { name: "Female" })).toBeChecked();
+    await userEvent.click(screen.getByRole("radio", { name: "Prefer not to say" }));
+    await userEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await waitFor(() => expect(updateProfileMock).toHaveBeenCalledWith({ gender: "" }));
+  });
+
+  it("copies an account detail and says so", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<Profile />, { wrapper: MemoryRouter });
+    await userEvent.click(screen.getByRole("button", { name: "Copy email" }));
+    expect(writeText).toHaveBeenCalledWith("jane.doe@example.com");
+    expect(showToastMock).toHaveBeenCalledWith("Email copied", "success");
+  });
+
+  it("saves with Cmd/Ctrl+S while there are unsaved changes", async () => {
+    render(<Profile />, { wrapper: MemoryRouter });
+    await userEvent.type(screen.getByLabelText("Address"), " 2");
+    await userEvent.keyboard("{Control>}s{/Control}");
+    await waitFor(() => expect(updateProfileMock).toHaveBeenCalledWith({ address: "Kicukiro 2" }));
+  });
 });
