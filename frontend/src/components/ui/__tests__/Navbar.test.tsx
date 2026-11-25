@@ -78,7 +78,7 @@ describe("Navbar", () => {
 
   it("shows only an icon (initials) for the logged-in user in the collapsed bar, not the name or email", () => {
     renderNavbar();
-    const accountButton = screen.getByRole("button", { name: /account menu/i });
+    const accountButton = screen.getAllByRole("button", { name: /account menu/i })[0]; // desktop bar (the phone bar has its own)
     expect(accountButton).toBeInTheDocument();
     expect(accountButton.textContent).toContain("JD");
     // The desktop dropdown trigger's own container must not reveal the name
@@ -94,7 +94,7 @@ describe("Navbar", () => {
   it("reveals the user's name and email inside the dropdown after clicking the account icon", async () => {
     const user = userEvent.setup();
     renderNavbar();
-    const accountButton = screen.getByRole("button", { name: /account menu/i });
+    const accountButton = screen.getAllByRole("button", { name: /account menu/i })[0]; // desktop bar (the phone bar has its own)
     const desktopAccountContainer = accountButton.closest(".relative") as HTMLElement;
     await user.click(accountButton);
     expect(within(desktopAccountContainer).getByText("Jane Doe")).toBeInTheDocument();
@@ -113,7 +113,7 @@ describe("Navbar", () => {
     try {
       const user = userEvent.setup();
       renderNavbar();
-      const accountButton = screen.getByRole("button", { name: /account menu/i });
+      const accountButton = screen.getAllByRole("button", { name: /account menu/i })[0]; // desktop bar (the phone bar has its own)
       const img = within(accountButton).getByRole("img", { name: "Jane Doe" });
       expect(img.getAttribute("src")).toBe(mockUser.avatar.sm);
       expect(accountButton.textContent).not.toContain("JD");

@@ -14,8 +14,17 @@ const GRADIENTS = [
   "from-fuchsia-500 to-violet-600",
 ];
 
+/**
+ * First + last initials from letters only. "Niyongabo Emmanuel (Eric)" is "NE", not "N(":
+ * bracketed asides are dropped and punctuation never becomes an initial.
+ */
 export function initialsOf(name: string | null | undefined): string {
-  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  const parts = (name || "")
+    .replace(/\([^)]*\)/g, " ")
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ""))
+    .filter(Boolean);
   if (!parts.length) return "?";
   const letters = parts.length === 1 ? parts[0].slice(0, 1) : `${parts[0][0]}${parts[parts.length - 1][0]}`;
   return letters.toUpperCase();

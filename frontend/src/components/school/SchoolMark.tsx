@@ -3,9 +3,12 @@ import React, { useState } from "react";
 /** A school's logo, or its initials on a blue tile when it has none (or it fails to load). */
 const SIZES = { sm: "h-6 w-6 text-[10px]", md: "h-9 w-9 text-xs", lg: "h-12 w-12 text-sm" } as const;
 
+/** Initials from letters only: "(Kigali)" or "&" never become an initial. */
 const initialsOf = (name: string) =>
   name
+    .replace(/\([^)]*\)/g, " ")
     .split(/\s+/)
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ""))
     .filter(Boolean)
     .slice(0, 2)
     .map((w) => w[0]!.toUpperCase())

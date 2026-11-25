@@ -89,7 +89,7 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
                   className="fixed inset-0 z-50 bg-black/50"
                   onClick={() => setIsSidebarOpen(false)}
                 />
-                <div className="fixed top-16 left-0 z-50 h-[calc(100vh-4rem)] w-64 bg-white dark:bg-gray-800 shadow-lg">
+                <div className="fixed top-16 left-0 z-50 h-[calc(100vh-4rem)] w-64 bg-white dark:bg-black shadow-lg">
                   <Sidebar
                     isCollapsed={false}
                     onToggle={() => setIsSidebarOpen(false)}

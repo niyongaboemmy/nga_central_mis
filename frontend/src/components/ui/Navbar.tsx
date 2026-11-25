@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
 import TenantLogo from "../brand/TenantLogo";
 import { useTenantBranding } from "../../hooks/useTenantBranding";
@@ -10,11 +10,12 @@ import NavSearch from "./NavSearch";
 import NotificationBell from "./NotificationBell";
 import MenteesQuickAccess from "./MenteesQuickAccess";
 import NavAppActions from "../apps/NavAppActions";
-import { KeyRound, LayoutGrid } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 import { useAccess } from "../../hooks/useAccess";
 import { usePermissions } from "../../hooks/usePermissions";
 import UserAvatar from "./UserAvatar";
-import SchoolSwitcher from "../school/SchoolSwitcher";
+import AccountMenu, { AccountMenuButton } from "./AccountMenu";
+import SchoolSwitcher, { SchoolSwitchHost } from "../school/SchoolSwitcher";
 
 interface NavbarProps {
   onNavigateToLogin?: () => void;
@@ -125,6 +126,8 @@ const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
+      {/* the confirm-switch dialog lives here, outside the menus that offer the choice */}
+      {user && <SchoolSwitchHost />}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-800/50 backdrop-blur-md border-b border-border-light/50 dark:border-gray-800/50">
         <div className={`${user ? "px-1.5 sm:pl-3" : "max-w-7xl mx-auto"}`}>
           <div className="flex items-center justify-between h-16">
@@ -209,8 +212,10 @@ const Navbar: React.FC<NavbarProps> = ({
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                    className="flex items-center justify-center w-10 h-10 rounded-full bg-surface-light dark:bg-surface-dark/50 hover:bg-gray-100 dark:hover:bg-gray-700/40 transition-all duration-200"
+                    className={`flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${isUserDropdownOpen ? "ring-2 ring-blue-500/60 bg-blue-50 dark:bg-blue-500/15" : "bg-surface-light dark:bg-surface-dark/50 hover:bg-gray-100 dark:hover:bg-gray-700/40"}`}
                     aria-label="Account menu"
+                    aria-haspopup="menu"
+                    aria-expanded={isUserDropdownOpen}
                     title={getUserDisplayName()}
                   >
                     <UserAvatar
@@ -221,135 +226,19 @@ const Navbar: React.FC<NavbarProps> = ({
                     />
                   </button>
 
-                  {/* Dropdown Menu */}
+                  {/* Account menu */}
                   {isUserDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-900 rounded-3xl shadow-lg border border-border-light dark:border-gray-700/30 py-2 animate-fade-in">
-                      <div className="px-4 py-3 border-b border-border-light dark:border-gray-700/40 flex items-center gap-3">
-                        <UserAvatar
-                          name={getUserDisplayName()}
-                          avatar={user.avatar}
-                          src={user.user?.avatar_url}
-                          size={40}
-                        />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark truncate">
-                            {getUserDisplayName()}
-                          </p>
-                          <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
-                            {user.user?.email}
-                          </p>
-                        </div>
-                      </div>
-                      <SchoolSwitcher variant="menu" onPicked={() => setIsUserDropdownOpen(false)} />
-                      <Link to={"/profile"} title="Profile">
-                        <button
-                          onClick={() => {
-                            setIsUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark flex items-center space-x-2"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                            />
-                          </svg>
-                          <span>Profile</span>
-                        </button>
-                      </Link>
-                      <button
-                        onClick={() => {
-                          onChangePassword?.();
-                          setIsUserDropdownOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark flex items-center space-x-2"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                          />
-                        </svg>
-                        <span>Change Password</span>
-                      </button>
-                      {canMyAi && (
-                        <Link to="/my-ai">
-                          <button
-                            onClick={() => {
-                              setIsUserDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark flex items-center space-x-2"
-                          >
-                            <KeyRound className="w-4 h-4" aria-hidden />
-                            <span>My AI</span>
-                          </button>
-                        </Link>
-                      )}
-                      <Link to={"/settings"}>
-                        <button
-                          onClick={() => {
-                            setIsUserDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark flex items-center space-x-2"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                          </svg>
-                          <span>Settings</span>
-                        </button>
-                      </Link>
-                      <div className="border-t border-border-light dark:border-gray-700/40 mt-2 pt-2">
-                        <button
-                          onClick={handleLogout}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-2"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                            />
-                          </svg>
-                          <span>Sign Out</span>
-                        </button>
-                      </div>
-                    </div>
+                    <AccountMenu
+                      name={getUserDisplayName()}
+                      email={user.user?.email}
+                      avatar={user.avatar}
+                      avatarUrl={user.user?.avatar_url}
+                      roles={(user.roles ?? []).map((r: { name: string }) => r.name)}
+                      canMyAi={canMyAi}
+                      onClose={() => setIsUserDropdownOpen(false)}
+                      onChangePassword={onChangePassword}
+                      onSignOut={handleLogout}
+                    />
                   )}
                 </div>
               ) : (
@@ -373,7 +262,21 @@ const Navbar: React.FC<NavbarProps> = ({
               {user && <NavAppActions compact />}
               {user && <MenteesQuickAccess compact />}
               {user && <NotificationBell />}
-              <ThemeToggle />
+              {/* signed in on a phone, dark mode lives in the account menu: the bar has no room for both */}
+              {!(showUserCard && user) && <ThemeToggle />}
+              {showUserCard && user && (
+                <AccountMenuButton
+                  showTheme
+                  name={getUserDisplayName()}
+                  email={user.user?.email}
+                  avatar={user.avatar}
+                  avatarUrl={user.user?.avatar_url}
+                  roles={(user.roles ?? []).map((r: { name: string }) => r.name)}
+                  canMyAi={canMyAi}
+                  onChangePassword={onChangePassword}
+                  onSignOut={handleLogout}
+                />
+              )}
               <button
                 onClick={onToggleSidebar || toggleMobileMenu}
                 className="inline-flex items-center justify-center p-2 rounded-lg text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200 focus:outline-none"
