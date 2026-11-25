@@ -1,8 +1,9 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { ArrowRight, Check, ChevronDown, Repeat } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Plus, Repeat } from "lucide-react";
 import SchoolMark from "./SchoolMark";
 import SwitchSchoolDialog from "./SwitchSchoolDialog";
-import { mySchools, type MySchool } from "../../lib/schoolSwitch";
+import AddSchoolDialog, { unlinkedText } from "./AddSchoolDialog";
+import { MY_SCHOOLS_CHANGED, mySchoolsInfo, type MySchool, type MySchoolsInfo } from "../../lib/schoolSwitch";
 import { useUser } from "../../contexts/UserContext";
 
 /**
@@ -14,23 +15,36 @@ import { useUser } from "../../contexts/UserContext";
  * Layout: inside a menu the list expands in place (a flyout would overflow the menu and
  * be cut off); from the top bar it is a popover that becomes a full-width sheet on phones.
  * Long school names wrap to two lines instead of being cut.
+ *
+ * "Add another school" (GAP-A): accounts that only share this e-mail are counted, never
+ * named, so the menu offers to add one with that school's password -- also for a person
+ * with a single listed school (the chip itself still needs two).
  */
-export function useMySchools(): MySchool[] | null {
+export function useMySchoolsInfo(): MySchoolsInfo | null {
   const { user } = useUser();
-  const [schools, setSchools] = useState<MySchool[] | null>(null);
+  const [info, setInfo] = useState<MySchoolsInfo | null>(null);
   const uid = user?.user?.user_id;
   useEffect(() => {
     if (!uid) return;
     let alive = true;
-    mySchools().then(
-      (s) => alive && setSchools(s),
-      () => alive && setSchools([]),
-    );
+    const load = (force = false) =>
+      mySchoolsInfo(force).then(
+        (i) => alive && setInfo(i),
+        () => alive && setInfo({ schools: [], unlinkedCount: 0 }),
+      );
+    void load();
+    const changed = () => void load(true);
+    window.addEventListener(MY_SCHOOLS_CHANGED, changed);
     return () => {
       alive = false;
+      window.removeEventListener(MY_SCHOOLS_CHANGED, changed);
     };
   }, [uid]);
-  return schools;
+  return info;
+}
+
+export function useMySchools(): MySchool[] | null {
+  return useMySchoolsInfo()?.schools ?? null;
 }
 
 /** "SUPER_ADMIN" -> "Super admin", "class_teacher" -> "Class teacher"; readable names kept. */
@@ -50,19 +64,50 @@ const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean)
  */
 const SWITCH_EVENT = "nga:switch-school";
 export const requestSchoolSwitch = (to: MySchool) => window.dispatchEvent(new CustomEvent<MySchool>(SWITCH_EVENT, { detail: to }));
+const ADD_EVENT = "nga:add-school";
+export const requestAddSchool = () => window.dispatchEvent(new CustomEvent(ADD_EVENT));
 
-/** Mount once (Navbar). Shows the confirm-switch dialog for any switcher on the page. */
+/** Mount once (Navbar). Shows the confirm-switch and add-school dialogs for any switcher on the page. */
 export const SchoolSwitchHost: React.FC = () => {
-  const schools = useMySchools();
+  const info = useMySchoolsInfo();
   const [target, setTarget] = useState<MySchool | null>(null);
+  const [adding, setAdding] = useState(false);
   useEffect(() => {
     const on = (e: Event) => setTarget((e as CustomEvent<MySchool>).detail);
+    const add = () => setAdding(true);
     window.addEventListener(SWITCH_EVENT, on);
-    return () => window.removeEventListener(SWITCH_EVENT, on);
+    window.addEventListener(ADD_EVENT, add);
+    return () => {
+      window.removeEventListener(SWITCH_EVENT, on);
+      window.removeEventListener(ADD_EVENT, add);
+    };
   }, []);
-  const current = schools?.find((s) => s.current) ?? null;
-  return <SwitchSchoolDialog from={current} to={target} onClose={() => setTarget(null)} />;
+  const current = info?.schools.find((s) => s.current) ?? null;
+  return (
+    <>
+      <SwitchSchoolDialog from={current} to={target} onClose={() => setTarget(null)} />
+      <AddSchoolDialog open={adding} unlinkedCount={info?.unlinkedCount ?? 0} onClose={() => setAdding(false)} />
+    </>
+  );
 };
+
+/** "Add another school": shown while unlinked e-mail matches exist (a count only). */
+export const AddSchoolItem: React.FC<{ count: number; onPick: () => void }> = ({ count, onPick }) => (
+  <button
+    type="button"
+    role="menuitem"
+    onClick={onPick}
+    className="flex w-full items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-800/70"
+  >
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-blue-300 text-blue-600 dark:border-blue-500/40 dark:text-blue-400" aria-hidden="true">
+      <Plus className="h-4 w-4" />
+    </span>
+    <span className="min-w-0 flex-1">
+      <span className="block text-sm font-medium text-gray-800 dark:text-gray-100">Add another school</span>
+      <span className="block text-xs leading-snug text-gray-500 dark:text-gray-400">{unlinkedText(count)}</span>
+    </span>
+  </button>
+);
 
 /** One school in the list: logo, name (wraps), roles, and Current / switch affordance. */
 const SchoolRow: React.FC<{ s: MySchool; onPick: (s: MySchool) => void }> = ({ s, onPick }) => (
@@ -98,7 +143,9 @@ const SchoolRow: React.FC<{ s: MySchool; onPick: (s: MySchool) => void }> = ({ s
 );
 
 const SchoolSwitcher: React.FC<{ variant?: "chip" | "menu"; onPicked?: () => void }> = ({ variant = "chip", onPicked }) => {
-  const schools = useMySchools();
+  const info = useMySchoolsInfo();
+  const schools = info?.schools ?? null;
+  const unlinked = info?.unlinkedCount ?? 0;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -114,6 +161,20 @@ const SchoolSwitcher: React.FC<{ variant?: "chip" | "menu"; onPicked?: () => voi
     };
   }, [open, variant]);
 
+  const add = () => {
+    setOpen(false);
+    requestAddSchool();
+    onPicked?.();
+  };
+  const addItem = unlinked > 0 ? <AddSchoolItem count={unlinked} onPick={add} /> : null;
+  // One listed school: no chip, but the account menu still offers to add another (GAP-A).
+  if (schools && schools.length < 2 && addItem && variant === "menu") {
+    return (
+      <div role="none" className="px-2 py-1">
+        {addItem}
+      </div>
+    );
+  }
   if (!schools || schools.length < 2) return null;
   const current = schools.find((s) => s.current) ?? null;
   // current school first, then the others by name
@@ -129,6 +190,11 @@ const SchoolSwitcher: React.FC<{ variant?: "chip" | "menu"; onPicked?: () => voi
       {ordered.map((s) => (
         <SchoolRow key={s.tid} s={s} onPick={pick} />
       ))}
+      {addItem && (
+        <li role="none" className="mt-1 border-t border-gray-200 pt-1 dark:border-gray-700/60">
+          {addItem}
+        </li>
+      )}
     </ul>
   );
 

@@ -320,7 +320,11 @@ describe("MIS-ISO-4..7: per-school state", () => {
       const signed = await request(app).get(`/scheme-of-work/verify/${id}`).query({ t: 1, s: schemeVerifySig(1, id) });
       expect([signed.status, signed.body.valid]).toEqual([200, true]);
       expect(signed.body.subject_name).toBe(`Subject ${CANARY_A}`);
-      // Legacy printed QR (no t): an NGA document -- even for a scanner signed in to school B.
+      // Legacy printed QR (no t): an NGA document -- even for a scanner signed in to school B --
+      // but only for a scheme created before the signed links shipped (GAP-C).
+      const fresh = await request(app).get(`/scheme-of-work/verify/${id}`).set(auth(ownerB));
+      expect([fresh.status, fresh.body.code]).toEqual([410, "QR_FORMAT_OUTDATED"]);
+      await pool.query("UPDATE SchemeOfWork SET created_at = FROM_UNIXTIME(?) WHERE scheme_id = ?", [Math.floor(Date.parse("2026-11-01T00:00:00Z") / 1000), id]);
       const legacy = await request(app).get(`/scheme-of-work/verify/${id}`).set(auth(ownerB));
       expect([legacy.status, legacy.body.subject_name]).toEqual([200, `Subject ${CANARY_A}`]);
       // Tampered: t without the right signature.
