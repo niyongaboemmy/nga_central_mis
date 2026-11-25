@@ -28,7 +28,9 @@ import {
   CheckCheck,
   Layers,
   RotateCcw,
+  FileSpreadsheet,
 } from "lucide-react";
+import SubjectsBulkUpload from "./bulk/SubjectsBulkUpload";
 import CurriculumTab from "../curriculum/CurriculumTab";
 import SubjectMaterialsTab from "../curriculum/SubjectMaterialsTab";
 import { useToast } from "../../contexts/ToastContext";
@@ -503,6 +505,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     }
   };
 
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -931,6 +934,15 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
             {assigningColors ? "Assigning…" : "Auto-assign colours"}
           </Button>
           <Button
+            variant="secondary"
+            onClick={() => setShowBulkUpload(true)}
+            title="Add many subjects to a grade from an Excel sheet"
+            className="inline-flex items-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Upload Excel
+          </Button>
+          <Button
             onClick={() => {
               setCurrentStep(1);
               setShowCreateModal(true);
@@ -985,7 +997,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                 {data.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={9}
                       className="px-6 py-12 text-center text-text-secondary-light dark:text-text-secondary-dark/70"
                     >
                       No subjects found
@@ -1069,6 +1081,13 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           </div>
         )}
       </div>
+
+      <SubjectsBulkUpload
+        isOpen={showBulkUpload}
+        onClose={() => setShowBulkUpload(false)}
+        onDone={onRefresh}
+        subjects={data}
+      />
 
       {/* Create Modal */}
       <Modal

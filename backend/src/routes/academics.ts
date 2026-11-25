@@ -42,6 +42,8 @@ import {
   updateSubject,
   deleteSubject,
   assignSubjectColors,
+  bulkImportGrades,
+  bulkImportSubjects,
 
   // Grade-Subject Assignments
   getGradeSubjects,
@@ -199,6 +201,12 @@ router.delete(
 
 // Grades routes
 router.get("/grades", authenticate, getGrades);
+router.post(
+  "/grades/bulk-import",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  bulkImportGrades,
+);
 router.get("/grades/:id", authenticate, getGrade);
 router.post(
   "/grades",
@@ -311,6 +319,12 @@ router.post(
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   assignSubjectColors,
+);
+router.post(
+  "/subjects/bulk-import",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  bulkImportSubjects,
 );
 router.get("/subjects/:id", authenticate, getSubject);
 router.post(
