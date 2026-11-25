@@ -76,11 +76,13 @@ describe("Navbar", () => {
     expect(screen.queryByText(/website/i)).not.toBeInTheDocument();
   });
 
-  it("shows only an icon (initials) for the logged-in user in the collapsed bar, not the name or email", () => {
+  it("shows only a person icon for the logged-in user in the collapsed bar, not initials, name or email", () => {
     renderNavbar();
     const accountButton = screen.getAllByRole("button", { name: /account menu/i })[0]; // desktop bar (the phone bar has its own)
     expect(accountButton).toBeInTheDocument();
-    expect(accountButton.textContent).toContain("JD");
+    // Without a photo, your own avatar is a person icon (initials are for lists).
+    expect(accountButton.querySelector('[data-fallback="person"]')).not.toBeNull();
+    expect(accountButton.textContent).not.toContain("JD");
     // The desktop dropdown trigger's own container must not reveal the name
     // or email until it's clicked open — the mobile slide-out menu (present
     // in the DOM but visually clipped) is a separate, expected exception.

@@ -101,7 +101,7 @@ const AccountMenu: React.FC<Props> = ({ name, email, avatar, avatarUrl, roles = 
       {/* who */}
       <div className="flex items-center gap-3 p-4">
         <span className="rounded-full ring-2 ring-blue-100 ring-offset-2 ring-offset-white dark:ring-blue-500/30 dark:ring-offset-gray-900">
-          <UserAvatar name={name} avatar={avatar as any} src={avatarUrl ?? undefined} size={44} />
+          <UserAvatar name={name} avatar={avatar as any} src={avatarUrl ?? undefined} size={44} fallback="person" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-gray-900 dark:text-white" title={name}>
@@ -182,7 +182,7 @@ export const AccountMenuButton: React.FC<Omit<Props, "onClose">> = (props) => {
           (open ? "bg-blue-50 ring-2 ring-blue-500/60 dark:bg-blue-500/15" : "hover:bg-gray-100 dark:hover:bg-gray-700/40")
         }
       >
-        <UserAvatar name={props.name} avatar={props.avatar as any} src={props.avatarUrl ?? undefined} size={30} />
+        <UserAvatar name={props.name} avatar={props.avatar as any} src={props.avatarUrl ?? undefined} size={30} fallback="person" />
       </button>
       {open && <AccountMenu {...props} onClose={() => setOpen(false)} />}
     </div>

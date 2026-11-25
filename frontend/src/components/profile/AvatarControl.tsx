@@ -74,14 +74,14 @@ const AvatarControl: React.FC<Props> = ({ name, avatar, onChange, userId, size =
         aria-label={avatar ? "Change profile picture" : "Add a profile picture"}
         title={avatar ? "Change profile picture" : "Add a profile picture"}
       >
-        <UserAvatar name={name} avatar={avatar} size={size} ring className="shadow-xl shadow-blue-900/10" />
+        <UserAvatar name={name} avatar={avatar} size={size} ring fallback="person" />
         <span className="absolute inset-0 rounded-full bg-black/45 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-medium gap-1">
           <Camera className="w-5 h-5" />
           {avatar ? "Change" : "Add photo"}
         </span>
         {/* Too small a picture for a badge to sit on without hiding the face. */}
         {size >= 96 && (
-          <span className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
+          <span className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center ring-2 ring-white dark:ring-gray-900">
             <Camera className="w-4 h-4" />
           </span>
         )}

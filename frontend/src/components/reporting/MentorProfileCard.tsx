@@ -110,6 +110,7 @@ const MentorProfileCard: React.FC<Props> = ({ mentor, yearName }) => {
       <div className="px-4 pb-5 md:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <UserAvatar
+            fallback="person"
             decorative
             avatar={mentor.avatar ?? null}
             userId={mentor.mentor_id}

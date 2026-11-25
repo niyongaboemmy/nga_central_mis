@@ -1,1178 +1,642 @@
-import React, { useEffect, useState } from "react";
-import { ChevronDown, Globe2, Gem } from "lucide-react";
-import { ANALYTICS_TABS } from "../analytics/nav";
-import { School, Server, Activity, Database, GraduationCap, LayoutGrid, MonitorCheck, LayoutDashboard } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronsLeft, ChevronsRight, Clock3, Search, Star, X } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
 import { useTenantBranding } from "../../hooks/useTenantBranding";
-import TenantLogo from "../brand/TenantLogo";
-import { Permissions } from "../../constants/permissions";
-import { getToken } from "../../utils/auth";
 import { requestAppsDialog } from "../apps/openAppsDialog";
 import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
-import { BarChart3, CalendarOff, Grid3x3, Target, HeartHandshake, Radar, ShieldAlert, ShieldCheck, UserPlus, Baby } from "lucide-react";
-import { Lightbulb, FolderKanban, ClipboardCheck, Briefcase as BriefcaseIcon } from "lucide-react";
 import { useSupervisingCount } from "../sideProjects/useSupervising";
-import { BellRing, Bot, CalendarDays, KeyRound, Clock4, Gamepad2, House, SquareTerminal, Users2 } from "lucide-react";
+import { useMotion } from "../../design/motion";
+import UserAvatar from "./UserAvatar";
+import { buildAccountLinks, buildNavAreas, matchPath, NavArea, NavGroup, NavLink, placeLinks, PlacedLink } from "./nav/navModel";
 
 interface SidebarProps {
+  /** Rail only: the panel opens over the page when an area is clicked. */
   isCollapsed?: boolean;
   onToggle?: () => void;
   onMenuClick?: () => void;
 }
 
+const KEYS = { area: "nga.sidebar.area", groups: "nga.sidebar.openGroups", pins: "nga.sidebar.pins", recent: "nga.sidebar.recent" };
+const readList = (key: string): string[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+const writeList = (key: string, list: string[]) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(list));
+  } catch {
+    /* private mode: just not remembered */
+  }
+};
+const RECENT_MAX = 4;
+
+const railBtn =
+  "relative grid h-10 w-10 place-items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+const railIdle = "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-white";
+const railOn = "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300";
+const rowBase =
+  "flex min-w-0 flex-1 items-center gap-2.5 rounded-full py-1.5 pl-2.5 pr-8 text-[13px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+const rowIdle = "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/50 dark:hover:text-white";
+const rowOn = "bg-blue-50 font-medium text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
+const headingCls = "px-2.5 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500";
+
+const Badge: React.FC<{ n: number }> = ({ n }) => (
+  <span className="ml-auto min-w-[1.25rem] rounded-full bg-blue-600 px-1.5 text-center text-[10px] font-semibold leading-5 text-white tabular-nums">
+    {n > 99 ? "99+" : n}
+    <span className="sr-only"> new</span>
+  </span>
+);
+
 /**
- * Where a link sits in the menu. Sections render in this order, each under a small
- * heading, and a section with nothing visible to the user is left out -- so a student
- * sees Learning, a teacher Teaching, an admin Administration, without wading through
- * every other role's links in one flat list.
+ * The MIS menu: an icon rail of areas (Teaching, Oversight, Administration…) and a
+ * panel with the chosen area's groups and pages. Labels on the rail show on hover or
+ * focus. The panel adds a menu search ("/"), pinned pages and recent pages. Collapsed,
+ * only the rail stays and the panel opens over the page.
  */
-const NAV_SECTIONS = [
-  { key: "main", title: null },
-  { key: "teaching", title: "Teaching" },
-  { key: "learning", title: "Learning" },
-  { key: "family", title: "Family" },
-  { key: "class", title: "Class teacher" },
-  { key: "workspace", title: "Workspace" },
-  { key: "oversight", title: "Oversight" },
-  { key: "admin", title: "Administration" },
-  { key: "you", title: "You" },
-] as const;
-type NavSection = (typeof NAV_SECTIONS)[number]["key"];
-const KNOWN_SECTIONS: ReadonlySet<string> = new Set(NAV_SECTIONS.map((s) => s.key));
-/**
- * A link merged in without a section (or with one not listed above) would otherwise
- * never render; it lands under "More" so it stays reachable until it is placed.
- */
-const RENDERED_SECTIONS = [...NAV_SECTIONS, { key: "more", title: "More" }] as const;
-
-interface NavItem {
-  label: string;
-  path?: string;
-  /** Top-level links must have one (TopNavItem); submenu children sit in their group's. */
-  section?: NavSection;
-  externalUrl?: string;
-  /** Done on click instead of navigating to `path`. */
-  action?: () => void;
-  icon: React.ReactNode;
-  requiredPermission?: string | string[];
-  /** Access control v2 capability (any of) -- see hooks/useAccess. */
-  requiredCapability?: string | string[];
-  /** Submenu. The group shows when any child is visible. */
-  children?: NavItem[];
-  /** Legacy permissions that open the item even without `requiredCapability`. */
-  orPermission?: string[];
-  /** Only for these user types (e.g. PARENT). */
-  userTypes?: string[];
-  /** Extra runtime condition (e.g. "has mentees"); hidden when false. */
-  when?: boolean;
-  /** Count shown next to the label (e.g. unread mentee check-ins). */
-  badge?: number;
-}
-
-type TopNavItem = NavItem & { section: NavSection };
-
-const Sidebar: React.FC<SidebarProps> = ({
-  isCollapsed = false,
-  onToggle,
-  onMenuClick,
-}) => {
+const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenuClick }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useUser();
   const brand = useTenantBranding();
   const access = useAccess();
+  const m = useMotion();
   const selectedYearId = useOptionalAcademicPeriod()?.selectedYearId;
   const mentorship = useMentorshipRole(user?.user?.user_id, selectedYearId);
   const userType = String(user?.profile?.user_type ?? "").toUpperCase();
   const supervising = useSupervisingCount(userType !== "STUDENT" && userType !== "PARENT" && !!user);
 
-  const hasPermission = (perm?: string | string[]) => {
-    if (!perm) return true;
-    const required = Array.isArray(perm) ? perm : [perm];
-    return user?.roles?.some((role) =>
-      role.permissions?.some((permission) => required.includes(permission.name)),
-    );
+  const hasPermission = useCallback(
+    (perm?: string | string[]) => {
+      if (!perm) return true;
+      const required = Array.isArray(perm) ? perm : [perm];
+      return !!user?.roles?.some((role) => role.permissions?.some((p) => required.includes(p.name)));
+    },
+    [user],
+  );
+
+  const ctx = {
+    isMentor: !!mentorship?.is_mentor,
+    menteeCheckins: mentorship?.new_checkins ?? 0,
+    hasMentor: !!mentorship?.has_mentor,
+    supervising: supervising || 0,
+    hasPermission,
+    openApps: () => {
+      if (!requestAppsDialog()) navigate("/apps");
+    },
   };
 
-  const navItems: TopNavItem[] = [
-    {
-      // Home: what needs me across every module (HOME_OVERVIEW_IMPLEMENTATION_PLAN.md).
-      label: "Home",
-      path: "/home",
-      section: "main",
-      icon: <House className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-    },
-    {
-      // /dashboard is the week's timetable for everyone, so it is named for what
-      // it shows. "Dashboard" next to Home read as two names for one page.
-      label: "Schedule",
-      path: "/dashboard",
-      section: "main",
-      icon: <CalendarDays className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-    },
-    {
-      // The teacher's working board: figures and reminders. Schedule above it is
-      // the weekly timetable.
-      label: "Teacher Dashboard",
-      path: "/teacher-dashboard",
-      section: "main",
-      icon: (
-        <LayoutDashboard className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />
-      ),
-      requiredPermission: Permissions.TEACHER_DASHBOARD,
-    },
-    {
-      // Reminder Hub: set up this device, Now & Next, reminder preferences.
-      label: "Reminders",
-      path: "/reminders",
-      section: "you",
-      icon: <BellRing className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-    },
-    {
-      // Install every NGA app on this device from one place, in a dialog over the
-      // current page (the standalone /apps page is for signed-out devices).
-      label: "Get the apps",
-      action: () => {
-        if (!requestAppsDialog()) navigate("/apps");
-      },
-      section: "you",
-      icon: <LayoutGrid className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-    },
-    {
-      // Transparency (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §10.5): everyone can see what
-      // is recorded about them, and whether anyone is monitoring their account.
-      label: "My activity",
-      path: "/me/activity",
-      section: "you",
-      icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-    },
-    {
-      // My AI (PERSONAL_AI_PROVIDERS_PLAN.md §9.1): your own AI keys and which AI answers what.
-      // Staff hold AI_PERSONAL_PROVIDERS, students AI_PERSONAL_PROVIDERS_STUDENT.
-      label: "My AI",
-      path: "/my-ai",
-      section: "you",
-      icon: <KeyRound className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredCapability: [Permissions.AI_PERSONAL_PROVIDERS, Permissions.AI_PERSONAL_PROVIDERS_STUDENT],
-      orPermission: [Permissions.AI_PERSONAL_PROVIDERS, Permissions.AI_PERSONAL_PROVIDERS_STUDENT],
-    },
-    {
-      label: "Profile",
-      path: "/profile",
-      section: "you",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-          />
-        </svg>
-      ),
-    },
-    {
-      label: "My Subjects",
-      path: "/my-subjects",
-      section: "teaching",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_MY_ASSIGNED_SUBJECTS,
-    },
-    {
-      label: "My Students",
-      path: "/my-students",
-      section: "teaching",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_MY_STUDENTS,
-    },
-    {
-      label: "My Subjects",
-      path: "/my-enrolled-subjects",
-      section: "learning",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_MY_ENROLLED_SUBJECTS,
-    },
-    {
-      label: "Scheme Of Work",
-      path: "/scheme-of-work",
-      section: "teaching",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_MY_ASSIGNED_SUBJECTS,
-    },
-    {
-      label: "Lesson Notes",
-      path: "/lesson-notes",
-      section: "teaching",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.MANAGE_LESSON_NOTES,
-    },
-    {
-      label: "My Learning",
-      path: "/my-learning",
-      section: "learning",
-      icon: <GraduationCap className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.VIEW_MY_COURSES,
-    },
-    {
-      // Write and run code in any language, full screen (CODE_PLAYGROUND_USE: every role).
-      label: "Code Playground",
-      path: "/code-playground",
-      section: "learning",
-      icon: <SquareTerminal className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.CODE_PLAYGROUND_USE,
-    },
-    {
-      label: "E-Learning",
-      path: "/elearning/courses",
-      section: "teaching",
-      icon: <LayoutGrid className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.MANAGE_COURSE_CONTENT,
-    },
-    {
-      label: "E-Learning Oversight",
-      path: "/admin/elearning",
-      section: "oversight",
-      icon: <MonitorCheck className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.VIEW_ALL_COURSES,
-    },
-    {
-      label: "Shared Notes",
-      path: "/shared-lesson-notes",
-      section: "learning",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_SHARED_LESSON_NOTES,
-    },
-    {
-      label: "All Teachers SOW",
-      path: "/all-teachers-sow",
-      section: "oversight",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST,
-    },
-    {
-      label: "Academic Calendar",
-      path: "/calendar",
-      section: "workspace",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      ),
-      // Where the timetable is built. Students and teachers read theirs under
-      // Schedule, so for them this was a second calendar of the same lessons.
-      requiredPermission: [
-        Permissions.MANAGE_ACADEMIC_CALENDAR,
-        Permissions.CREATE_ACADEMIC_CALENDAR,
-        Permissions.UPDATE_CALENDAR_SLOT,
-      ],
-    },
-    {
-      label: "Reporting",
-      path: "/reporting",
-      section: "teaching",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 17v-2a4 4 0 00-4-4H5m14 0h-2a4 4 0 00-4 4v2m-3-3l3-3m0 0l3 3m-3-3v8"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.SUBMIT_REPORTING,
-    },
-    {
-      // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §9-11).
-      label: "Office Hours",
-      path: "/office-hours",
-      section: "teaching",
-      icon: <Clock4 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_OWN, Permissions.OFFICE_HOURS_MANAGE_ANY],
-    },
-    {
-      label: "Office Hours Oversight",
-      path: "/office-hours/admin",
-      section: "oversight",
-      icon: <Clock4 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_ANY, Permissions.OFFICE_HOURS_VIEW, Permissions.OFFICE_HOURS_CONFIGURE],
-    },
-    {
-      label: "My Office Hours",
-      path: "/my-office-hours",
-      section: "learning",
-      icon: <Clock4 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.OFFICE_HOURS_VIEW_SELF,
-    },
-    {
-      // Anyone holding mentees this year — teacher, staff or admin.
-      label: "My Mentees",
-      path: "/my-mentees",
-      section: "teaching",
-      icon: <Users2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      when: !!mentorship?.is_mentor,
-      badge: mentorship?.new_checkins ?? 0,
-    },
-    {
-      label: "My Mentor",
-      path: "/my-mentor",
-      section: "learning",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-          />
-        </svg>
-      ),
-      // Any student with a live mentor, even where no admin ever granted the
-      // check-in permission (migration 047 left it ungranted).
-      when: !!mentorship?.has_mentor || !!hasPermission(Permissions.SUBMIT_MENTEE_CHECKIN),
-    },
-    {
-      label: "Admin Reports",
-      path: "/admin/reports",
-      section: "oversight",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-          />
-        </svg>
-      ),
-      requiredPermission: [Permissions.VIEW_REPORTS, Permissions.ALL_SUBMITTED_REPORTS],
-    },
-    {
-      label: "Documents",
-      path: "/documents",
-      section: "workspace",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-          />
-        </svg>
-      ),
-    },
-    // {
-    //   label: "Report Card",
-    //   externalUrl:
-    //     "https://nga.ac.rw/public/report_card/auto_login.php?token=xxxxxxx",
-    //   icon: (
-    //     <svg
-    //       className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-    //       fill="none"
-    //       stroke="currentColor"
-    //       viewBox="0 0 24 24"
-    //     >
-    //       <path
-    //         strokeLinecap="round"
-    //         strokeLinejoin="round"
-    //         strokeWidth={2}
-    //         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-    //       />
-    //     </svg>
-    //   ),
-    //   requiredPermission: Permissions.ACCESS_REPORT_CARD_MODULE,
-    // },
-    {
-      label: "Academics",
-      path: "/academics",
-      section: "admin",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.MANAGE_ACADEMICS,
-    },
-    {
-      label: "Enrollment",
-      path: "/enrollment",
-      section: "admin",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.ASSIGN_STUDENT_CLASS_GROUPS,
-    },
-    {
-      label: "Users",
-      path: "/users",
-      section: "admin",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.MANAGE_USERS,
-    },
-    {
-      label: "Program Users",
-      path: "/program-users",
-      section: "oversight",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_PROGRAM_USERS,
-    },
-    {
-      label: "Program Academics",
-      path: "/program-academics",
-      section: "oversight",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_PROGRAM_ACADEMICS,
-    },
-    {
-      label: "Class Users",
-      path: "/class-users",
-      section: "class",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_USERS_BY_CLASS_TEACHER_GRADE,
-    },
-    {
-      label: "Class Subjects",
-      path: "/class-subjects",
-      section: "class",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE,
-    },
-    {
-      label: "Class Calendar",
-      path: "/class-calendar",
-      section: "class",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.VIEW_CALENDAR_BY_CLASS_TEACHER_GRADE,
-    },
-    {
-      label: "Insights",
-      path: "/insights",
-      section: "oversight",
-      icon: <BarChart3 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      // Anyone holding an insight capability somewhere (the page lists what they can open).
-      requiredCapability: ["VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST", "VIEW_REPORTS", "VIEW_ALL_COURSES"],
-    },
-    {
-      // One group for every Usage & Monitoring page; each entry carries the
-      // capability its page needs (same list as the in-page tabs).
-      label: "Usage & Monitoring",
-      path: "/analytics",
-      section: "oversight",
-      icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      // No gate of its own: the group shows when any page in it is open to the viewer.
-      children: ANALYTICS_TABS.map((t) => ({
-        label: t.label,
-        path: t.to,
-        icon: <t.icon className="w-3.5 h-3.5" />,
-        requiredCapability: t.caps,
-        orPermission: t.perms,
-      })),
-    },
-    {
-      label: "Leadership & Access",
-      path: "/access-studio",
-      section: "admin",
-      icon: <ShieldCheck className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredCapability: ["ACCESS_STUDIO_VIEW", "VIEW_LEADERSHIP_STRUCTURE"],
-    },
-    {
-      label: "Permissions",
-      path: "/permissions",
-      section: "admin",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.MANAGE_ROLES,
-    },
-    {
-      label: "Settings",
-      path: "/settings",
-      section: "admin",
-      icon: (
-        <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-      ),
-      requiredPermission: Permissions.MANAGE_SETTINGS,
-    },
-    {
-      label: "My competences",
-      path: "/my-competences",
-      section: "learning",
-      icon: <Target className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      userTypes: ["STUDENT"],
-    },
-    {
-      // Side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §6, §13): one group. The group
-      // opens on My projects; staff also get Assigned projects (migration 131), and leads the
-      // school-wide monitor.
-      label: "Projects",
-      path: "/my-projects",
-      section: "workspace",
-      icon: <Lightbulb className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      children: [
-        {
-          label: "My projects",
-          path: "/my-projects",
-          icon: <Lightbulb className="w-3.5 h-3.5" />,
-          // Everyone may own projects (migration 129 gives every role SIDE_PROJECTS_MANAGE_OWN).
-          requiredPermission: Permissions.SIDE_PROJECTS_MANAGE_OWN,
-        },
-        {
-          label: "Assigned projects",
-          path: "/assigned-projects",
-          icon: <ClipboardCheck className="w-3.5 h-3.5" />,
-          requiredPermission: Permissions.SIDE_PROJECTS_ASSIGNED,
-          userTypes: ["TEACHER", "STAFF", "ADMIN"],
-          badge: supervising || undefined,
-        },
-        {
-          label: "Customers",
-          path: "/project-customers",
-          icon: <BriefcaseIcon className="w-3.5 h-3.5" />,
-          requiredPermission: Permissions.SIDE_PROJECTS_MANAGE_OWN,
-        },
-        {
-          label: "All projects",
-          path: "/projects-monitor",
-          icon: <FolderKanban className="w-3.5 h-3.5" />,
-          requiredCapability: "SIDE_PROJECTS_VIEW",
-        },
-      ],
-    },
-    {
-      label: "Wellbeing",
-      path: "/wellbeing",
-      section: "learning",
-      icon: <HeartHandshake className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      userTypes: ["STUDENT"],
-    },
-    {
-      label: "Staff cover",
-      path: "/cover",
-      section: "workspace",
-      icon: <CalendarOff className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      userTypes: ["TEACHER", "STAFF", "ADMIN"],
-    },
-    {
-      label: "Competency map",
-      path: "/competency-map",
-      section: "teaching",
-      icon: <Grid3x3 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      userTypes: ["TEACHER", "STAFF", "ADMIN"],
-    },
-    {
-      label: "Early warning",
-      path: "/early-warning",
-      section: "oversight",
-      icon: <Radar className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredCapability: "EARLY_WARNING_VIEW",
-    },
-    {
-      label: "Safeguarding",
-      path: "/safeguarding",
-      section: "oversight",
-      icon: <ShieldAlert className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.SAFEGUARDING_MANAGE,
-    },
-    {
-      label: "My children",
-      path: "/family",
-      section: "family",
-      icon: <Baby className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      userTypes: ["PARENT"],
-    },
-    {
-      label: "Import parents",
-      path: "/families/import",
-      section: "admin",
-      icon: <UserPlus className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.MANAGE_USERS,
-    },
-    {
-      label: "AI Tutor for my children",
-      path: "/family/ai-tutor",
-      section: "family",
-      icon: <Bot className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      userTypes: ["PARENT"],
-    },
-    {
-      label: "Desktop tools",
-      path: "/desktop-tools",
-      section: "admin",
-      icon: <Gamepad2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.DESKTOP_TOOLS_CONFIGURE,
-    },
-    // Tenant management: the primary tenant's console, and each school's own subscription.
-    {
-      label: "Platform",
-      path: "/platform",
-      section: "admin",
-      icon: <Globe2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredCapability: ["PLATFORM_TENANTS_VIEW", "PLATFORM_APPLICATIONS_REVIEW", "PLATFORM_BILLING_INVOICE", "PLATFORM_SUPPORT_ACCESS"],
-    },
-    {
-      label: "Subscription",
-      path: "/settings/subscription",
-      section: "admin",
-      icon: <Gem className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredCapability: "SCHOOL_BILLING_MANAGE",
-    },
-    {
-      label: "Schools",
-      path: "/schools",
-      section: "admin",
-      icon: <School className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.MANAGE_SCHOOLS,
-    },
-    {
-      label: "Systems",
-      path: "/systems",
-      section: "admin",
-      icon: <Server className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.MANAGE_SYSTEMS,
-    },
-    {
-      label: "Database Management",
-      path: "/database-management",
-      section: "admin",
-      icon: <Database className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.DATABASE_MANAGEMENT,
-    },
-  ];
-
-  // Nested learner/builder routes keep their sidebar entry lit (e.g. /my-learning/courses/3).
-  const isActive = (path?: string) =>
-    path
-      ? location.pathname === path ||
-        ((path === "/my-learning" || path === "/elearning/courses" || path === "/my-mentees") && location.pathname.startsWith(path))
-      : false;
-
-  /** Profile is an account action, not a destination alongside Academics or
-   *  Documents — it sits at the foot of the rail where account controls live. */
-  const PROFILE_LABEL = "Profile";
-  const mainNavItems = navItems.filter((item) => item.label !== PROFILE_LABEL);
-  const profileItem = navItems.find((item) => item.label === PROFILE_LABEL);
-
   /** Both gates: the v1 permission and, where set, an access-control v2 capability. */
-  const isVisible = (item: NavItem): boolean =>
-    item.when !== false &&
-    (!item.userTypes || item.userTypes.includes(String(user?.profile?.user_type ?? "").toUpperCase())) &&
-    !!hasPermission(item.requiredPermission) &&
-    (!item.requiredCapability || access.can(item.requiredCapability) || (!!item.orPermission?.length && !!hasPermission(item.orPermission))) &&
-    (!item.children || item.children.some(isVisible));
+  const isVisible = (l: NavLink): boolean =>
+    l.when !== false &&
+    (!l.userTypes || l.userTypes.includes(userType)) &&
+    hasPermission(l.requiredPermission) &&
+    (!l.requiredCapability || access.can(l.requiredCapability) || (!!l.orPermission?.length && hasPermission(l.orPermission)));
 
-  /** A group is "in" when the current page is one of its children (or below one). */
-  const under = (path?: string) => !!path && (location.pathname === path || location.pathname.startsWith(`${path}/`));
-  const groupHas = (item: NavItem) => under(item.path) || !!item.children?.some((c) => under(c.path));
-  const childActive = (child: NavItem, group: NavItem) =>
-    child.path === group.path ? location.pathname === child.path : !!child.path && (location.pathname === child.path || location.pathname.startsWith(`${child.path}/`));
+  const areas: NavArea[] = buildNavAreas(ctx)
+    .map((a) => {
+      if (a.link) return isVisible(a.link) ? a : null;
+      const groups = (a.groups ?? []).map((g) => ({ ...g, items: g.items.filter(isVisible) })).filter((g) => g.items.length > 0);
+      return groups.length ? { ...a, groups } : null;
+    })
+    .filter((a): a is NavArea => !!a);
+  const accountLinks = buildAccountLinks(ctx).filter(isVisible);
+  const placed = placeLinks(areas);
+  const current = matchPath(placed, location.pathname);
+  const panelAreas = areas.filter((a) => a.groups);
 
-  const OPEN_KEY = "nga.sidebar.openGroups";
-  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+  // ---- remembered state ----
+  const [storedArea, setStoredArea] = useState<string | null>(() => {
     try {
-      return new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || "[]"));
+      return localStorage.getItem(KEYS.area);
     } catch {
-      return new Set();
+      return null;
     }
   });
-  const setGroupOpen = (label: string, open: boolean) =>
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(readList(KEYS.groups)));
+  const [pins, setPins] = useState<string[]>(() => readList(KEYS.pins));
+  const [recent, setRecent] = useState<string[]>(() => readList(KEYS.recent));
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [tip, setTip] = useState<{ label: string; badge: number; top: number; left: number } | null>(null);
+  const asideRef = useRef<HTMLElement>(null);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const accountBtnRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const chooseArea = (id: string) => {
+    setStoredArea(id);
+    try {
+      localStorage.setItem(KEYS.area, id);
+    } catch {
+      /* not remembered */
+    }
+  };
+  const setGroupOpen = (key: string, open: boolean) =>
     setOpenGroups((prev) => {
       const next = new Set(prev);
-      if (open) next.add(label);
-      else next.delete(label);
-      try {
-        localStorage.setItem(OPEN_KEY, JSON.stringify([...next]));
-      } catch {
-        /* private mode: open state is just not remembered */
-      }
+      if (open) next.add(key);
+      else next.delete(key);
+      writeList(KEYS.groups, [...next]);
       return next;
     });
-  // Landing on a page inside a group opens that group.
+  const togglePin = (path: string) =>
+    setPins((prev) => {
+      const next = prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path];
+      writeList(KEYS.pins, next);
+      return next;
+    });
+
+  // Landing on a page: its area becomes the panel, it joins Recent, its group opens.
+  const currentPath = current?.link.path;
+  const currentAreaId = current?.area.groups ? current.area.id : null;
+  const currentGroupKey = current?.group ? `${current.area.id}/${current.group.label}` : null;
   useEffect(() => {
-    for (const item of navItems) {
-      if (item.children && groupHas(item) && !openGroups.has(item.label)) setGroupOpen(item.label, true);
+    setOverlayOpen(false);
+    setAccountOpen(false);
+    setQuery("");
+    if (currentAreaId) chooseArea(currentAreaId);
+    if (currentGroupKey && !openGroups.has(currentGroupKey)) setGroupOpen(currentGroupKey, true);
+    if (currentPath && currentAreaId) {
+      setRecent((prev) => {
+        const next = [currentPath, ...prev.filter((p) => p !== currentPath)].slice(0, RECENT_MAX + 1);
+        writeList(KEYS.recent, next);
+        return next;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
-  const renderGroup = (item: NavItem) => {
-    const kids = item.children!.filter(isVisible);
-    const open = openGroups.has(item.label);
-    const inGroup = groupHas(item);
-    const panelId = `nav-group-${item.label.replace(/\W+/g, "-").toLowerCase()}`;
+  const area = panelAreas.find((a) => a.id === storedArea) ?? panelAreas.find((a) => a.id === currentAreaId) ?? panelAreas[0];
+  const panelVisible = !!area && (!isCollapsed || overlayOpen);
+
+  // Overlay and account menu close on Escape or a click outside them.
+  useEffect(() => {
+    if (!overlayOpen && !accountOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (accountOpen && !accountRef.current?.contains(t) && !accountBtnRef.current?.contains(t)) setAccountOpen(false);
+      if (overlayOpen && !asideRef.current?.contains(t)) setOverlayOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (accountOpen) {
+        setAccountOpen(false);
+        accountBtnRef.current?.focus();
+      } else setOverlayOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [overlayOpen, accountOpen]);
+
+  // "/" jumps to the menu search (not while typing somewhere else).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      e.preventDefault();
+      if (searchRef.current) searchRef.current.focus();
+      else {
+        setOverlayOpen(true);
+        window.setTimeout(() => searchRef.current?.focus(), 0);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isCollapsed]);
+
+  // Move focus to the first account item when the menu opens.
+  useEffect(() => {
+    if (accountOpen) accountRef.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+  }, [accountOpen]);
+
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return placed.filter(({ link, area: a, group }) => `${link.label} ${group?.label ?? ""} ${a.label}`.toLowerCase().includes(q)).slice(0, 30);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, location.pathname, areas.length, placed.length]);
+
+  const byPath = (path: string) => placed.find((p) => p.link.path === path && p.area.groups);
+  const pinned = pins.map(byPath).filter((p): p is PlacedLink => !!p);
+  const recents = recent
+    .filter((p) => p !== currentPath && !pins.includes(p))
+    .map(byPath)
+    .filter((p): p is PlacedLink => !!p)
+    .slice(0, RECENT_MAX - 1);
+
+  const badgeOf = (a: NavArea) => (a.groups ?? []).reduce((n, g) => n + g.items.reduce((k, l) => k + (l.badge || 0), 0), 0);
+
+  // ---- rail ----
+  const showTip = (el: HTMLElement, label: string, badge = 0) => {
+    const r = el.getBoundingClientRect();
+    setTip({ label, badge, top: r.top + r.height / 2, left: r.right + 10 });
+  };
+  const tipProps = (label: string, badge = 0) => ({
+    onMouseEnter: (e: React.MouseEvent<HTMLElement>) => showTip(e.currentTarget, label, badge),
+    onMouseLeave: () => setTip(null),
+    onFocus: (e: React.FocusEvent<HTMLElement>) => showTip(e.currentTarget, label, badge),
+    onBlur: () => setTip(null),
+  });
+  const railKeys = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const all = Array.from(asideRef.current?.querySelectorAll<HTMLElement>("[data-rail]") ?? []);
+    const i = all.indexOf(e.currentTarget);
+    all[(i + (e.key === "ArrowDown" ? 1 : all.length - 1)) % all.length]?.focus();
+  };
+
+  const onArea = (a: NavArea) => {
+    setTip(null);
     if (isCollapsed) {
-      // Rail mode: the icon opens the group's first page; the in-page tabs do the rest.
-      return (
-        <button
-          onClick={() => {
-            if (kids[0]?.path) navigate(kids[0].path);
-            onMenuClick?.();
-          }}
-          className={`w-full flex items-center justify-center px-3 py-2.5 rounded-xl transition-all duration-200 ${
-            inGroup
-              ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-              : "font-light text-text-secondary-light dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
-          }`}
-          title={item.label}
-          aria-label={item.label}
+      if (overlayOpen && area?.id === a.id) setOverlayOpen(false);
+      else {
+        chooseArea(a.id);
+        setOverlayOpen(true);
+      }
+      return;
+    }
+    if (area?.id === a.id) onToggle?.();
+    else chooseArea(a.id);
+  };
+
+  // ---- panel rows ----
+  const pageRow = (p: PlacedLink, opts: { showWhere?: boolean; icon?: React.ReactNode } = {}) => {
+    const { link } = p;
+    const active = current?.link === link;
+    const isPinned = !!link.path && pins.includes(link.path);
+    const Icon = link.icon;
+    return (
+      <li key={`${p.area.id}:${link.path ?? link.label}`} className="group/row relative flex items-center">
+        <Link
+          to={link.path!}
+          onClick={() => onMenuClick?.()}
+          aria-current={active ? "page" : undefined}
+          className={`${rowBase} ${active ? rowOn : rowIdle}`}
         >
-          <span className="flex-shrink-0">{item.icon}</span>
-        </button>
+          <span className="shrink-0 opacity-80">{opts.icon ?? <Icon className="h-4 w-4" aria-hidden />}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">{link.label}</span>
+            {opts.showWhere && (
+              <span className="block truncate text-[11px] font-normal text-gray-400 dark:text-gray-500">
+                {[p.area.label, p.group && p.group.label !== p.area.label ? p.group.label : null].filter(Boolean).join(" › ")}
+              </span>
+            )}
+          </span>
+          {!!link.badge && <Badge n={link.badge} />}
+        </Link>
+        {link.path && (
+          <button
+            type="button"
+            onClick={() => togglePin(link.path!)}
+            aria-label={isPinned ? `Unpin ${link.label}` : `Pin ${link.label}`}
+            aria-pressed={isPinned}
+            title={isPinned ? "Unpin" : "Pin to top"}
+            className={`absolute right-1 rounded-full p-1 transition focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 ${
+              isPinned
+                ? "text-blue-600 opacity-0 group-hover/row:opacity-100 dark:text-blue-300"
+                : "text-gray-400 opacity-0 hover:text-gray-700 group-hover/row:opacity-100 dark:hover:text-gray-200"
+            } ${link.badge ? "hidden group-hover/row:block" : ""}`}
+          >
+            <Star className={`h-3.5 w-3.5 ${isPinned ? "fill-current" : ""}`} aria-hidden />
+          </button>
+        )}
+      </li>
+    );
+  };
+
+  const groupBlock = (a: NavArea, g: NavGroup) => {
+    const key = `${a.id}/${g.label}`;
+    const list = (
+      <ul aria-label={g.label} className="space-y-0.5">
+        {g.items.map((link) => pageRow({ link, area: a, group: g }))}
+      </ul>
+    );
+    if (!g.collapsible) {
+      return (
+        <div key={key}>
+          <h3 className={headingCls}>{g.label}</h3>
+          {list}
+        </div>
       );
     }
+    const open = openGroups.has(key);
+    const badge = g.items.reduce((n, l) => n + (l.badge || 0), 0);
+    const panelId = `nav-group-${key.replace(/\W+/g, "-").toLowerCase()}`;
     return (
-      <div>
+      <div key={key} className="pt-2">
         <button
-          onClick={() => setGroupOpen(item.label, !open)}
+          type="button"
+          onClick={() => setGroupOpen(key, !open)}
           aria-expanded={open}
           aria-controls={panelId}
-          className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-            inGroup
-              ? "text-blue-600 dark:text-blue-400 font-medium"
-              : "font-light text-text-secondary-light dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+          className={`flex w-full items-center gap-2 rounded-full px-2.5 py-1.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+            currentGroupKey === key && !open ? "text-blue-600 dark:text-blue-300" : ""
           }`}
-          title={item.label}
         >
-          <span className="flex-shrink-0">{item.icon}</span>
-          <span className="flex-1 text-left">{item.label}</span>
-          <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} aria-hidden />
+          <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${open ? "" : "-rotate-90"}`} aria-hidden />
+          <span className="flex-1 text-left">{g.label}</span>
+          {badge > 0 && !open ? <Badge n={badge} /> : <span className="rounded-full bg-gray-100 px-1.5 text-[10px] font-semibold leading-[18px] text-gray-500 tabular-nums dark:bg-gray-800/70 dark:text-gray-400">{g.items.length}</span>}
         </button>
-        <div
-          id={panelId}
-          className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
-        >
-          <ul className="overflow-hidden ml-5 pl-2 border-l border-border-light dark:border-gray-700/40 space-y-0.5 mt-0.5" aria-label={item.label} hidden={!open}>
-            {kids.map((child) => {
-              const active = childActive(child, item);
-              return (
-                <li key={child.path || child.label}>
-                  <button
-                    onClick={() => {
-                      if (child.path) navigate(child.path);
-                      onMenuClick?.();
-                    }}
-                    aria-current={active ? "page" : undefined}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors ${
-                      active
-                        ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium"
-                        : "font-light text-text-secondary-light dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
-                    }`}
-                  >
-                    <span className="flex-shrink-0 opacity-80">{child.icon}</span>
-                    <span className="truncate">{child.label}</span>
-                    {child.badge ? (
-                      <span className="ml-auto min-w-[1.25rem] rounded-full bg-blue-600 px-1.5 text-center text-[10px] font-semibold leading-5 text-white tabular-nums">{child.badge}</span>
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+        <div id={panelId} className={`grid transition-[grid-template-rows] duration-200 ease-out ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+          <div className="overflow-hidden" hidden={!open}>
+            <div className="ml-4 mt-0.5 border-l border-gray-200 pl-1.5 dark:border-gray-700/40">{list}</div>
+          </div>
         </div>
       </div>
     );
   };
 
-  const renderNavItem = (item: (typeof navItems)[number]) => (
-    <button
-      onClick={() => {
-        if (item.action) {
-          item.action();
-        } else if (item.externalUrl) {
-          const token = getToken();
-          const url = item.externalUrl.replace("xxxxxxx", token || "");
-          window.open(url, "_blank");
-        } else if (item.path) {
-          navigate(item.path);
-        }
-        onMenuClick?.();
-      }}
-      className={`w-full flex items-center ${
-        isCollapsed ? "justify-center" : ""
-      } space-x-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-        isActive(item.path)
-          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-          : "font-light text-text-secondary-light dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
-      }`}
-      title={item.badge ? `${item.label} (${item.badge} unread)` : item.label}
-    >
-      <span className="relative flex-shrink-0">
-        {item.icon}
-        {isCollapsed && !!item.badge && (
-          <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-blue-600" aria-hidden />
-        )}
-      </span>
-      {!isCollapsed && <span className="flex-1 text-left">{item.label}</span>}
-      {!isCollapsed && !!item.badge && (
-        <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
-          {item.badge > 99 ? "99+" : item.badge}
-          <span className="sr-only"> unread</span>
-        </span>
-      )}
-    </button>
-  );
+  const areaBody = (a: NavArea) => {
+    const groups = a.groups ?? [];
+    const total = groups.reduce((n, g) => n + g.items.length, 0);
+    // One group, or a handful of pages: no headings, just the pages.
+    if (!groups.some((g) => g.collapsible) && (groups.length === 1 || total <= 4)) {
+      return (
+        <ul aria-label={a.label} className="space-y-0.5 pt-1">
+          {groups.flatMap((g) => g.items.map((link) => pageRow({ link, area: a, group: g })))}
+        </ul>
+      );
+    }
+    return groups.map((g) => groupBlock(a, g));
+  };
 
-  return (
-    <aside
-      className={`fixed left-0 top-16 bg-white dark:bg-gray-800/30 border-r border-border-light dark:border-gray-700/20 transition-all duration-300 z-50 flex flex-col ${
-        isCollapsed ? "w-20" : "w-64"
+  const panel = area && (
+    <div
+      id="nav-panel"
+      className={`flex w-56 min-h-0 flex-col ${
+        isCollapsed
+          ? "absolute left-16 top-0 h-full border-r border-gray-200 bg-white dark:border-gray-700/40 dark:bg-gray-900"
+          : ""
       }`}
-      style={{ height: "calc(100vh - 4rem)" }}
     >
-      {/* Logo */}
-      <div
-        className={`flex items-center ${
-          isCollapsed ? "justify-center" : "justify-between"
-        } p-4 border-b border-border-light dark:border-gray-700/30`}
-      >
-        {!isCollapsed && (
-          <div className="flex items-center space-x-3 min-w-0">
-            {/* The signed-in school's logo (NGA falls back to its shield). */}
-            {(brand.isPrimary || brand.logoUrl) && (
-              <TenantLogo src={brand.logoUrl} name={brand.name} isPrimary={brand.isPrimary} className="w-7 h-7" />
-            )}
-            <span className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark truncate" title={brand.isPrimary ? undefined : brand.name}>
-              {brand.isPrimary ? "Menus" : brand.name}
-            </span>
-          </div>
-        )}
+      <div className="flex items-center justify-between gap-2 px-3 pb-2 pt-3.5">
+        <h2 className="truncate text-[15px] font-semibold text-gray-900 dark:text-white">{query ? "Search" : area.label}</h2>
         <button
-          onClick={onToggle}
-          aria-label={isCollapsed ? "Expand menu" : "Collapse menu"}
-          aria-expanded={!isCollapsed}
-          className="p-2 rounded-lg hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
+          type="button"
+          onClick={() => (isCollapsed ? setOverlayOpen(false) : onToggle?.())}
+          aria-label={isCollapsed ? "Close menu" : "Collapse menu"}
+          title={isCollapsed ? "Close" : "Collapse menu"}
+          className="rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800/60 dark:hover:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
-          <svg
-            className={`text-text-secondary-light dark:text-text-secondary-dark/70 transition-transform ${
-              isCollapsed ? "rotate-180 w-5 h-5" : "w-4 h-4"
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-            />
-          </svg>
+          {isCollapsed ? <X className="h-4 w-4" aria-hidden /> : <ChevronsLeft className="h-4 w-4" aria-hidden />}
         </button>
       </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 py-3 overflow-y-auto text-sm">
-        {RENDERED_SECTIONS.map(({ key, title }, sectionIndex) => {
-          const items = mainNavItems.filter(
-            (item) => (key === "more" ? !KNOWN_SECTIONS.has(item.section) : item.section === key) && isVisible(item),
-          );
-          if (items.length === 0) return null;
-          const headingId = `nav-section-${key}`;
-          return (
-            <div key={key} className={sectionIndex > 0 ? "mt-3" : undefined}>
-              {title &&
-                (isCollapsed ? (
-                  <div className="mx-4 mb-2 border-t border-border-light dark:border-gray-700/30" role="separator" aria-label={title} />
-                ) : (
-                  <h2
-                    id={headingId}
-                    className="px-5 mb-1 text-[11px] font-semibold uppercase tracking-wider text-text-secondary-light/80 dark:text-slate-400"
-                  >
-                    {title}
-                  </h2>
-                ))}
-              <ul className="space-y-0.5 px-2.5" aria-labelledby={title && !isCollapsed ? headingId : undefined}>
-                {items.map((item, index) => (
-                  <li key={item.path || item.label || `nav-${index}`}>{item.children ? renderGroup(item) : renderNavItem(item)}</li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* Bottom section */}
-      <div className="border-t border-border-light dark:border-gray-700/30 px-2.5 pt-2 pb-3 text-sm">
-        {profileItem && isVisible(profileItem) && renderNavItem(profileItem)}
-        {!isCollapsed && (
-          <div className="mt-2 text-xs text-text-secondary-light dark:text-slate-300 text-center">
-            {brand.isPrimary ? "NGA MIS v1.0" : `${brand.name} · MIS`}
-          </div>
-        )}
+      <div className="px-3 pb-2">
+        <label className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30 dark:border-gray-700/30 dark:bg-gray-900/50">
+          <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setQuery("");
+              } else if (e.key === "Enter" && results[0]?.link.path) {
+                navigate(results[0].link.path);
+                onMenuClick?.();
+              }
+            }}
+            placeholder="Search menu"
+            aria-label="Search menu"
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-gray-900 outline-none placeholder:text-gray-400 dark:text-white dark:placeholder:text-gray-500"
+          />
+          {query ? (
+            <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          ) : (
+            <kbd className="rounded border border-gray-200 px-1 text-[10px] text-gray-400 dark:border-gray-700/40">/</kbd>
+          )}
+        </label>
       </div>
-    </aside>
+      <nav aria-label={query ? "Search results" : area.label} className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+        {query ? (
+          results.length ? (
+            <ul aria-label="Search results" className="space-y-0.5">
+              {results.map((p) => pageRow(p, { showWhere: true }))}
+            </ul>
+          ) : (
+            <p className="px-2.5 py-6 text-center text-[13px] text-gray-500 dark:text-gray-400">No page called “{query}”. Try another word.</p>
+          )
+        ) : (
+          <motion.div key={area.id} initial={m("reveal").initial} animate={m("reveal").animate} transition={m("reveal").transition}>
+              {pinned.length > 0 && (
+                <div>
+                  <h3 className={headingCls}>Pinned</h3>
+                  <ul aria-label="Pinned" className="space-y-0.5">
+                    {pinned.map((p) => pageRow(p, { icon: <Star className="h-4 w-4 fill-current text-blue-500" aria-hidden /> }))}
+                  </ul>
+                </div>
+              )}
+              {recents.length > 0 && (
+                <div>
+                  <h3 className={headingCls}>Recent</h3>
+                  <ul aria-label="Recent" className="space-y-0.5">
+                    {recents.map((p) => pageRow(p, { icon: <Clock3 className="h-4 w-4" aria-hidden /> }))}
+                  </ul>
+                </div>
+              )}
+              {(pinned.length > 0 || recents.length > 0) && <div className="mx-2.5 mt-3 border-t border-gray-100 dark:border-gray-700/30" />}
+              {areaBody(area)}
+          </motion.div>
+        )}
+      </nav>
+    </div>
+  );
+
+  const fullName = [user?.profile?.first_name, user?.profile?.last_name].filter(Boolean).join(" ") || user?.user?.username || "Account";
+  const roleLabel = userType ? userType.charAt(0) + userType.slice(1).toLowerCase() : "";
+
+  return (
+    <>
+      <aside
+        ref={asideRef}
+        className={`fixed left-0 top-16 z-50 flex border-r border-gray-200 bg-white transition-[width] duration-300 dark:border-gray-700/20 dark:bg-gray-800/30 ${
+          isCollapsed ? "w-16" : "w-72"
+        }`}
+        style={{ height: "calc(100vh - 4rem)" }}
+        aria-label="Main menu"
+      >
+        {/* Rail: one icon per area; the label shows on hover or focus. */}
+        <nav aria-label="Areas" className="flex w-16 shrink-0 flex-col items-center gap-1 border-r border-gray-100 py-3 dark:border-gray-700/30">
+          {areas.map((a) => {
+            const Icon = a.icon;
+            if (a.link) {
+              const active = current?.area.id === a.id;
+              return (
+                <Link
+                  key={a.id}
+                  to={a.link.path!}
+                  data-rail
+                  aria-label={a.label}
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => {
+                    setTip(null);
+                    onMenuClick?.();
+                  }}
+                  onKeyDown={railKeys}
+                  {...tipProps(a.label)}
+                  className={`${railBtn} ${active ? railOn : railIdle}`}
+                >
+                  <Icon className="h-5 w-5" aria-hidden />
+                </Link>
+              );
+            }
+            const showing = panelVisible && area?.id === a.id;
+            const holdsCurrent = currentAreaId === a.id;
+            const badge = badgeOf(a);
+            return (
+              <button
+                key={a.id}
+                type="button"
+                data-rail
+                aria-label={badge ? `${a.label} (${badge} new)` : a.label}
+                aria-expanded={showing}
+                aria-controls="nav-panel"
+                onClick={() => onArea(a)}
+                onKeyDown={railKeys}
+                {...tipProps(a.label, badge)}
+                className={`${railBtn} ${showing ? railOn : holdsCurrent ? "text-blue-600 hover:bg-gray-100 dark:text-blue-300 dark:hover:bg-gray-800/60" : railIdle}`}
+              >
+                <Icon className="h-5 w-5" aria-hidden />
+                {badge > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white dark:ring-gray-900" aria-hidden />}
+              </button>
+            );
+          })}
+          <div className="flex-1" />
+          {isCollapsed && (
+            <button type="button" data-rail onClick={onToggle} onKeyDown={railKeys} aria-label="Expand menu" {...tipProps("Expand menu")} className={`${railBtn} ${railIdle}`}>
+              <ChevronsRight className="h-5 w-5" aria-hidden />
+            </button>
+          )}
+          <button
+            ref={accountBtnRef}
+            type="button"
+            data-rail
+            onClick={() => {
+              setTip(null);
+              setAccountOpen((o) => !o);
+            }}
+            onKeyDown={railKeys}
+            aria-label="Account"
+            aria-haspopup="menu"
+            aria-expanded={accountOpen}
+            {...tipProps("Account")}
+            className={`mt-1 rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${accountOpen ? "ring-2 ring-blue-500" : "hover:ring-2 hover:ring-gray-200 dark:hover:ring-gray-700"}`}
+          >
+            <UserAvatar name={fullName} avatar={user?.avatar} size={34} decorative fallback="person" />
+          </button>
+        </nav>
+
+        {panelVisible && panel}
+      </aside>
+
+      {/* Rail labels: fixed so the rail's scroll box never clips them. */}
+      <AnimatePresence>
+        {tip && (
+          <motion.div
+            key={tip.label}
+            role="tooltip"
+            initial={{ opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12 }}
+            className="pointer-events-none fixed z-[70] flex -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white dark:bg-gray-700"
+            style={{ top: tip.top, left: tip.left }}
+          >
+            {tip.label}
+            {tip.badge > 0 && <span className="rounded-full bg-blue-600 px-1.5 text-[10px] font-semibold leading-4 tabular-nums">{tip.badge}</span>}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Account menu: everything about you, out of the main list. */}
+      <AnimatePresence>
+        {accountOpen && (
+          <motion.div
+            ref={accountRef}
+            role="menu"
+            aria-label="Account"
+            {...m("reveal")}
+            className="fixed bottom-3 left-[4.5rem] z-[60] w-64 rounded-2xl border border-gray-200 bg-white p-1.5 dark:border-gray-700/40 dark:bg-gray-900"
+            onKeyDown={(e) => {
+              if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+              e.preventDefault();
+              const items = Array.from(accountRef.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? []);
+              const i = items.indexOf(document.activeElement as HTMLElement);
+              items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+            }}
+          >
+            <div className="flex items-center gap-3 px-2.5 pb-2.5 pt-2">
+              <UserAvatar name={fullName} avatar={user?.avatar} size={36} decorative fallback="person" />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{fullName}</div>
+                <div className="truncate text-xs text-gray-500 dark:text-gray-400">{roleLabel}</div>
+              </div>
+            </div>
+            <div className="mb-1 border-t border-gray-100 dark:border-gray-700/30" />
+            {accountLinks.map((l) => {
+              const Icon = l.icon;
+              const cls = `flex w-full items-center gap-2.5 rounded-full px-2.5 py-2 text-left text-[13px] transition-colors focus:outline-none focus-visible:bg-gray-100 dark:focus-visible:bg-gray-800/60 ${
+                l.path && location.pathname === l.path ? rowOn : rowIdle
+              }`;
+              const body = (
+                <>
+                  <Icon className="h-4 w-4 opacity-80" aria-hidden />
+                  {l.label}
+                </>
+              );
+              return l.path ? (
+                <Link
+                  key={l.label}
+                  to={l.path}
+                  role="menuitem"
+                  className={cls}
+                  onClick={() => {
+                    setAccountOpen(false);
+                    onMenuClick?.();
+                  }}
+                >
+                  {body}
+                </Link>
+              ) : (
+                <button
+                  key={l.label}
+                  type="button"
+                  role="menuitem"
+                  className={cls}
+                  onClick={() => {
+                    setAccountOpen(false);
+                    l.action?.();
+                    onMenuClick?.();
+                  }}
+                >
+                  {body}
+                </button>
+              );
+            })}
+            <div className="mt-1 border-t border-gray-100 px-2.5 pb-1 pt-2 text-[11px] text-gray-400 dark:border-gray-700/30 dark:text-gray-500">
+              {brand.isPrimary ? "NGA MIS v1.0" : `${brand.name} · MIS`}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 

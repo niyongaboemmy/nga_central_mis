@@ -223,6 +223,7 @@ const Navbar: React.FC<NavbarProps> = ({
                       avatar={user.avatar}
                       src={user.user?.avatar_url}
                       size={32}
+                      fallback="person"
                     />
                   </button>
 
@@ -346,6 +347,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     avatar={user.avatar}
                     src={user.user?.avatar_url}
                     size={40}
+                    fallback="person"
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark truncate">
