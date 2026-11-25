@@ -91,7 +91,7 @@ const AvatarControl = forwardRef<AvatarControlHandle, Props>(
     const withMenu = menu && !!avatar;
 
     return (
-      <div ref={wrap} className={`relative ${layout === "inline" ? "flex items-center gap-4" : "flex flex-col items-center gap-3"}`}>
+      <div ref={wrap} className={`relative ${layout === "inline" ? "flex items-center gap-4" : `flex flex-col items-center ${showActions ? "gap-3" : ""}`}`}>
         <button
           type="button"
           onClick={() => (withMenu ? setMenuOpen((o) => !o) : openPicker())}
@@ -105,7 +105,7 @@ const AvatarControl = forwardRef<AvatarControlHandle, Props>(
             setDragging(false);
             pick(e.dataTransfer.files?.[0]);
           }}
-          className={`group relative rounded-full focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 ${
+          className={`group relative flex rounded-full focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 ${
             dragging ? "ring-4 ring-blue-500/60" : ""
           }`}
           aria-label={avatar ? "Change profile picture" : "Add a profile picture"}
