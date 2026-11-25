@@ -3,7 +3,9 @@ import { Navigate, useSearchParams } from "react-router-dom";
 import { Check, Loader2 } from "lucide-react";
 import SchoolMark from "./SchoolMark";
 import SwitchSchoolDialog from "./SwitchSchoolDialog";
-import { mySchools, safeReturnUrl, type MySchool } from "../../lib/schoolSwitch";
+import AddSchoolDialog from "./AddSchoolDialog";
+import { AddSchoolItem } from "./SchoolSwitcher";
+import { mySchoolsInfo, safeReturnUrl, type MySchool } from "../../lib/schoolSwitch";
 import { useUser } from "../../contexts/UserContext";
 
 /**
@@ -19,10 +21,20 @@ const SwitchSchoolPage: React.FC = () => {
   const [schools, setSchools] = useState<MySchool[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [target, setTarget] = useState<MySchool | null>(null);
+  const [unlinked, setUnlinked] = useState(0);
+  const [adding, setAdding] = useState(false);
 
+  const load = () =>
+    mySchoolsInfo(true).then(
+      (i) => {
+        setSchools(i.schools);
+        setUnlinked(i.unlinkedCount);
+      },
+      (e) => setError(e?.response?.data?.message ?? "Could not load your schools."),
+    );
   useEffect(() => {
     if (!isAuthenticated) return;
-    mySchools(true).then(setSchools, (e) => setError(e?.response?.data?.message ?? "Could not load your schools."));
+    void load();
   }, [isAuthenticated]);
 
   if (isLoading) return <Centered><Loader2 className="h-8 w-8 animate-spin text-blue-600" aria-label="Loading" /></Centered>;
@@ -40,7 +52,7 @@ const SwitchSchoolPage: React.FC = () => {
     <Centered>
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-900">
         <h1 className="text-lg font-bold text-slate-900 dark:text-white">Switch school</h1>
-        <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">Choose the school to work in. Every NGA app on this device follows.</p>
+        <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">Choose the school to work in. Every Amashuri app on this device follows.</p>
         {error && <p role="alert" className="text-sm text-red-600 dark:text-red-300">{error}</p>}
         {!schools && !error && (
           <ul className="space-y-2" aria-busy="true">
@@ -75,8 +87,22 @@ const SwitchSchoolPage: React.FC = () => {
             ))}
           </ul>
         )}
+        {schools && unlinked > 0 && (
+          <div className="mt-3 rounded-2xl border border-dashed border-slate-200 p-1 dark:border-slate-700">
+            <AddSchoolItem count={unlinked} onPick={() => setAdding(true)} />
+          </div>
+        )}
       </div>
       <SwitchSchoolDialog from={current} to={target} next={back} onClose={() => setTarget(null)} />
+      <AddSchoolDialog
+        open={adding}
+        unlinkedCount={unlinked}
+        onClose={() => setAdding(false)}
+        onAdded={() => {
+          setSchools(null);
+          void load();
+        }}
+      />
     </Centered>
   );
 };

@@ -1342,23 +1342,29 @@ export const getSchemeVerification = asyncHandler(async (req: any, res: any) => 
   }
   // MIS-ISO-4: the QR names its school (signed); a legacy QR without `t` is an NGA
   // document (tenant 1). Never the scanner's own session school.
-  const { schemeVerifyTid } = await import("../services/schemeVerifyLink");
+  // GAP-C: an old link (no `t`) vouches only for a tenant-1 scheme created before the cutover.
+  const { schemeVerifyTid, isLegacyVerifyRequest } = await import("../services/schemeVerifyLink");
   const { usableTenant, enterTenant } = await import("../tenancy/express");
   const tid = schemeVerifyTid(schemeId, req.query?.t, req.query?.s);
   const tenant = tid ? await usableTenant(tid) : null;
   if (!tenant) {
     return res.status(404).json({ valid: false, message: "No Scheme of Work found for this document" });
   }
-  return enterTenant(req, tenant, () => schemeVerificationIn(schemeId, res));
+  const legacy = isLegacyVerifyRequest(req.query?.t);
+  return enterTenant(req, tenant, () => schemeVerificationIn(schemeId, res, { legacy, tenantName: tenant.name }));
 });
 
-const schemeVerificationIn = async (schemeId: number, res: any) => {
+const schemeVerificationIn = async (schemeId: number, res: any, opts: { legacy: boolean; tenantName: string }) => {
+  const { LEGACY_QR_CUTOFF, LEGACY_QR_REPRINT_MESSAGE } = await import("../services/schemeVerifyLink");
 
   const [row] = await db
     .select({
       scheme_id: SchemeOfWork.scheme_id,
       created_at: SchemeOfWork.created_at,
       validation_status: SchemeOfWork.validation_status,
+      // Compared in SQL: UNIX_TIMESTAMP reads the stored DATETIME in the same session
+      // time zone CURRENT_TIMESTAMP wrote it in, whatever the Node process's zone is.
+      created_epoch: sql<number | null>`UNIX_TIMESTAMP(${SchemeOfWork.created_at})`,
       subject_name: Subject.name,
       subject_code: Subject.code,
       class_group_name: ClassGroup.name,
@@ -1380,12 +1386,20 @@ const schemeVerificationIn = async (schemeId: number, res: any) => {
     return res.status(404).json({ valid: false, message: "No Scheme of Work found for this document" });
   }
 
+  if (opts.legacy) {
+    const created = row.created_epoch === null || row.created_epoch === undefined ? NaN : Number(row.created_epoch) * 1000;
+    if (!(created < LEGACY_QR_CUTOFF.getTime())) {
+      return res.status(410).json({ valid: false, code: "QR_FORMAT_OUTDATED", message: LEGACY_QR_REPRINT_MESSAGE });
+    }
+  }
+
   const [school] = await db.select({ name: School.name }).from(School).limit(1);
 
   res.json({
     valid: true,
     scheme_id: row.scheme_id,
-    school_name: school?.name || null,
+    // The issuing school, always named (GAP-C): its School row, else the tenant's name.
+    school_name: school?.name || opts.tenantName || null,
     subject_name: row.subject_name,
     subject_code: row.subject_code,
     class_group_name: row.class_group_name,

@@ -22,7 +22,7 @@ const valid = (a: AccountRef) => Number.isSafeInteger(a.tid) && a.tid > 0 && Num
 const ordered = (a: AccountRef, b: AccountRef): [AccountRef, AccountRef] =>
   a.tid < b.tid || (a.tid === b.tid && a.uid < b.uid) ? [a, b] : [b, a];
 
-export async function linkPersons(a: AccountRef, b: AccountRef, via: "copy" | "switch"): Promise<void> {
+export async function linkPersons(a: AccountRef, b: AccountRef, via: "copy" | "switch" | "password"): Promise<void> {
   if (!valid(a) || !valid(b) || a.tid === b.tid) return;
   const [x, y] = ordered(a, b);
   try {

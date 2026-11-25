@@ -4,6 +4,7 @@
  *
  *   GET  /auth/my-schools
  *   POST /auth/switch-school { tenant, password? }
+ *   POST /auth/link-school { password }
  *
  * A person's accounts in different schools are linked by their e-mail (the
  * Account Directory). Switching issues the target school's session through the
@@ -18,10 +19,16 @@
  * password hash is never proof: independent bcrypt hashes never match, so equality
  * only ever meant "copied", and copies no longer carry credentials.
  *
- * Which schools are listed (MIS-ISO-5): accounts linked to this one (a cross-school
- * copy or an earlier switch -- tenancy/personLinks.ts), plus e-mail matches where
- * both accounts already chose their own password. Another school's roles are
- * never shown; switching still needs the proof above.
+ * Which schools are listed (MIS-ISO-5, GAP-A): the current school and accounts
+ * linked to this one (a cross-school copy, an earlier switch or link-school --
+ * tenancy/personLinks.ts). Plain e-mail matches are only COUNTED (unlinkedCount):
+ * naming them would tell an admin who typed someone's e-mail into a puppet account
+ * which other school that person belongs to. The person adds such a school with
+ *
+ *   POST /auth/link-school { password }
+ *
+ * which tries the password against each unlinked match and links the first that
+ * opens. Another school's roles are never shown; switching still needs the proof above.
  */
 import bcrypt from "bcryptjs";
 import { RowDataPacket } from "mysql2/promise";
@@ -88,53 +95,80 @@ async function accountById(tid: number, uid: number): Promise<RowDataPacket | nu
   );
 }
 
-const ownPassword = (acc: RowDataPacket | null) => !!acc && acc.force_password_change !== null && acc.force_password_change !== undefined && Number(acc.force_password_change) === 0;
+const brand = async (t: TenantCtx) => brandingFor(t).catch(() => null);
 
-/** The schools this person can switch to (the current one first). Never throws for one bad school. */
-export async function mySchools(current: TenantCtx, userId: number): Promise<MySchool[]> {
-  const email = await emailOf(current.tid, userId);
-  const me = await accountById(current.tid, userId);
-  // tid -> how the other account is known: by a link (trusted) or by e-mail only.
-  const candidates = new Map<number, { uid: number | null }>();
-  for (const l of await linkedAccounts({ tid: current.tid, uid: userId })) if (!candidates.has(l.tid)) candidates.set(l.tid, { uid: l.uid });
-  if (email) {
-    for (const h of (await lookupDirectory(email)) ?? []) {
-      if (String(h.status) === "ACTIVE" && h.tid !== current.tid && !candidates.has(h.tid)) candidates.set(h.tid, { uid: null });
+async function entryFor(t: TenantCtx): Promise<MySchool> {
+  const b = await brand(t);
+  return { tid: t.tid, slug: t.slug, name: b?.school_name || t.name, logoUrl: b?.logoUrl ?? null, status: t.status, current: false };
+}
+
+const listable = (t: TenantCtx | null | undefined): t is TenantCtx => !!t && (isTenantUsable(t.status) || t.status === "SUSPENDED");
+
+/**
+ * Accounts with this person's e-mail in other schools that are NOT linked to this
+ * account (MIS-ISO-5 / GAP-A). Any school administrator can type any e-mail on an
+ * account of their school, so these are never named -- only counted -- until the
+ * person proves the other account is theirs (POST /auth/link-school).
+ */
+async function unlinkedMatches(current: TenantCtx, userId: number, email: string | null): Promise<{ tenant: TenantCtx; uid: number; hash: string | null }[]> {
+  if (!email) return [];
+  const linked = new Set((await linkedAccounts({ tid: current.tid, uid: userId })).map((l) => l.tid));
+  const out: { tenant: TenantCtx; uid: number; hash: string | null }[] = [];
+  const seen = new Set<number>();
+  for (const h of (await lookupDirectory(email)) ?? []) {
+    if (String(h.status) !== "ACTIVE" || h.tid === current.tid || linked.has(h.tid) || seen.has(h.tid)) continue;
+    seen.add(h.tid);
+    try {
+      const t = await getTenant(h.tid);
+      if (!t || !isTenantUsable(t.status)) continue;
+      const acc = await accountIn(h.tid, email);
+      if (!acc || String(acc.status) !== "ACTIVE") continue;
+      out.push({ tenant: t, uid: Number(acc.user_id), hash: acc.password_hash ? String(acc.password_hash) : null });
+    } catch (err) {
+      logger.warn("[schoolSwitch] e-mail match skipped", { tid: h.tid, error: (err as Error)?.message });
     }
   }
+  return out;
+}
+
+export interface MySchoolsResult {
+  schools: MySchool[];
+  /** E-mail matches in other schools that are not linked yet: a count only, never names (GAP-A). */
+  unlinkedCount: number;
+}
+
+/**
+ * The schools this person can switch to (the current one first): the current school
+ * plus accounts linked in PersonLink. Never throws for one bad school.
+ */
+export async function mySchools(current: TenantCtx, userId: number): Promise<MySchoolsResult> {
+  const email = await emailOf(current.tid, userId);
   const out: MySchool[] = [];
-  const brand = async (t: TenantCtx) => brandingFor(t).catch(() => null);
   {
     const b = await brand(current);
     out.push({ tid: current.tid, slug: current.slug, name: b?.school_name || current.name, logoUrl: b?.logoUrl ?? null, status: current.status, current: true, roles: await rolesOf(current.tid, userId).catch(() => []) });
   }
-  for (const [tid, c] of candidates) {
+  const seen = new Set<number>([current.tid]);
+  for (const l of await linkedAccounts({ tid: current.tid, uid: userId })) {
+    if (seen.has(l.tid)) continue;
+    seen.add(l.tid);
     try {
-      const t = await getTenant(tid);
-      if (!t) continue;
-      if (!isTenantUsable(t.status) && t.status !== "SUSPENDED") continue;
-      let acc: RowDataPacket | null;
-      if (c.uid) {
-        acc = await accountById(tid, c.uid);
-      } else {
-        // E-mail only: any school can type any e-mail on its accounts, so list it only
-        // when both accounts already chose their own password (no admin-set or one-time one).
-        acc = email ? await accountIn(tid, email) : null;
-        if (!ownPassword(acc) || !ownPassword(me)) continue;
-      }
+      const t = await getTenant(l.tid);
+      if (!listable(t)) continue;
+      const acc = await accountById(l.tid, l.uid);
       if (!acc || String(acc.status) !== "ACTIVE") continue;
-      const b = await brand(t);
-      out.push({ tid, slug: t.slug, name: b?.school_name || t.name, logoUrl: b?.logoUrl ?? null, status: t.status, current: false });
+      out.push(await entryFor(t));
     } catch (err) {
-      logger.warn("[schoolSwitch] school skipped", { tid, error: (err as Error)?.message });
+      logger.warn("[schoolSwitch] school skipped", { tid: l.tid, error: (err as Error)?.message });
     }
   }
-  return out.sort((a, b) => (a.current === b.current ? a.name.localeCompare(b.name) : a.current ? -1 : 1));
+  const unlinkedCount = (await unlinkedMatches(current, userId, email).catch(() => [])).length;
+  return { schools: out.sort((a, b) => (a.current === b.current ? a.name.localeCompare(b.name) : a.current ? -1 : 1)), unlinkedCount };
 }
 
 export const getMySchools = asyncHandler(async (req: any, res: any) => {
-  const schools = await mySchools(req.tenant, Number(req.user.userId));
-  successResponse(res, "Your schools", { schools });
+  const result = await mySchools(req.tenant, Number(req.user.userId));
+  successResponse(res, "Your schools", result);
 });
 
 // Wrong target passwords: 5 per 15 minutes per (school, person).
@@ -217,4 +251,55 @@ export const switchSchool = asyncHandler(async (req: any, res: any) => {
   // The new school's session: exactly a sign-in (cookie, claims, nga_school, response).
   req.tenant = target;
   await runWithTenant(target, () => completeLogin(targetUid, res, "SCHOOL_SWITCH", req, { amr: sameGoogle ? "google" : "pwd" }));
+});
+
+/**
+ * POST /auth/link-school { password } (GAP-A): the person proves that an unlinked
+ * account with their e-mail in another school is theirs by typing THAT account's
+ * password. Tried against each unlinked ACTIVE match in a usable school, one after
+ * the other, stopping at the first that opens; that pair is linked (PersonLink via
+ * 'password') and the school is returned in the my-schools shape (no roles). A miss
+ * never says which school(s) were tried. Rate-limited like switch-school: 5 wrong
+ * passwords per 15 minutes per current (school, person).
+ */
+export const linkSchool = asyncHandler(async (req: any, res: any) => {
+  const current: TenantCtx = req.tenant;
+  const userId = Number(req.user.userId);
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (!password) return refuse(res, 400, "PASSWORD_REQUIRED", "Enter the password you use at the other school.");
+  if (await checkBlocked(deviceIdOf(req), clientIpOf(req)).catch(() => null)) {
+    return refuse(res, 403, "BLOCKED", "Sign-in from this device or network has been blocked.");
+  }
+  const key = `link:${failKey(current.tid, userId)}`;
+  if (recentFailures(key) >= MAX_FAILURES) {
+    return refuse(res, 429, "TOO_MANY_ATTEMPTS", "Too many wrong passwords. Try again in 15 minutes.");
+  }
+
+  const email = await emailOf(current.tid, userId);
+  let found: { tenant: TenantCtx; uid: number } | null = null;
+  for (const m of await unlinkedMatches(current, userId, email)) {
+    if (m.hash && (await bcrypt.compare(password, m.hash))) {
+      found = { tenant: m.tenant, uid: m.uid };
+      break;
+    }
+  }
+
+  if (!found) {
+    failures.get(key)!.push(Date.now());
+    trackAuth(req, { kind: "login", outcome: "failure", reason: "school_link_bad_password", userId, usernameAttempted: email ?? undefined });
+    void platformAudit({ action: "auth.link_school", targetTid: current.tid, actorUserId: userId, ip: clientIpOf(req) ?? null, payload: { fromTid: current.tid, fromUserId: userId, outcome: "failure" } });
+    return refuse(res, 403, "WRONG_PASSWORD", "That password doesn't open another school account with your e-mail.");
+  }
+  failures.delete(key);
+
+  await linkPersons({ tid: current.tid, uid: userId }, { tid: found.tenant.tid, uid: found.uid }, "password");
+  await recordActivity(userId, "SCHOOL_LINK", `Added ${found.tenant.name} to my schools`, "User", userId, { toTid: found.tenant.tid }, userId).catch(() => undefined);
+  void platformAudit({
+    action: "auth.link_school",
+    targetTid: found.tenant.tid,
+    actorUserId: userId,
+    ip: clientIpOf(req) ?? null,
+    payload: { fromTid: current.tid, fromUserId: userId, toUserId: found.uid, outcome: "linked", proof: "password" },
+  });
+  successResponse(res, "School added", { school: await entryFor(found.tenant) });
 });

@@ -22,6 +22,7 @@ import { System } from "../db/schema";
 import { assignTestSystems } from "../test/systems";
 import { ensurePlatform, provisionSchool, removeSchool, sessionToken, stampOf } from "../test/tenantMgmtFixtures";
 import { areLinked } from "../tenancy/personLinks";
+import { controlPool } from "../db/platform";
 
 let school: Awaited<ReturnType<typeof provisionSchool>>;
 const PW = "Switch-Schools-pw1";
@@ -44,6 +45,16 @@ async function primaryPerson(first: string, password = PW): Promise<{ id: number
   await syncDirectoryUser(id, 1);
   created.push(id);
   return { id, email };
+}
+
+/** An account with `email` in school `tid` (e.g. a puppet an admin typed someone's e-mail on). */
+async function puppetIn(tid: number, email: string, password: string, forceChange = 0): Promise<number> {
+  const pool = poolFor(tid);
+  const [u]: any = await pool.query("INSERT INTO `User` (username, email, status) VALUES (?, ?, 'ACTIVE')", [`pup_${stamp}_${crypto.randomBytes(3).toString("hex")}`, email]);
+  const id = Number(u.insertId);
+  await pool.query("INSERT INTO AuthCredential (user_id, password_hash, force_password_change) VALUES (?, ?, ?)", [id, await bcrypt.hash(password, 4), forceChange]);
+  await syncDirectoryUser(id, tid);
+  return id;
 }
 
 const teacherRole = async (tid: number) => Number(((await poolFor(tid).query<any[]>("SELECT role_id FROM `Role` WHERE name = 'TEACHER'"))[0] as any[])[0].role_id);
@@ -90,24 +101,25 @@ describe("my schools", () => {
     expect(Array.isArray(r.body.data.schools[0].roles)).toBe(true);
   });
 
-  it("MIS-ISO-5: an e-mail match alone is listed only when both accounts chose their own password; a link always is", async () => {
+  it("GAP-A: a plain e-mail match is never named -- only counted -- even when both accounts chose their own password; a link always is listed", async () => {
     const p = await primaryPerson("Lookalike");
-    // A school admin types this person's e-mail on an account of their own school.
-    const pool = poolFor(school.tid);
-    const [u]: any = await pool.query("INSERT INTO `User` (username, email, status) VALUES (?, ?, 'ACTIVE')", [`look_${stamp}`, p.email]);
-    const otherId = Number(u.insertId);
-    await pool.query("INSERT INTO AuthCredential (user_id, password_hash, force_password_change) VALUES (?, ?, 1)", [otherId, await bcrypt.hash("Admin-set-pw1", 4)]);
-    await syncDirectoryUser(otherId, school.tid);
-    const list = async () => (await request(app).get("/auth/my-schools").set(auth(await sessionToken(p.id, 1)))).body.data.schools.map((s: any) => s.tid);
-    expect(await list()).toEqual([1]); // admin-set (one-time) password: not trusted
-    await pool.query("UPDATE AuthCredential SET force_password_change = 0 WHERE user_id = ?", [otherId]);
+    // A school admin types this person's e-mail on a (puppet) account of their own school.
+    const otherId = await puppetIn(school.tid, p.email, "Admin-set-pw1", 0);
     await poolFor(1).query("UPDATE AuthCredential SET force_password_change = 0 WHERE user_id = ?", [p.id]);
-    expect(await list()).toEqual([1, school.tid]); // both chose their own: listed, without roles
-    // And a copied account (one-time password, force_password_change = 1) is linked, so listed.
+    const r = await request(app).get("/auth/my-schools").set(auth(await sessionToken(p.id, 1)));
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.data.schools.map((s: any) => s.tid)).toEqual([1]);
+    expect(r.body.data.unlinkedCount).toBe(1);
+    // Nothing about the other school leaks: no name, slug, tid or logo anywhere in the body.
+    expect(r.text).not.toContain(school.slug);
+    expect(r.text).not.toContain(`"tid":${school.tid}`);
+    expect(otherId).toBeGreaterThan(0);
+    // A copied account (one-time password) is linked, so listed, and not counted.
     const q = await primaryPerson("Linked");
     await copyPersonInto({ sourceTid: 1, sourceUserId: q.id, targetTid: school.tid, roleIds: [await teacherRole(school.tid)], actorUserId: null, via: "platform" });
-    const r = await request(app).get("/auth/my-schools").set(auth(await sessionToken(q.id, 1)));
-    expect(r.body.data.schools.map((s: any) => s.tid)).toEqual([1, school.tid]);
+    const l = await request(app).get("/auth/my-schools").set(auth(await sessionToken(q.id, 1)));
+    expect(l.body.data.schools.map((s: any) => s.tid)).toEqual([1, school.tid]);
+    expect(l.body.data.unlinkedCount).toBe(0);
   });
 
   it("never lists a school where the account is not ACTIVE", async () => {
@@ -205,6 +217,80 @@ describe("switch school", () => {
   it("needs a signed-in session", async () => {
     expect((await request(app).post("/auth/switch-school").send({ tenant: school.slug })).status).toBe(401);
     expect((await request(app).get("/auth/my-schools")).status).toBe(401);
+  });
+});
+
+describe("GAP-A: link another school", () => {
+  const link = (token: string, password?: string) => request(app).post("/auth/link-school").set(auth(token)).send(password === undefined ? {} : { password });
+  const auditRows = async (uid: number) =>
+    ((await controlPool().query<any[]>("SELECT action, target_tid, payload FROM PlatformAudit WHERE action = 'auth.link_school' AND actor_user_id = ? ORDER BY audit_id", [uid]))[0] as any[]);
+
+  it("GAP-A: the right password of the e-mail-matched account links it, lists it and audits it; switch-school then still needs its proof", async () => {
+    const p = await primaryPerson("Linker");
+    const THERE = "There-School-pw7";
+    const otherId = await puppetIn(school.tid, p.email, THERE);
+    const token = await sessionToken(p.id, 1);
+    const r = await link(token, THERE);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.data.school).toMatchObject({ tid: school.tid, slug: school.slug, current: false });
+    expect(r.body.data.school.roles).toBeUndefined();
+    expect(Object.keys(r.body.data.school).sort()).toEqual(["current", "logoUrl", "name", "slug", "status", "tid"]);
+    expect(await areLinked({ tid: 1, uid: p.id }, { tid: school.tid, uid: otherId })).toBe(true);
+    const [[row]]: any = await controlPool().query("SELECT via FROM PersonLink WHERE (tid_a = 1 AND uid_a = ? AND tid_b = ? AND uid_b = ?)", [p.id, school.tid, otherId]);
+    expect(row.via).toBe("password");
+    const list = await request(app).get("/auth/my-schools").set(auth(token));
+    expect(list.body.data.schools.map((s: any) => s.tid)).toEqual([1, school.tid]);
+    expect(list.body.data.unlinkedCount).toBe(0);
+    await vi.waitFor(async () => expect((await auditRows(p.id)).some((a) => a.target_tid === school.tid)).toBe(true));
+    // Switching keeps its own proof rules: no password -> PASSWORD_REQUIRED; the right one works.
+    vi.spyOn(backchannel, "notifyLogout").mockResolvedValue([]);
+    const need = await request(app).post("/auth/switch-school").set(auth(token)).send({ tenant: school.slug });
+    expect([need.status, need.body.code]).toEqual([403, "PASSWORD_REQUIRED"]);
+    const sw = await request(app).post("/auth/switch-school").set(auth(token)).send({ tenant: school.slug, password: THERE });
+    expect(sw.status, JSON.stringify(sw.body)).toBe(200);
+    expect(jwt.decode(sw.body.data.token)).toMatchObject({ userId: otherId, tid: school.tid });
+  });
+
+  it("GAP-A: a wrong password is 403 WRONG_PASSWORD, names no school and links nothing", async () => {
+    const p = await primaryPerson("Guesser");
+    const otherId = await puppetIn(school.tid, p.email, "Real-There-pw3");
+    const token = await sessionToken(p.id, 1);
+    const r = await link(token, PW); // this school's password, not the other one's
+    expect([r.status, r.body.code]).toEqual([403, "WRONG_PASSWORD"]);
+    expect(r.text).not.toContain(school.slug);
+    expect(r.text).not.toContain(school.name);
+    expect(await areLinked({ tid: 1, uid: p.id }, { tid: school.tid, uid: otherId })).toBe(false);
+    const list = await request(app).get("/auth/my-schools").set(auth(token));
+    expect(list.body.data.schools.map((s: any) => s.tid)).toEqual([1]);
+    expect(list.body.data.unlinkedCount).toBe(1);
+    await vi.waitFor(async () => expect((await auditRows(p.id)).length).toBeGreaterThan(0));
+    expect((await link(token)).status).toBe(400); // no password at all
+  });
+
+  it("GAP-A: an INACTIVE e-mail match is neither counted nor linkable", async () => {
+    const p = await primaryPerson("Dormant");
+    const otherId = await puppetIn(school.tid, p.email, "Dormant-pw5");
+    await poolFor(school.tid).query("UPDATE `User` SET status = 'INACTIVE' WHERE user_id = ?", [otherId]);
+    await syncDirectoryUser(otherId, school.tid);
+    const token = await sessionToken(p.id, 1);
+    expect((await request(app).get("/auth/my-schools").set(auth(token))).body.data.unlinkedCount).toBe(0);
+    expect((await link(token, "Dormant-pw5")).status).toBe(403);
+  });
+
+  it("GAP-A: 5 wrong passwords per 15 minutes, then 429 even for the right one", async () => {
+    const p = await primaryPerson("Hammer");
+    const THERE = "Hammer-There-pw2";
+    await puppetIn(school.tid, p.email, THERE);
+    const token = await sessionToken(p.id, 1);
+    for (let i = 0; i < 5; i++) expect((await link(token, `nope-${i}`)).status).toBe(403);
+    const limited = await link(token, THERE);
+    expect([limited.status, limited.body.code]).toEqual([429, "TOO_MANY_ATTEMPTS"]);
+    resetSwitchFailures();
+    expect((await link(token, THERE)).status).toBe(200);
+  });
+
+  it("GAP-A: needs a signed-in session", async () => {
+    expect((await request(app).post("/auth/link-school").send({ password: "x" })).status).toBe(401);
   });
 });
 
