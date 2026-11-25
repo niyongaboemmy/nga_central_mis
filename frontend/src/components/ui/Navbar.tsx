@@ -46,7 +46,8 @@ const Navbar: React.FC<NavbarProps> = ({
   const { user, logout } = useUser();
   // The product is Amashuri: its logo and name lead the top bar for every school.
   // The school itself shows in the sidebar header and the school switcher.
-  const brandMark = (size: string) => <AmashuriMark size={size === "w-10 h-10" ? 40 : 36} title="Amashuri" />;
+  // 30 px: the same visual weight as the 24 px toolbar icons beside it.
+  const brandMark = () => <AmashuriMark size={30} title="Amashuri" />;
   const brandName = "Amashuri";
   // My AI (own AI keys): staff hold AI_PERSONAL_PROVIDERS, students the _STUDENT variant.
   const access = useAccess();
@@ -149,16 +150,16 @@ const Navbar: React.FC<NavbarProps> = ({
               {onNavigateBack ? (
                 <button
                   onClick={onNavigateBack}
-                  className="flex items-center space-x-3 group"
+                  className="flex items-center gap-2.5 group"
                 >
-                  <span className="group-hover:shadow-lg transition-shadow rounded-full">{brandMark("w-9 h-9")}</span>
+                  <span className="rounded-full">{brandMark()}</span>
                   <span className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark truncate max-w-[14rem]">
                     {brandName}
                   </span>
                 </button>
               ) : (
-                <div className="flex items-center space-x-3">
-                  {brandMark("w-10 h-10")}
+                <div className="flex items-center gap-2.5">
+                  {brandMark()}
                   <span className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark truncate max-w-[14rem]">
                     {brandName}
                   </span>
