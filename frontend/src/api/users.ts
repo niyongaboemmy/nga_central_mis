@@ -1169,6 +1169,9 @@ export const bulkCreateUsers = async (
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      // Creating accounts takes time per row (password hashing, profile, role): the
+      // default 10 s gave up on a 34-row file the server went on to finish.
+      timeout: 5 * 60 * 1000,
     });
     return response.data.data || { success: 0, failed: 0, errors: [] };
   } catch (error: any) {

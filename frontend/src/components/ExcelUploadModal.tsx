@@ -288,7 +288,29 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
         onSuccess();
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Upload failed");
+      const status: number | undefined = err.response?.status;
+      const serverMessage: string | undefined = err.response?.data?.message;
+      if (!err.response) {
+        // No answer (timeout or connection lost): the server may still have created the
+        // accounts. Refresh the list so the person sees them before trying again.
+        setError(
+          err.code === "ECONNABORTED"
+            ? "The server is taking longer than expected. Some or all users may already have been created: the list has been refreshed, check it before uploading again."
+            : "The connection was lost during the upload. Some users may already have been created: the list has been refreshed, check it before uploading again.",
+        );
+        onSuccess();
+      } else if (serverMessage) {
+        setError(serverMessage);
+      } else if (status === 413) {
+        setError("The file is too large for the server. Split it into smaller files.");
+      } else if (status === 403) {
+        setError("You don't have permission to add users.");
+      } else if (status && status >= 500) {
+        setError(`The server hit an error (${status}). Some users may have been created: check the list before trying again.`);
+        onSuccess();
+      } else {
+        setError(`Upload failed${status ? ` (${status})` : ""}.`);
+      }
       setStep("preview");
     } finally {
       setLoading(false);
