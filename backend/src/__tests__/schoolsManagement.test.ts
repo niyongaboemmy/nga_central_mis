@@ -10,8 +10,9 @@ import { assignRole, createRoleWithPermissions, createUser, signToken } from "..
 import { isServableLogo, readSchoolBody, sniffImage } from "../controllers/schoolController";
 
 /**
- * School records (Tenants & Schools): validation, duplicate checks, the
- * last-active guard, and logos -- uploaded only through POST /:id/logo (a Save
+ * School records (Tenants & Schools): one record per school (no second record
+ * can be created or made active, the one in use stays active), validation,
+ * duplicate checks, and logos -- uploaded only through POST /:id/logo (a Save
  * must never overwrite a logo path; that is how NGA's logo became "uploaded"),
  * byte-checked, removable, and never a 500 when the file is gone.
  */
@@ -76,32 +77,39 @@ describe("readSchoolBody / sniffImage / isServableLogo", () => {
 });
 
 describe("school records", () => {
+  // A leftover second record, as some older databases have: inserted directly,
+  // because the API no longer creates one.
   let id: number;
+  let inUse: number;
 
-  it("needs MANAGE_SCHOOLS and validates input", async () => {
-    expect((await request(app).post("/schools").set(auth(teacher)).send({ name: "X school" })).status).toBe(403);
-    const bad = await request(app).post("/schools").set(auth(admin)).send({ name: "", contact_email: "nope" });
-    expect(bad.status).toBe(400);
-    expect(bad.body.errors).toHaveProperty("name");
-    const ok = await request(app)
-      .post("/schools")
-      .set(auth(admin))
-      .send({ name: `Campus ${stamp}`, school_code: `C${stamp}`, contact_phone: "+250 788 000 000", logo: "uploaded" });
-    expect(ok.status).toBe(201);
-    id = ok.body.data.school_id;
+  beforeAll(async () => {
+    const [r]: any = await db.insert(School).values({ name: `Campus ${stamp}`, school_code: `C${stamp}`, status: "INACTIVE" } as any);
+    id = Number(r.insertId);
     created.push(id);
-    expect(ok.body.data.logo).toBeNull();
+    const rows = await db.select().from(School);
+    inUse = rows.filter((s: any) => s.status === "ACTIVE").sort((a: any, b: any) => a.school_id - b.school_id)[0].school_id;
+  });
+
+  it("never creates a second school record", async () => {
+    expect((await request(app).post("/schools").set(auth(teacher)).send({ name: "X school" })).status).toBe(403);
+    const second = await request(app).post("/schools").set(auth(admin)).send({ name: `Another ${stamp}`, school_code: `A${stamp}` });
+    expect(second.status).toBe(409);
+    expect(second.body.message).toMatch(/already has its record/);
+    expect(await db.select().from(School).where(eq(School.name, `Another ${stamp}`))).toHaveLength(0);
   });
 
   it("refuses duplicate names and codes without regard to case", async () => {
-    const dupName = await request(app).post("/schools").set(auth(admin)).send({ name: `campus ${stamp}` });
+    const dupName = await request(app).put(`/schools/${inUse}`).set(auth(admin)).send({ name: `campus ${stamp}` });
     expect(dupName.status).toBe(409);
     expect(dupName.body.field).toBe("name");
-    const dupCode = await request(app).post("/schools").set(auth(admin)).send({ name: `Other ${stamp}`, school_code: `c${stamp}` });
+    const dupCode = await request(app).put(`/schools/${inUse}`).set(auth(admin)).send({ school_code: `c${stamp}` });
     expect(dupCode.status).toBe(409);
     expect(dupCode.body.field).toBe("school_code");
     // Saving a school with its own name is not a clash.
     expect((await request(app).put(`/schools/${id}`).set(auth(admin)).send({ name: `Campus ${stamp}` })).status).toBe(200);
+    const bad = await request(app).put(`/schools/${id}`).set(auth(admin)).send({ name: "", contact_email: "nope" });
+    expect(bad.status).toBe(400);
+    expect(bad.body.errors).toHaveProperty("name");
   });
 
   it("keeps the logo when the form is saved, and serves it with a version", async () => {
@@ -154,24 +162,20 @@ describe("school records", () => {
     expect((await request(app).delete(`/schools/${id}/logo/primary`).set(auth(teacher))).status).toBe(403);
   });
 
-  it("never deactivates the last active school record", async () => {
-    const all = await db.select().from(School);
-    const others = all.filter((s: any) => s.school_id !== id && s.status === "ACTIVE");
-    // Leave only our new record active.
-    for (const o of others) await db.update(School).set({ status: "INACTIVE" } as any).where(eq(School.school_id, o.school_id));
-    try {
-      const del = await request(app).delete(`/schools/${id}`).set(auth(admin));
-      expect(del.status).toBe(409);
-      const put = await request(app).put(`/schools/${id}`).set(auth(admin)).send({ status: "SUSPENDED" });
-      expect(put.status).toBe(409);
-      // With another active record it may go.
-      if (others[0]) {
-        await db.update(School).set({ status: "ACTIVE" } as any).where(eq(School.school_id, others[0].school_id));
-        expect((await request(app).delete(`/schools/${id}`).set(auth(admin))).status).toBe(200);
-        expect((await request(app).put(`/schools/${id}`).set(auth(admin)).send({ status: "ACTIVE" })).status).toBe(200);
-      }
-    } finally {
-      for (const o of others) await db.update(School).set({ status: "ACTIVE" } as any).where(eq(School.school_id, o.school_id));
-    }
+  it("keeps the record in use active, and never makes a second one active", async () => {
+    // The in-use record (lowest active id) can't be deactivated or suspended.
+    expect((await request(app).delete(`/schools/${inUse}`).set(auth(admin))).status).toBe(409);
+    const suspend = await request(app).put(`/schools/${inUse}`).set(auth(admin)).send({ status: "SUSPENDED" });
+    expect(suspend.status).toBe(409);
+    expect(suspend.body.field).toBe("status");
+    // The leftover can't be reactivated: it would take over the name, logo and registration code.
+    const revive = await request(app).put(`/schools/${id}`).set(auth(admin)).send({ status: "ACTIVE" });
+    expect(revive.status).toBe(409);
+    expect(revive.body.message).toMatch(/Only one school record can be active/);
+    // An active leftover (higher id than the one in use) may be retired.
+    await db.update(School).set({ status: "ACTIVE" } as any).where(eq(School.school_id, id));
+    expect((await request(app).delete(`/schools/${id}`).set(auth(admin))).status).toBe(200);
+    const [row] = await db.select().from(School).where(eq(School.school_id, id));
+    expect(row.status).toBe("INACTIVE");
   });
 });

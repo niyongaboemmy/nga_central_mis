@@ -144,7 +144,7 @@ const SEARCH_ITEMS: SearchItem[] = [
     requiredPermission: Permissions.MANAGE_SETTINGS,
   },
   {
-    label: "Schools",
+    label: "School profile",
     path: "/schools",
     requiredPermission: Permissions.MANAGE_SCHOOLS,
   },

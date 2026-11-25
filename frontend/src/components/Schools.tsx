@@ -7,7 +7,6 @@ import {
   Search,
   Edit,
   Power,
-  RotateCcw,
   MapPin,
   Mail,
   Phone,
@@ -157,16 +156,21 @@ const SchoolCard = ({
         <button type="button" onClick={() => onEdit(school)} className={iconBtn} title="Edit" aria-label={`Edit ${school.name}`}>
           <Edit className="w-4 h-4" />
         </button>
-        <button
-          type="button"
-          onClick={() => onToggleActive(school)}
-          disabled={busy}
-          className={active ? `${iconBtn} hover:!text-red-600 hover:!bg-red-50 dark:hover:!bg-red-900/20` : iconBtn}
-          title={active ? "Deactivate" : "Reactivate"}
-          aria-label={`${active ? "Deactivate" : "Reactivate"} ${school.name}`}
-        >
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : active ? <Power className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
-        </button>
+        {/* The record in use always stays active, and an extra record is never made active
+            again (it would take over the name, logo and registration numbers): only an
+            active extra record can be retired. */}
+        {active && !isBrand && (
+          <button
+            type="button"
+            onClick={() => onToggleActive(school)}
+            disabled={busy}
+            className={`${iconBtn} hover:!text-red-600 hover:!bg-red-50 dark:hover:!bg-red-900/20`}
+            title="Deactivate this extra record"
+            aria-label={`Deactivate ${school.name}`}
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Power className="w-4 h-4" />}
+          </button>
+        )}
       </div>
     </motion.div>
   );
@@ -698,14 +702,15 @@ const SchoolModal = ({
   onSaved,
   school,
   isBrand,
-  isLastActive,
+  canActivate,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSaved: (school: School | null, created: boolean) => void;
   school?: School | null;
   isBrand: boolean;
-  isLastActive: boolean;
+  /** No record is active yet, so this one may become the school's record. */
+  canActivate: boolean;
 }) => {
   const [formData, setFormData] = useState<Partial<School>>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<SchoolTextField | "status", string>>>({});
@@ -742,7 +747,7 @@ const SchoolModal = ({
     if (current && current.status === "ACTIVE" && formData.status !== "ACTIVE") {
       const ok = await confirm({
         title: `Make ${current.name} ${STATUS_LABEL[formData.status as Status].toLowerCase()}?`,
-        message: "Its users lose access until it is active again. Nothing is deleted.",
+        message: "It is an extra record that nothing reads while another one is in use. It can't be made active again. Nothing is deleted.",
         confirmText: "Save",
         tone: "warning",
       });
@@ -759,7 +764,7 @@ const SchoolModal = ({
         onClose();
       } else {
         const created = await createSchool(payload);
-        showToast(created ? "School created. You can add its logos now." : "School created", "success");
+        showToast(created ? "School set up. You can add its logos now." : "School set up", "success");
         onSaved(created, true);
         if (created) {
           // Stay open on the new record so its logos can be uploaded straight away.
@@ -848,9 +853,9 @@ const SchoolModal = ({
             <Building className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{current ? "Edit school" : "New school"}</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{current ? "Edit school" : "Set up this school"}</h2>
             <p className="text-gray-500 dark:text-gray-400 text-sm font-normal">
-              {current ? "Identity, logos and contacts" : "Add a school record to this account"}
+              {current ? "Identity, logos and contacts" : "Its name, logos and contacts, as everyone signed in here sees them"}
             </p>
           </div>
         </div>
@@ -952,36 +957,42 @@ const SchoolModal = ({
             />
           </Field>
 
-          <fieldset className="sm:col-span-2 lg:col-span-3">
-            <legend className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">Status</legend>
-            <div className="flex flex-wrap gap-3">
-              {(["ACTIVE", "INACTIVE", "SUSPENDED"] as Status[]).map((status) => {
-                const blocked = status !== "ACTIVE" && !!current && current.status === "ACTIVE" && isLastActive;
-                return (
-                  <label key={status} className={`relative flex items-center ${blocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
-                    <input
-                      type="radio"
-                      name="status"
-                      value={status}
-                      disabled={blocked}
-                      checked={formData.status === status}
-                      onChange={(e) => set("status", e.target.value)}
-                      className="sr-only peer"
-                    />
-                    <span className="px-4 py-2 rounded-full border border-gray-200 dark:border-gray-700/30 text-sm font-medium text-gray-500 peer-checked:bg-blue-50 peer-checked:border-blue-500 peer-checked:text-blue-600 dark:peer-checked:bg-blue-900/40 dark:peer-checked:text-blue-400 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 transition-all">
-                      {STATUS_LABEL[status]}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-            {current?.status === "ACTIVE" && isLastActive && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-1">
-                This is the only active school record, so it stays active: sign-in, branding and report cards depend on it.
-              </p>
-            )}
-            {errors.status && <p className="text-xs text-red-600 mt-1 ml-1">{errors.status}</p>}
-          </fieldset>
+          {current && isBrand ? (
+            <p className="sm:col-span-2 lg:col-span-3 text-xs text-gray-500 dark:text-gray-400 ml-1">
+              This is the record in use: sign-in, branding, registration numbers and report cards depend on it, so it stays active.
+            </p>
+          ) : current ? (
+            <fieldset className="sm:col-span-2 lg:col-span-3">
+              <legend className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">Status</legend>
+              <div className="flex flex-wrap gap-3">
+                {(["ACTIVE", "INACTIVE", "SUSPENDED"] as Status[]).map((status) => {
+                  const blocked = status === "ACTIVE" && current.status !== "ACTIVE" && !canActivate;
+                  return (
+                    <label key={status} className={`relative flex items-center ${blocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
+                      <input
+                        type="radio"
+                        name="status"
+                        value={status}
+                        disabled={blocked}
+                        checked={formData.status === status}
+                        onChange={(e) => set("status", e.target.value)}
+                        className="sr-only peer"
+                      />
+                      <span className="px-4 py-2 rounded-full border border-gray-200 dark:border-gray-700/30 text-sm font-medium text-gray-500 peer-checked:bg-blue-50 peer-checked:border-blue-500 peer-checked:text-blue-600 dark:peer-checked:bg-blue-900/40 dark:peer-checked:text-blue-400 peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500 transition-all">
+                        {STATUS_LABEL[status]}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {current.status !== "ACTIVE" && !canActivate && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-1">
+                  An extra record can't be made active: it would take over this school's name, logo and registration numbers.
+                </p>
+              )}
+              {errors.status && <p className="text-xs text-red-600 mt-1 ml-1">{errors.status}</p>}
+            </fieldset>
+          ) : null}
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
@@ -1051,34 +1062,26 @@ const Schools = () => {
   }, [canManage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const brandId = useMemo(() => brandSchoolId(schools), [schools]);
-  const activeCount = schools.filter((s) => s.status === "ACTIVE").length;
+  const hasExtras = schools.length > 1;
+  const canApplications = access.can("PLATFORM_APPLICATIONS_REVIEW");
 
   const handleToggleActive = async (school: School) => {
-    const activating = school.status !== "ACTIVE";
-    if (!activating && activeCount <= 1) {
-      showToast("This is the only active school record. Activate or add another one first.", "error");
-      return;
-    }
-    const ok = await confirm(
-      activating
-        ? { title: `Reactivate ${school.name}?`, message: "Its users can sign in again.", confirmText: "Reactivate", tone: "info" }
-        : {
-            title: `Deactivate ${school.name}?`,
-            message: "Its users lose access until it is reactivated. Nothing is deleted.",
-            confirmText: "Deactivate",
-            tone: "warning",
-          },
-    );
+    if (school.status !== "ACTIVE" || school.school_id === brandId) return;
+    const ok = await confirm({
+      title: `Deactivate ${school.name}?`,
+      message: "It is an extra record that nothing reads while another one is in use. It can't be made active again. Nothing is deleted.",
+      confirmText: "Deactivate",
+      tone: "warning",
+    });
     if (!ok) return;
     setBusyId(school.school_id);
     try {
-      if (activating) await updateSchool(school.school_id, { status: "ACTIVE" });
-      else await deleteSchool(school.school_id);
-      showToast(activating ? `${school.name} is active again` : `${school.name} deactivated`, "success");
+      await deleteSchool(school.school_id);
+      showToast(`${school.name} deactivated`, "success");
       await fetchSchools(true);
       refreshBranding();
     } catch (error: any) {
-      showToast(error.response?.data?.message || "Couldn't change the school's status", "error");
+      showToast(error.response?.data?.message || "Couldn't deactivate the record", "error");
     } finally {
       setBusyId(null);
     }
@@ -1118,33 +1121,56 @@ const Schools = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-              Tenants & Schools
+              School profile
               <span className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-md border border-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
                 Admin
               </span>
             </h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-2 text-base">
-              This school's identity, logos and apps. The logo marked <span className="font-medium">In use</span> is the one everyone signed in here sees.
+            <p className="text-gray-500 dark:text-gray-400 mt-2 text-base max-w-3xl">
+              This school's identity, logos and apps: what everyone signed in here sees. Each school has one record. A new school is a separate
+              account that joins through an application on the platform, not a record added here.
             </p>
-            {canPlatform && (
-              <Link to="/platform/schools" className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                Other schools on the platform are managed in the platform console <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
+            {(canPlatform || canApplications) && (
+              <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2">
+                {canApplications && (
+                  <Link to="/platform/applications" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                    New schools: applications in the platform console <ArrowUpRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
+                {canPlatform && (
+                  <Link to="/platform/schools" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                    All schools on the platform <ArrowUpRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
+              </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedSchool(null);
-              setModalOpen(true);
-            }}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center gap-2 font-semibold transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Add school
-          </button>
+          {!loading && !loadError && schools.length === 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSchool(null);
+                setModalOpen(true);
+              }}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center gap-2 font-semibold transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Set up school
+            </button>
+          )}
         </div>
 
+        {hasExtras && !loading && (
+          <div role="note" className="flex items-start gap-3 rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <p>
+              This school has {schools.length} records. Only the one marked <span className="font-semibold">In use</span> counts: its name, logo and code
+              are what everyone sees and what registration numbers start with. The others are leftovers. Deactivate any that are still active.
+            </p>
+          </div>
+        )}
+
+        {hasExtras && (
         <div className="flex flex-col lg:flex-row lg:items-center gap-3">
           <div className="relative w-full lg:max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1178,10 +1204,10 @@ const Schools = () => {
             ))}
           </div>
         </div>
-
+        )}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6" aria-busy="true" aria-label="Loading schools">
-            {[0, 1, 2].map((i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6" aria-busy="true" aria-label="Loading the school">
+            {[0].map((i) => (
               <SchoolCardSkeleton key={i} />
             ))}
           </div>
@@ -1220,9 +1246,9 @@ const Schools = () => {
             <div className="w-20 h-20 bg-gray-50 dark:bg-gray-800/50 rounded-full flex items-center justify-center mb-5">
               <Search className="w-9 h-9 text-gray-300 dark:text-gray-600" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{schools.length ? "No schools match" : "No schools yet"}</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{schools.length ? "No records match" : "This school isn't set up yet"}</h3>
             <p className="text-gray-500 dark:text-gray-400 max-w-sm">
-              {schools.length ? "Try another search or status." : "Add the school's record to set its name, logo and apps."}
+              {schools.length ? "Try another search or status." : "Set up the school's record to give it a name, logo and apps."}
             </p>
           </div>
         )}
@@ -1234,7 +1260,7 @@ const Schools = () => {
         onSaved={() => void fetchSchools(true)}
         school={selectedSchool}
         isBrand={!!selectedSchool && selectedSchool.school_id === brandId}
-        isLastActive={activeCount <= 1}
+        canActivate={brandId === null}
       />
 
       {selectedSchool && (
