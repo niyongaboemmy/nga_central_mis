@@ -19,6 +19,7 @@ import { usePermissions } from "../hooks/usePermissions";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import SchoolPicker from "./auth/SchoolPicker";
 import { TENANT_MESSAGES, isTenantRefusal, type SchoolChoice } from "../lib/tenant";
+import { rememberSchool, rememberedSchool } from "../lib/schoolSwitch";
 import { setOnboardingToken } from "../api/tenantMgmt";
 import { registerSchoolHref } from "../utils/registrationSite";
 import {
@@ -635,6 +636,27 @@ const useLoginBrand = () => {
   return brand;
 };
 
+/** The e-mail inside a Google ID token (only to remember a school choice; never trusted). */
+const googleEmailOf = (credential: string): string => {
+  try {
+    return String(JSON.parse(atob(credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).email ?? "");
+  } catch {
+    return "";
+  }
+};
+
+/** /switch-school (signed out) -> sign in -> back to it. Only same-origin paths. */
+const AFTER_LOGIN_KEY = "nga.afterLogin";
+const takeAfterLogin = (): string | null => {
+  try {
+    const v = sessionStorage.getItem(AFTER_LOGIN_KEY);
+    sessionStorage.removeItem(AFTER_LOGIN_KEY);
+    return v && v.startsWith("/switch-school") ? v : null;
+  } catch {
+    return null;
+  }
+};
+
 const LoginBrandPanel = () => {
   const brand = useLoginBrand();
   return (
@@ -750,6 +772,19 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   // dialog; the sign-in is then sent again with the chosen school.
   const [schoolChoices, setSchoolChoices] = useState<SchoolChoice[] | null>(null);
   const retryWithSchool = useRef<((slug: string) => Promise<void>) | null>(null);
+  /** Who the picker remembers a school for (the typed identifier, or the Google e-mail). */
+  const chooserIdentity = useRef<string>("");
+  /** A school remembered on this device for this person is used without asking. */
+  const offerSchools = (choices: SchoolChoice[], identity: string, retry: (slug: string) => Promise<void>) => {
+    chooserIdentity.current = identity;
+    retryWithSchool.current = retry;
+    const remembered = identity ? rememberedSchool(identity) : null;
+    if (remembered && choices.some((c) => c.slug === remembered)) {
+      void retry(remembered);
+      return;
+    }
+    setSchoolChoices(choices);
+  };
   /** A school that can't be used yet says why (pending -> the review page). */
   const signInError = (error: any, fallback: string): string | null => {
     const code = error?.response?.data?.code;
@@ -819,8 +854,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       const response = await login(tenant ? { username, password, tenant } : { username, password });
       if (takeOnboarding(response)) return;
       if (response?.choose?.length) {
-        retryWithSchool.current = (slug) => signInWithPassword(slug);
-        setSchoolChoices(response.choose);
+        offerSchools(response.choose, username, (slug) => signInWithPassword(slug));
         return;
       }
       setSchoolChoices(null);
@@ -962,6 +996,13 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       }
     }
 
+    // The switch-school page sent a signed-out person here: go back to it.
+    const after = takeAfterLogin();
+    if (after) {
+      window.location.assign(after);
+      return;
+    }
+
     setStep("success");
     setTimeout(() => {
       if (onLoginSuccess) {
@@ -977,8 +1018,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       const response = await googleLogin(credential, undefined, undefined, tenant);
       if (takeOnboarding(response)) return;
       if (response && response.choose?.length) {
-        retryWithSchool.current = (slug) => signInWithGoogle(credential, slug);
-        setSchoolChoices(response.choose);
+        offerSchools(response.choose, googleEmailOf(credential), (slug) => signInWithGoogle(credential, slug));
         return;
       }
       setSchoolChoices(null);
@@ -2423,8 +2463,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         schools={schoolChoices}
         busy={loading}
         onClose={() => setSchoolChoices(null)}
-        onChoose={(school) => {
+        onChoose={(school, remember) => {
           const retry = retryWithSchool.current;
+          if (chooserIdentity.current) rememberSchool(chooserIdentity.current, remember ? school.slug : null);
           setSchoolChoices(null);
           if (retry) void retry(school.slug);
         }}

@@ -1,3 +1,4 @@
+import { watchSchoolChanges } from "../lib/schoolSwitch";
 import React, {
   createContext,
   useContext,
@@ -111,6 +112,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     refreshUser();
   }, [refreshUser]);
+
+  // Another tab, NGA app or the desktop switched school: reload into it
+  // (TENANT_SWITCHING_PLAN.md §4.2). The reload re-reads the session, and
+  // noteIdentity drops the previous school's cached data.
+  const tidRef = useRef<number | null>(null);
+  tidRef.current = (user as any)?.tenant?.tid ?? null;
+  useEffect(() => watchSchoolChanges(() => tidRef.current), []);
 
   const login = async (_tempToken: string) => {
     // The actual login flow stores the token via verifyOTP

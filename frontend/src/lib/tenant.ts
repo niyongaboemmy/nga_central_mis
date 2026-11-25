@@ -28,6 +28,7 @@ export interface SchoolChoice {
   tid: number;
   name: string;
   slug: string;
+  logoUrl?: string | null;
 }
 
 export const PRIMARY_TID = 1;

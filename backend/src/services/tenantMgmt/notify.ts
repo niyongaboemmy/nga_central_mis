@@ -22,7 +22,9 @@ export type PlatformEventKey =
   | "provisioning.failed"
   | "tenant.live"
   | "billing.digest"
-  | "limit.digest";
+  | "limit.digest"
+  | "tenancy.strict_on"
+  | "tenancy.fallback_alert";
 
 /** Primary-tenant users who hold one of `caps` through an ACTIVE grant (any scope). */
 export async function platformStaffWith(caps: string[]): Promise<number[]> {

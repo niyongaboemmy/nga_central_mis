@@ -112,6 +112,15 @@ if (config.nodeEnv !== "test") {
   setTimeout(runGitHousekeeping, 5 * 60_000);
   setInterval(runGitHousekeeping, 10 * 60 * 1000).unref();
 
+  // Automatic strict tenancy (TENANT_SWITCHING_PLAN.md Appendix A.6): report MIS's
+  // own fallbacks to school 1, decide per app after 7 clean days, apply MIS's flag.
+  const runTenancyStrict = async () => {
+    const { tenancyStrictTick } = await import("./services/tenancy/strictMode");
+    await tenancyStrictTick();
+  };
+  setTimeout(() => void runTenancyStrict(), 60_000);
+  setInterval(() => void runTenancyStrict(), 60 * 60 * 1000).unref();
+
   // My AI: once a day, re-check people's own AI keys used in the last 30 days, so a revoked
   // key or an empty account shows up in My AI before the next call fails.
   const runKeySweep = tenantJob("my-ai-key-sweep", async (tenant) => {

@@ -79,8 +79,19 @@ async function primaryAccountOf(identifier: string): Promise<number | null> {
 /** The `choose` list sent back when several schools match. */
 export const chooseList = (tenants: TenantCtx[]) => tenants.map((t) => ({ tid: t.tid, name: t.name, slug: t.slug }));
 
-export function sendChoose(res: any, tenants: TenantCtx[]) {
-  const choose = chooseList(tenants);
+/** The choose list with each school's logo (public branding; never fails the sign-in). */
+async function chooseListWithLogos(tenants: TenantCtx[]) {
+  const { brandingFor } = await import("../routes/tenantBranding");
+  return Promise.all(
+    tenants.map(async (t) => {
+      const brand = await brandingFor(t).catch(() => null);
+      return { tid: t.tid, name: brand?.school_name || t.name, slug: t.slug, logoUrl: brand?.logoUrl ?? null };
+    }),
+  );
+}
+
+export async function sendChoose(res: any, tenants: TenantCtx[]) {
+  const choose = await chooseListWithLogos(tenants);
   return res.status(200).json({
     success: true,
     message: "This account belongs to more than one school. Choose one and sign in again.",

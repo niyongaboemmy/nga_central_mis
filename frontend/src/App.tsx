@@ -14,6 +14,7 @@ import OnboardingPending from "./components/auth/OnboardingPending";
 const RegisterSchoolPage = lazy(() => import("./components/tenantMgmt/register/RegisterSchoolPage"));
 const OnboardingTracker = lazy(() => import("./components/tenantMgmt/onboarding/OnboardingTracker"));
 const PlatformConsole = lazy(() => import("./components/tenantMgmt/platform/PlatformConsole"));
+const SwitchSchoolPage = lazy(() => import("./components/school/SwitchSchoolPage"));
 const MyProjects = lazy(() => import("./components/sideProjects/MyProjects"));
 const ProjectsMonitor = lazy(() => import("./components/sideProjects/monitor/ProjectsMonitor"));
 const AssignedProjects = lazy(() => import("./components/sideProjects/AssignedProjects"));
@@ -424,6 +425,15 @@ function App() {
                     <OnboardingTracker />
                   </Suspense>
                 )
+              }
+            />
+            {/* Every NGA app sends people here to change school (TENANT_SWITCHING_PLAN.md A.4). */}
+            <Route
+              path="/switch-school"
+              element={
+                <Suspense fallback={null}>
+                  <SwitchSchoolPage />
+                </Suspense>
               }
             />
             <Route

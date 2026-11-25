@@ -16,6 +16,7 @@ import {
   redeemDesktopHandoff,
 } from "../controllers/authController";
 import { authenticate, authenticateFor, authenticateIdentityRead } from "../middleware/auth";
+import { getMySchools, switchSchool } from "../controllers/schoolSwitchController";
 
 const router = express.Router();
 
@@ -26,6 +27,9 @@ router.post("/desktop-handoff", authenticate, createDesktopHandoff);
 router.post("/desktop-handoff/redeem", redeemDesktopHandoff);
 router.post("/logout", authenticate, logout);
 router.get("/session", authenticate, getSession);
+// One person, several schools (TENANT_SWITCHING_PLAN.md §4.3).
+router.get("/my-schools", authenticate, getMySchools);
+router.post("/switch-school", authenticate, switchSchool);
 // Cheap "is this token still valid" check -- authenticate() already does
 // the token_version revocation check, this just returns without the
 // heavy profile/roles/systems payload getSession assembles. Meant to be

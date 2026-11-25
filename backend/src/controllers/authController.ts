@@ -46,7 +46,8 @@ import { getCurrentAcademicYearId } from "../utils/academicYear";
 import { TenantCtx, runWithTenant } from "../vendor/nga-tenancy";
 import { applicantGoogleSignIn, applicantSignIn, resolveLoginTenants, sendChoose, sendOnboarding } from "../tenancy/loginResolver";
 import { holdsBillingCapability, sendRefusal, tenantFromClaims } from "../tenancy/express";
-import { tenantBlock, tenantClaims } from "../tenancy/claims";
+import { responseTenant, tenantBlock, tenantClaims } from "../tenancy/claims";
+import { clearSchoolCookie, newSessionId, setSchoolCookie } from "../tenancy/schoolCookie";
 import { lookupDirectory, queueDirectorySync } from "../tenancy/directory";
 import { findTenant, getTenant } from "../tenancy/registry";
 import { primaryTenant } from "../tenancy/express";
@@ -81,7 +82,7 @@ const withSignInTenant = async (
       else candidates = [r.tenants[0]]; // fails in there with the usual "Invalid credentials"
     }
     if (candidates.length > 1) {
-      sendChoose(res, candidates);
+      await sendChoose(res, candidates);
       return;
     }
     tenant = candidates[0];
@@ -262,10 +263,12 @@ const googleClient = new OAuth2Client(config.google.clientId);
 // Builds and sends the final session (JWT + cookie + full user context) for
 // any login method that has already verified the user's identity (password
 // + OTP, or a verified Google ID token).
-const completeLogin = async (
+const responseTenantTid = () => responseTenant().tid;
+
+export const completeLogin = async (
   userId: number,
   res: any,
-  loginMethod: "OTP_EMAIL" | "GOOGLE_OAUTH" | "DESKTOP_BROWSER",
+  loginMethod: "OTP_EMAIL" | "GOOGLE_OAUTH" | "DESKTOP_BROWSER" | "SCHOOL_SWITCH",
   req?: any,
 ) => {
   // Get user permissions
@@ -401,6 +404,8 @@ const completeLogin = async (
   // No client_secret -- see utils/publicSystems.ts.
   const systems = await getPublicSystems(undefined, userId);
 
+  const sid = newSessionId();
+
   // Generate final JWT token
   const token = jwt.sign(
     {
@@ -420,6 +425,9 @@ const completeLogin = async (
       tokenVersion: user[0].token_version || 0,
       // Token contract v2 (packages/tenancy/CONTRACT.md §2).
       ...tenantClaims(),
+      // This browser session (TENANT_SWITCHING_PLAN.md §4.2): carried into the
+      // spokes' MIS tokens so a school switch ends only this device's sessions.
+      sid,
     },
     config.jwtSecret,
     { expiresIn: "24h" },
@@ -433,6 +441,9 @@ const completeLogin = async (
     domain: config.cookieDomain,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   });
+  // The selected school, readable by every NGA app on this domain: their school
+  // guard compares it with their own session (no credential in it).
+  setSchoolCookie(res, responseTenantTid(), sid);
 
   logger.info(
     `Login completed for user: ${user[0].username} via ${loginMethod}`,
@@ -440,6 +451,7 @@ const completeLogin = async (
 
   trackAuth(req, {
     kind: loginMethod === "GOOGLE_OAUTH" ? "google" : "login",
+    ...(loginMethod === "SCHOOL_SWITCH" ? { reason: "school_switch" } : {}),
     // DESKTOP_BROWSER: the NGA desktop app, signed in through the person's browser.
     outcome: "success",
     method: loginMethod === "GOOGLE_OAUTH" ? "google" : loginMethod === "DESKTOP_BROWSER" ? "desktop_browser" : "password_otp",
@@ -450,7 +462,7 @@ const completeLogin = async (
   await recordActivity(
     userId,
     "LOGIN_SUCCESS",
-    `User successfully logged in via ${loginMethod === "GOOGLE_OAUTH" ? "Google" : loginMethod === "DESKTOP_BROWSER" ? "the desktop app (browser sign-in)" : "2FA"}`,
+    `User successfully logged in via ${loginMethod === "GOOGLE_OAUTH" ? "Google" : loginMethod === "DESKTOP_BROWSER" ? "the desktop app (browser sign-in)" : loginMethod === "SCHOOL_SWITCH" ? "a school switch" : "2FA"}`,
     "User",
     userId,
     { method: loginMethod, timestamp: new Date().toISOString() },
@@ -754,6 +766,7 @@ export const logout = asyncHandler(async (req: any, res: any) => {
     domain: config.cookieDomain,
     path: "/",
   });
+  clearSchoolCookie(res);
 
   // Single sign-out: tell every connected app (Task Mentor, Tendo, Tupo, ...)
   // to end this user's sessions too -- OIDC Back-Channel Logout, in the

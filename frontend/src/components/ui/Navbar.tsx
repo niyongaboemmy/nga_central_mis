@@ -14,6 +14,7 @@ import { KeyRound, LayoutGrid } from "lucide-react";
 import { useAccess } from "../../hooks/useAccess";
 import { usePermissions } from "../../hooks/usePermissions";
 import UserAvatar from "./UserAvatar";
+import SchoolSwitcher from "../school/SchoolSwitcher";
 
 interface NavbarProps {
   onNavigateToLogin?: () => void;
@@ -200,6 +201,7 @@ const Navbar: React.FC<NavbarProps> = ({
               {user && <NavAppActions />}
               {user && <MenteesQuickAccess />}
               {user && <NotificationBell />}
+              {user && <SchoolSwitcher />}
               <ThemeToggle />
 
               {showUserCard && user ? (
@@ -238,6 +240,7 @@ const Navbar: React.FC<NavbarProps> = ({
                           </p>
                         </div>
                       </div>
+                      <SchoolSwitcher variant="menu" onPicked={() => setIsUserDropdownOpen(false)} />
                       <Link to={"/profile"} title="Profile">
                         <button
                           onClick={() => {
@@ -557,6 +560,9 @@ const Navbar: React.FC<NavbarProps> = ({
                 )}
               </>
             )}
+
+            {/* Switch school (only for people with 2+ schools) */}
+            {user && <SchoolSwitcher variant="menu" onPicked={closeMobileMenu} />}
 
             {/* Sign In / Sign Out for Mobile */}
             {showAuthButtons && user ? (

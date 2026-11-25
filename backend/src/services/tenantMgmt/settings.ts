@@ -18,6 +18,8 @@ export const PLATFORM_SETTING_DEFAULTS = {
   "review.sla_days": 3,
   "documents.required": ["REGISTRATION_CERT"] as string[],
   "support.max_hours": 24,
+  /** Automatic strict tenancy per app (services/tenancy/strictMode.ts). */
+  "tenancy.strict": {} as Record<string, { on: boolean; since: string | null; lastAlertDay?: string | null }>,
 };
 
 export type PlatformSettingKey = keyof typeof PLATFORM_SETTING_DEFAULTS;
