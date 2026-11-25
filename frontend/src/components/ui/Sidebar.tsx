@@ -537,7 +537,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
             aria-haspopup="menu"
             aria-expanded={accountOpen}
             {...tipProps("Account")}
-            className={`mt-1 rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${accountOpen ? "ring-2 ring-blue-500" : "hover:ring-2 hover:ring-gray-200 dark:hover:ring-gray-700"}`}
+            className={`mt-1 flex rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${accountOpen ? "ring-2 ring-blue-500" : "hover:ring-2 hover:ring-gray-200 dark:hover:ring-gray-700"}`}
           >
             <UserAvatar name={fullName} avatar={user?.avatar} size={34} decorative fallback="person" />
           </button>

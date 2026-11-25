@@ -47,15 +47,50 @@ beforeEach(() => {
   api.getSchools.mockResolvedValue([nga]);
 });
 
-describe("Tenants & Schools", () => {
-  it("shows the logo with its version, marks the record in use, and filters", async () => {
+const leftover = { ...nga, school_id: 7, name: "Old Campus", school_code: "OLD", logo: undefined, status: "ACTIVE" as const };
+
+describe("School profile", () => {
+  it("shows the logo with its version and marks the record in use", async () => {
     renderPage();
     const card = (await screen.findByText(nga.name)).closest("div.flex.flex-col") as HTMLElement;
     const img = within(card).getByRole("img", { name: nga.name }) as HTMLImageElement;
     expect(img.src).toContain("/schools/1/logo/primary?v=99");
     expect(within(card).getByText("In use")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: /inactive/i }));
-    expect(screen.getByText("No schools match")).toBeInTheDocument();
+  });
+
+  it("offers no way to add a second school, or to switch off the one in use", async () => {
+    renderPage();
+    await screen.findByText(nga.name);
+    expect(screen.queryByRole("button", { name: /add school|set up school/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /deactivate/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: /filter by status/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: `Edit ${nga.name}` }));
+    expect(screen.queryByRole("radio", { name: /inactive/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/so it stays active/i)).toBeInTheDocument();
+  });
+
+  it("sets up the record only when the school has none", async () => {
+    api.getSchools.mockResolvedValue([]);
+    renderPage();
+    expect(await screen.findByRole("button", { name: /set up school/i })).toBeInTheDocument();
+    expect(screen.getByText(/isn't set up yet/i)).toBeInTheDocument();
+  });
+
+  it("flags leftover records; they can be deactivated but never reactivated", async () => {
+    api.getSchools.mockResolvedValue([nga, leftover, { ...leftover, school_id: 8, name: "Older Campus", status: "INACTIVE" as const }]);
+    api.deleteSchool.mockResolvedValue(undefined);
+    renderPage();
+    expect(await screen.findByText(/this school has 3 records/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `Deactivate ${nga.name}` })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /reactivate/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Deactivate Old Campus" }));
+    await waitFor(() => expect(api.deleteSchool).toHaveBeenCalledWith(7));
+    fireEvent.click(screen.getByRole("tab", { name: /suspended/i }));
+    expect(screen.getByText("No records match")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^all/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Older Campus" }));
+    expect(screen.getByRole("radio", { name: /^active$/i })).toBeDisabled();
   });
 
   it("validates inline and never sends logo paths on save", async () => {
@@ -76,13 +111,6 @@ describe("Tenants & Schools", () => {
     expect(payload).not.toHaveProperty("logo");
     expect(payload).not.toHaveProperty("partner_logo");
     expect(toast).toHaveBeenCalledWith("School saved", "success");
-  });
-
-  it("won't deactivate the only active record", async () => {
-    renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: `Deactivate ${nga.name}` }));
-    expect(api.deleteSchool).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith(expect.stringMatching(/only active school/i), "error");
   });
 
   it("offers a retry when the list can't load", async () => {
