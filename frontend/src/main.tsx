@@ -28,7 +28,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID || ""}>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID || ""} locale="en">
       <UserProvider>
         <ThemeProvider>
           <App />

@@ -91,4 +91,21 @@ describe("POST /users/service/staff-identity", () => {
     const rows: any = await db.execute(sql`SELECT google_id FROM AuthCredential WHERE user_id = ${teacherId}`);
     expect((Array.isArray(rows[0]) ? rows[0] : rows)[0].google_id).toBeNull();
   });
+
+  it("a person types the Gmail they check in with (no Google pop-up); it matches, and clashes are refused", async () => {
+    const token = signToken(otherId);
+    const bad = await request(app).put("/users/me/attendance-google").set("Authorization", `Bearer ${token}`).send({ email: "not-an-email" });
+    expect(bad.status).toBe(400);
+    const clash = await request(app).put("/users/me/attendance-google").set("Authorization", `Bearer ${token}`).send({ email: `grace.${tag}@gmail.com` });
+    expect(clash.status).toBe(409);
+    const set = await request(app).put("/users/me/attendance-google").set("Authorization", `Bearer ${token}`).send({ email: ` Office.Typed.${tag}@Gmail.com ` });
+    expect(set.status).toBe(200);
+    expect(set.body.data).toMatchObject({ linked: true, google_email: `office.typed.${tag}@gmail.com`, verified: false });
+    const res = await request(app).post("/users/service/staff-identity").set("Authorization", auth)
+      .send({ google_sub: `typed-${tag}`, google_email: `office.typed.${tag}@gmail.com` });
+    expect(res.body.data).toMatchObject({ user_id: otherId, matched_by: "google_email" });
+    // Removing it forgets both the typed address and the Google account id.
+    const off = await request(app).delete("/users/me/attendance-google").set("Authorization", `Bearer ${token}`);
+    expect(off.body.data).toMatchObject({ linked: false, google_email: null, verified: false });
+  });
 });

@@ -44,6 +44,7 @@ import {
   staffIdentity,
   getMyAttendanceGoogle,
   linkMyAttendanceGoogle,
+  setMyAttendanceGoogle,
   unlinkMyAttendanceGoogle,
   getUserAttendanceGoogle,
   setUserAttendanceGoogle,
@@ -120,6 +121,7 @@ router.post("/service/staff-identity", requireServiceToken("profiles:read"), sta
 // The Google account a person checks in with (their own, or set by an admin).
 router.get("/me/attendance-google", authenticate, getMyAttendanceGoogle);
 router.post("/me/attendance-google", authenticate, linkMyAttendanceGoogle);
+router.put("/me/attendance-google", authenticate, setMyAttendanceGoogle);
 router.delete("/me/attendance-google", authenticate, unlinkMyAttendanceGoogle);
 router.get("/:id/attendance-google", authenticate, authorize("MANAGE_USERS"), getUserAttendanceGoogle);
 router.put("/:id/attendance-google", authenticate, authorize("MANAGE_USERS"), setUserAttendanceGoogle);
