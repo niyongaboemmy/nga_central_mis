@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeftRight, Check, Copy, Crown, KeyRound, Lock, Mail, Phone, RotateCcw, School, Search, ShieldCheck, TriangleAlert, UserCog, UserMinus, UserPlus, Users } from "lucide-react";
+import { ArrowLeftRight, Check, Copy, Crown, KeyRound, Lock, Mail, Phone, RotateCcw, ShieldCheck, TriangleAlert, UserCog, UserMinus, UserPlus, Users } from "lucide-react";
+import { PersonResults, PersonResultsSkeleton, PersonSearchField, PickedPerson } from "../../people/PersonElsewhere";
 import Modal from "../../ui/Modal";
-import { EmptyState } from "../kit";
+import { EmptyState, Pill } from "../kit";
 import { platformApi, type PersonElsewhere, type TenantAdmin, type TenantDetail } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
-import { Btn, Card, Field, IconBtn, ReasonDialog, act, ago, cx, errorText, fmtDateTime, initials, inputCls, toast, usePlatform } from "./platformShared";
+import { Btn, Field, IconBtn, ReasonDialog, Skeleton, SkeletonRows, accent, act, ago, cx, errorText, fmtDateTime, initials, inputCls, surface, toast, usePlatform } from "./platformShared";
 
 type Kind = TenantAdmin["kind"];
 type Credentials = { name: string; email: string | null; username: string; password: string; emailed: boolean };
@@ -50,8 +51,8 @@ const SchoolAdminsTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-bold text-slate-900 dark:text-white">Administrators</h2>
-          <p className="text-sm text-slate-600 dark:text-gray-300">
+          <h2 className="text-base font-bold text-gray-900 dark:text-white">Administrators</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             {admins === null ? "Loading…" : `${admins.length} ${admins.length === 1 ? "person runs" : "people run"} ${t.name}`}
           </p>
         </div>
@@ -68,24 +69,14 @@ const SchoolAdminsTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
       </div>
 
       {t.isPrimary && (
-        <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-gray-300">
-          <ShieldCheck className="h-4 w-4 text-brand-600 dark:text-brand-200" aria-hidden />
+        <p className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+          <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden />
           The primary school's administrators are managed in its own Access settings.
         </p>
       )}
 
       {admins === null ? (
-        <ul className="space-y-2" aria-busy="true" aria-label="Loading administrators">
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="flex animate-pulse items-center gap-3 rounded-2xl border border-slate-200 p-3 dark:border-gray-700">
-              <span className="h-11 w-11 rounded-full bg-slate-200 dark:bg-gray-800" />
-              <span className="flex-1 space-y-2">
-                <span className="block h-3.5 w-40 rounded bg-slate-200 dark:bg-gray-800" />
-                <span className="block h-3 w-64 max-w-full rounded bg-slate-100 dark:bg-gray-800/70" />
-              </span>
-            </li>
-          ))}
-        </ul>
+        <SkeletonRows rows={3} label="Loading administrators" />
       ) : admins.length === 0 ? (
         <EmptyState icon={Users} title="No administrators">
           {manage && (
@@ -95,7 +86,7 @@ const SchoolAdminsTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
           )}
         </EmptyState>
       ) : (
-        <ul className="space-y-2" aria-label="Administrators">
+        <ul className={cx(surface.card, "divide-y px-2", surface.divide)} aria-label="Administrators">
           <AnimatePresence initial={false}>
             {admins.map((a) => (
               <motion.li key={a.userId} layout {...m("reveal")}>
@@ -152,7 +143,7 @@ const SchoolAdminsTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
           setCreds({ name: a.name, email: a.email, username: a.username, password: r.tempPassword, emailed: r.emailed });
         }}
       >
-        <p className="text-sm text-slate-600 dark:text-gray-300">They get a one-time password, are signed out everywhere, and choose a new password at their next sign-in.</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300">They get a one-time password, are signed out everywhere, and choose a new password at their next sign-in.</p>
       </ReasonDialog>
 
       <ReasonDialog
@@ -170,7 +161,7 @@ const SchoolAdminsTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
           load();
         }}
       >
-        <p className="text-sm text-slate-600 dark:text-gray-300">Their administrator access ends. The account itself stays, with any other roles it has.</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300">Their administrator access ends. The account itself stays, with any other roles it has.</p>
       </ReasonDialog>
 
       <CredentialsDialog creds={creds} onClose={() => setCreds(null)} />
@@ -180,20 +171,6 @@ const SchoolAdminsTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
 
 // ---------------------------------------------------------------------------
 
-const Chip: React.FC<{ tone: "brand" | "slate" | "amber" | "red"; icon?: React.ElementType; children: React.ReactNode }> = ({ tone, icon: Icon, children }) => (
-  <span
-    className={cx(
-      "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold",
-      tone === "brand" && "bg-brand-100 text-brand-800 dark:bg-brand-500/20 dark:text-brand-200",
-      tone === "slate" && "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-200",
-      tone === "amber" && "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200",
-      tone === "red" && "bg-red-100 text-red-700 dark:bg-red-400/15 dark:text-red-200",
-    )}
-  >
-    {Icon && <Icon className="h-3 w-3" aria-hidden />}
-    {children}
-  </span>
-);
 
 const AdminRow: React.FC<{ admin: TenantAdmin; manage: boolean; lastOwner: boolean; onReset: () => void; onRemove: () => void }> = ({
   admin: a,
@@ -204,11 +181,11 @@ const AdminRow: React.FC<{ admin: TenantAdmin; manage: boolean; lastOwner: boole
 }) => {
   const active = a.status === "ACTIVE";
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 sm:flex-nowrap">
+    <div className="flex flex-wrap items-center gap-3 px-2 py-3 sm:flex-nowrap">
       <span
         className={cx(
           "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-          active ? "bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200" : "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-400",
+          active ? "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" : "bg-gray-100 text-gray-500 dark:bg-gray-800/70 dark:text-gray-400",
         )}
         aria-hidden
       >
@@ -216,27 +193,27 @@ const AdminRow: React.FC<{ admin: TenantAdmin; manage: boolean; lastOwner: boole
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="truncate font-semibold text-slate-900 dark:text-white">{a.name}</span>
+          <span className="truncate font-semibold text-gray-900 dark:text-white">{a.name}</span>
           {a.kind === "OWNER" ? (
-            <Chip tone="brand" icon={Crown}>
+            <Pill tone="blue" icon={Crown}>
               Owner
-            </Chip>
+            </Pill>
           ) : (
-            <Chip tone="slate" icon={UserCog}>
+            <Pill tone="gray" icon={UserCog}>
               Administrator
-            </Chip>
+            </Pill>
           )}
-          {!active && <Chip tone="red">Deactivated</Chip>}
+          {!active && <Pill tone="red">Deactivated</Pill>}
           {a.lockedUntil && (
-            <Chip tone="red" icon={Lock}>
+            <Pill tone="red" icon={Lock}>
               Locked
-            </Chip>
+            </Pill>
           )}
-          {a.mustChangePassword && <Chip tone="amber">Password not set yet</Chip>}
+          {a.mustChangePassword && <Pill tone="amber">Password not set yet</Pill>}
         </div>
-        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-600 dark:text-gray-300">
+        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-600 dark:text-gray-300">
           {a.email && (
-            <a href={`mailto:${a.email}`} className="inline-flex min-w-0 items-center gap-1 hover:text-brand-700 dark:hover:text-brand-200">
+            <a href={`mailto:${a.email}`} className="inline-flex min-w-0 items-center gap-1 hover:text-blue-700 dark:hover:text-blue-300">
               <Mail className="h-3 w-3 shrink-0" aria-hidden />
               <span className="truncate">{a.email}</span>
             </a>
@@ -332,16 +309,17 @@ const AddAdminDialog: React.FC<{
                 disabled={disabled}
                 onClick={() => setF({ ...f, kind: k })}
                 className={cx(
-                  "flex items-start gap-3 rounded-2xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-50",
-                  on ? "border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-500/10" : "border-slate-200 hover:bg-slate-50 dark:border-gray-700 dark:hover:bg-gray-800",
+                  "flex items-start gap-3 rounded-2xl p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  accent.focus,
+                  on ? accent.selected : "bg-gray-50 hover:bg-gray-100 dark:bg-gray-800/50 dark:hover:bg-gray-800/80",
                 )}
               >
-                <span className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", on ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 dark:bg-gray-800 dark:text-gray-300")}>
+                <span className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", on ? "bg-blue-600 text-white" : "bg-white text-gray-600 dark:bg-gray-900/60 dark:text-gray-300")}>
                   <Icon className="h-4 w-4" aria-hidden />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-slate-900 dark:text-white">{label}</span>
-                  <span className="block text-xs text-slate-600 dark:text-gray-300">{disabled ? "Already 2 owners" : hint}</span>
+                  <span className="block text-sm font-semibold text-gray-900 dark:text-white">{label}</span>
+                  <span className="block text-xs text-gray-600 dark:text-gray-300">{disabled ? "Already 2 owners" : hint}</span>
                 </span>
               </button>
             );
@@ -360,7 +338,7 @@ const AddAdminDialog: React.FC<{
         <Field label="Reason">
           {(id) => <textarea id={id} required rows={2} value={f.reason} onChange={set("reason")} className={inputCls} placeholder="e.g. The head teacher asked for a second administrator" />}
         </Field>
-        <p className="text-xs text-slate-600 dark:text-gray-300">
+        <p className="text-xs text-gray-600 dark:text-gray-300">
           A new person gets a one-time password by e-mail and sets their own at first sign-in. Someone who already has an account with this e-mail keeps their password.
         </p>
         <div className="flex justify-end gap-2">
@@ -462,80 +440,30 @@ const AssignPersonDialog: React.FC<{ open: boolean; tid: number; schoolName: str
       >
         {!picked ? (
           <>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-              <input
-                autoFocus
-                aria-label="Search people in every school"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Name, e-mail, username or phone"
-                className={cx(inputCls, "pl-9")}
-              />
-            </div>
+            <PersonSearchField autoFocus label="Search people in every school" value={q} onChange={setQ} placeholder="Name, e-mail, username or phone" />
             {searching ? (
-              <ul className="space-y-2" aria-busy="true">
-                {[0, 1].map((i) => (
-                  <li key={i} className="h-14 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800" />
-                ))}
-              </ul>
+              <PersonResultsSkeleton />
             ) : results === null ? (
-              <p className="text-sm text-slate-600 dark:text-gray-300">Search every school. The person keeps their password and signs in to both schools.</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Search every school. The person keeps their password and signs in to both schools.</p>
             ) : results.length === 0 ? (
-              <p className="text-sm text-slate-600 dark:text-gray-300">No one matches “{q.trim()}”.</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">No one matches “{q.trim()}”.</p>
             ) : (
-              <ul className="max-h-72 space-y-2 overflow-y-auto" aria-label="People found">
-                {results.map((p) => (
-                  <li key={`${p.tid}-${p.userId}`}>
-                    <button
-                      type="button"
-                      disabled={p.alreadyInTarget}
-                      onClick={() => setPicked(p)}
-                      className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 p-3 text-left transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:hover:bg-gray-800"
-                    >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200" aria-hidden>
-                        {initials(p.name) || "?"}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold text-slate-900 dark:text-white">{p.name}</span>
-                        <span className="flex flex-wrap gap-x-3 text-xs text-slate-600 dark:text-gray-300">
-                          <span className="inline-flex items-center gap-1">
-                            <School className="h-3 w-3" aria-hidden />
-                            {p.schoolName}
-                          </span>
-                          {p.email && <span className="truncate">{p.email}</span>}
-                          {p.roles.length > 0 && <span>{p.roles.join(", ")}</span>}
-                        </span>
-                      </span>
-                      {p.alreadyInTarget && <span className="shrink-0 text-xs font-semibold text-slate-600 dark:text-gray-300">Already here</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <PersonResults people={results} onPick={(p) => setPicked(p as PersonElsewhere)} className="max-h-72 overflow-y-auto" />
             )}
           </>
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-brand-300 bg-brand-50 p-3 dark:border-brand-400/40 dark:bg-brand-500/10">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white" aria-hidden>
-                {initials(picked.name) || "?"}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold text-slate-900 dark:text-white">{picked.name}</span>
-                <span className="block truncate text-xs text-slate-600 dark:text-gray-300">
-                  {picked.schoolName} · {picked.email ?? `@${picked.username}`}
-                </span>
-              </span>
+            <PickedPerson person={picked} detail={`${picked.schoolName} · ${picked.email ?? `@${picked.username}`}`}>
               <Btn size="sm" onClick={() => setPicked(null)}>
                 Change
               </Btn>
-            </div>
+            </PickedPerson>
             <div>
-              <p className="mb-2 text-xs font-semibold text-slate-600 dark:text-gray-300">Role in {schoolName}</p>
+              <p className="mb-2 text-xs font-semibold text-gray-600 dark:text-gray-300">Role in {schoolName}</p>
               {roles === null ? (
                 <div className="flex gap-2" aria-busy="true">
                   {[0, 1, 2].map((i) => (
-                    <span key={i} className="h-8 w-24 animate-pulse rounded-full bg-slate-100 dark:bg-gray-800" />
+                    <Skeleton key={i} className="h-8 w-24 !rounded-full" />
                   ))}
                 </div>
               ) : (
@@ -550,8 +478,9 @@ const AssignPersonDialog: React.FC<{ open: boolean; tid: number; schoolName: str
                         title={r.description ?? undefined}
                         onClick={() => setRoleIds(on ? roleIds.filter((x) => x !== r.roleId) : [...roleIds, r.roleId])}
                         className={cx(
-                          "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-                          on ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800",
+                          "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                          accent.focus,
+                          on ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800/70 dark:text-gray-200 dark:hover:bg-gray-800",
                         )}
                       >
                         {r.name}
@@ -560,7 +489,7 @@ const AssignPersonDialog: React.FC<{ open: boolean; tid: number; schoolName: str
                   })}
                 </div>
               )}
-              <p className="mt-2 text-xs text-slate-600 dark:text-gray-300">Owners are added with “Add administrator”.</p>
+              <p className="mt-2 text-xs text-gray-600 dark:text-gray-300">Owners are added with “Add administrator”.</p>
             </div>
             <Field label="Reason">
               {(id) => <textarea id={id} required rows={2} value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} placeholder="e.g. Teaches in both schools" />}
@@ -608,23 +537,23 @@ const CredentialsDialog: React.FC<{ creds: Credentials | null; onClose: () => vo
       }
     >
       <div className="space-y-4">
-        <p className={cx("flex items-start gap-2 text-sm", creds.emailed ? "text-slate-700 dark:text-gray-200" : "text-amber-700 dark:text-amber-200")}>
+        <p className={cx("flex items-start gap-2 text-sm", creds.emailed ? "text-gray-700 dark:text-gray-200" : "text-amber-700 dark:text-amber-200")}>
           {creds.emailed ? <Mail className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> : <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />}
           {creds.emailed ? `Sent to ${creds.email}. Share it yourself only if the e-mail doesn't arrive.` : `The e-mail could not be sent. Give ${creds.name} this password through a safe channel.`}
         </p>
-        <Card className="space-y-2">
+        <div className={cx(surface.inset, "space-y-2 p-4")}>
           <div className="flex justify-between gap-2 text-sm">
-            <span className="text-slate-600 dark:text-gray-300">Username</span>
-            <span className="truncate font-semibold text-slate-900 dark:text-white">{creds.username}</span>
+            <span className="text-gray-600 dark:text-gray-300">Username</span>
+            <span className="truncate font-semibold text-gray-900 dark:text-white">{creds.username}</span>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <code className="select-all rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-lg font-bold tracking-wider text-slate-900 dark:bg-gray-800 dark:text-white">{creds.password}</code>
+            <code className="select-all rounded-lg bg-white px-3 py-1.5 font-mono text-lg font-bold tracking-wider text-gray-900 dark:bg-gray-900/60 dark:text-white">{creds.password}</code>
             <Btn icon={copied ? Check : Copy} onClick={copy} size="sm">
               {copied ? "Copied" : "Copy"}
             </Btn>
           </div>
-        </Card>
-        <p className="text-xs text-slate-600 dark:text-gray-300">Shown once. {creds.name} must choose a new password at the first sign-in.</p>
+        </div>
+        <p className="text-xs text-gray-600 dark:text-gray-300">Shown once. {creds.name} must choose a new password at the first sign-in.</p>
         <div className="flex justify-end">
           <Btn tone="primary" onClick={onClose}>
             Done

@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Archive, ArrowDown, ArrowUp, Check, Clock, FileClock, FileText, Hourglass, Plus, Receipt, Save, Scale, Send, Timer, Trash2, type LucideIcon } from "lucide-react";
 import { platformApi, type DocumentKind, type PaymentInstruction, type PaymentMethod } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
-import { Btn, Card, IconBtn, Spinner, Stepper, Switch, cx, errorText, inputCls, toast, usePlatform } from "./platformShared";
+import { Btn, Card, IconBtn, Skeleton, SkeletonRows, Stepper, Switch, accent, cx, errorText, inputCls, surface, toast, usePlatform } from "./platformShared";
 import { METHOD_META } from "./BillingPage";
 
 type Item = Omit<PaymentInstruction, "id"> & { id?: number; _k: string };
@@ -68,7 +68,7 @@ const SettingsPage: React.FC = () => {
   }, [changed.length, itemsDirty, setDirty]);
 
   if (error) return <p className="text-sm text-red-600 dark:text-red-300">{error}</p>;
-  if (!base) return <Spinner />;
+  if (!base) return <SkeletonRows rows={5} avatar={false} label="Loading settings" />;
 
   const num = (k: string) => Number(draft[k] ?? 0);
   const docs = (Array.isArray(draft["documents.required"]) ? draft["documents.required"] : []) as string[];
@@ -86,7 +86,7 @@ const SettingsPage: React.FC = () => {
     <div className="grid gap-4 lg:grid-cols-2">
       <Card className="space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white">Windows</h2>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Windows</h2>
           <Btn
             size="sm"
             tone={changed.length ? "primary" : "ghost"}
@@ -115,24 +115,24 @@ const SettingsPage: React.FC = () => {
         <ul className="space-y-2">
           {WINDOWS.map((w) => (
             <li key={w.key} className="flex items-center gap-3">
-              <w.icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-gray-300" aria-hidden />
-              <span className="flex-1 text-sm font-medium text-slate-800 dark:text-gray-100">{w.label}</span>
+              <w.icon className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-300" aria-hidden />
+              <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-100">{w.label}</span>
               <Stepper label={w.label} value={num(w.key)} min={0} max={w.max} onChange={(v) => setDraft((d) => ({ ...d, [w.key]: v }))} />
             </li>
           ))}
         </ul>
-        <ul className="space-y-3 border-t border-slate-100 pt-3 dark:border-gray-800">
+        <ul className="space-y-3 pt-2">
           {SWITCHES.map((s) => (
             <li key={s.key} className="flex items-center gap-3">
-              <s.icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-gray-300" aria-hidden />
-              <span className="flex-1 text-sm font-medium text-slate-800 dark:text-gray-100">{s.label}</span>
+              <s.icon className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-300" aria-hidden />
+              <span className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-100">{s.label}</span>
               <Switch checked={!!draft[s.key]} onChange={(v) => setDraft((d) => ({ ...d, [s.key]: v }))} label={s.label} />
             </li>
           ))}
         </ul>
-        <div className="border-t border-slate-100 pt-3 dark:border-gray-800">
-          <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-gray-100">
-            <FileText className="h-4 w-4 text-slate-500 dark:text-gray-300" aria-hidden />
+        <div className="pt-2">
+          <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-gray-800 dark:text-gray-100">
+            <FileText className="h-4 w-4 text-gray-500 dark:text-gray-300" aria-hidden />
             Required documents
           </p>
           <div className="flex flex-wrap gap-2">
@@ -146,7 +146,7 @@ const SettingsPage: React.FC = () => {
                   onClick={() => setDraft((d) => ({ ...d, "documents.required": on ? docs.filter((x) => x !== k.kind) : [...docs, k.kind] }))}
                   className={cx(
                     "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                    on ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-200",
+                    on ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200",
                   )}
                 >
                   {on && <Check className="h-3.5 w-3.5" aria-hidden />}
@@ -160,7 +160,7 @@ const SettingsPage: React.FC = () => {
 
       <Card className="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white">How to pay</h2>
+          <h2 className="text-sm font-bold text-gray-900 dark:text-white">How to pay</h2>
           <div className="flex gap-2">
             <Btn size="sm" icon={Plus} onClick={() => setItems((l) => [...(l ?? []), { method: "MOMO", label: "", details: "", sortOrder: (l ?? []).length, isActive: true, _k: key() }])}>
               Add
@@ -192,12 +192,16 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
         {!items ? (
-          <Spinner />
+          <div className="space-y-3" role="status" aria-busy="true" aria-label="Loading payment methods">
+            {[0, 1].map((k) => (
+              <Skeleton key={k} className="h-32 !rounded-xl" />
+            ))}
+          </div>
         ) : (
           <ul className="space-y-3">
             <AnimatePresence initial={false}>
               {items.map((it, i) => (
-                <motion.li key={it._k} layout {...m("reveal")} className={cx("space-y-2 rounded-2xl border p-3", it.isActive ? "border-slate-200 dark:border-gray-700" : "border-dashed border-slate-300 opacity-70 dark:border-gray-600")}>
+                <motion.li key={it._k} layout {...m("reveal")} className={cx("space-y-2 p-3", surface.inset, !it.isActive && "opacity-60")}>
                   <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={`Method ${i + 1}`}>
                     {METHODS.map((mt) => {
                       const meta = METHOD_META[mt];
@@ -209,7 +213,7 @@ const SettingsPage: React.FC = () => {
                           role="radio"
                           aria-checked={on}
                           onClick={() => setItem(i, { method: mt })}
-                          className={cx("flex flex-col items-center gap-0.5 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold transition-all", on ? cx(meta.tone, "ring-2 ring-brand-500") : "text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800")}
+                          className={cx("flex flex-col items-center gap-0.5 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold transition-all", on ? accent.soft : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/70")}
                         >
                           <meta.icon className="h-4 w-4" aria-hidden />
                           {meta.label}

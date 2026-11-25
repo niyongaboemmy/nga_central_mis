@@ -154,8 +154,8 @@ const SchoolFields: React.FC<{
                 {...m("tap")}
                 onClick={() => onChange({ schoolType: t.value })}
                 className={cx(
-                  "flex flex-col items-center gap-1 rounded-2xl border-2 px-2 py-3 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-                  on ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-100" : "border-slate-200 text-slate-700 hover:border-slate-300 dark:border-gray-700 dark:text-gray-200",
+                  "flex flex-col items-center gap-1 rounded-2xl px-2 py-3 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                  on ? "bg-blue-50 text-blue-700 ring-2 ring-blue-600 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500" : "bg-gray-50 text-gray-700 hover:bg-gray-100 dark:bg-gray-800/50 dark:text-gray-200 dark:hover:bg-gray-800/80",
                 )}
               >
                 <motion.span animate={on ? { scale: [1, 1.2, 1] } : { scale: 1 }}>
@@ -198,7 +198,7 @@ const SchoolFields: React.FC<{
       <Field label="Short name" icon={Link2} error={errors.desiredSlug ?? (slugBad ? slugCheck.reason || "Taken" : undefined)} className="sm:col-span-2" trailing={<LiveCheck state={slugCheck.state} label={slugCheck.state === "ok" ? "Available" : slugCheck.state === "bad" ? "Not available" : "Checking"} />}>
         {({ id, describedBy, invalid }) => (
           <>
-            <div className={cx("flex items-center overflow-hidden rounded-xl border bg-white focus-within:ring-2 focus-within:ring-brand-500 dark:bg-gray-800", errors.desiredSlug || slugBad ? "border-red-500" : slugCheck.state === "ok" ? "border-emerald-500" : "border-slate-300 dark:border-gray-600")}>
+            <div className={cx("flex items-center overflow-hidden rounded-xl border bg-gray-50 focus-within:ring-2 focus-within:ring-blue-500/30 dark:bg-gray-900/50", errors.desiredSlug || slugBad ? "border-red-500" : slugCheck.state === "ok" ? "border-emerald-500" : "border-gray-200 dark:border-gray-700/30")}>
               <input
                 id={id}
                 value={s.desiredSlug}
@@ -207,9 +207,9 @@ const SchoolFields: React.FC<{
                 aria-describedby={describedBy}
                 autoCapitalize="none"
                 spellCheck={false}
-                className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none dark:text-white"
+                className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm font-semibold text-gray-900 focus:outline-none dark:text-white"
               />
-              <span className="shrink-0 pr-3 text-sm text-slate-600 dark:text-gray-300">.amashuri.com</span>
+              <span className="shrink-0 pr-3 text-sm text-gray-600 dark:text-gray-300">.amashuri.com</span>
             </div>
             <AnimatePresence>
               {slugCheck.suggestion && (

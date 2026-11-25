@@ -58,9 +58,9 @@ export const JourneyStepper: React.FC<{ current: TrackerStep; failed?: boolean; 
   const reduced = useReducedMotion();
   return (
     <ol className="relative flex items-start justify-between gap-1" aria-label="Progress">
-      <div className="absolute left-5 right-5 top-5 h-1 rounded-full bg-slate-200 dark:bg-gray-700" aria-hidden />
+      <div className="absolute left-5 right-5 top-5 h-1 rounded-full bg-gray-200 dark:bg-gray-800" aria-hidden />
       <motion.div
-        className={cx("absolute left-5 top-5 h-1 rounded-full", failed ? "bg-red-500" : "bg-brand-600")}
+        className={cx("absolute left-5 top-5 h-1 rounded-full", failed ? "bg-red-500" : "bg-blue-600")}
         initial={{ width: 0 }}
         animate={{ width: `calc((100% - 2.5rem) * ${Math.max(0, idx) / (TRACKER_STEPS.length - 1)})` }}
         transition={{ duration: reduced ? 0 : 0.9, ease: "easeOut" }}
@@ -76,9 +76,9 @@ export const JourneyStepper: React.FC<{ current: TrackerStep; failed?: boolean; 
               className={cx(
                 "flex h-10 w-10 items-center justify-center rounded-full border-2",
                 done && "border-emerald-500 bg-emerald-500 text-white",
-                active && !failed && "border-brand-500 bg-white text-brand-600 dark:bg-gray-900 dark:text-brand-200",
+                active && !failed && "border-blue-500 bg-white text-blue-600 dark:bg-gray-900 dark:text-blue-400",
                 active && failed && "border-red-500 bg-white text-red-600 dark:bg-gray-900",
-                !done && !active && "border-slate-300 bg-white text-slate-400 dark:border-gray-600 dark:bg-gray-800",
+                !done && !active && "border-transparent bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500",
               )}
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -87,7 +87,7 @@ export const JourneyStepper: React.FC<{ current: TrackerStep; failed?: boolean; 
               {done ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
               {active && !reduced && (
                 <motion.span
-                  className={cx("absolute inset-0 rounded-full", failed ? "bg-red-400/30" : "bg-brand-500/25")}
+                  className={cx("absolute inset-0 rounded-full", failed ? "bg-red-400/30" : "bg-blue-500/25")}
                   animate={{ scale: [1, 1.6], opacity: [0.7, 0] }}
                   transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
                   aria-hidden
@@ -95,7 +95,7 @@ export const JourneyStepper: React.FC<{ current: TrackerStep; failed?: boolean; 
               )}
             </motion.span>
             {!compact && (
-              <span className={cx("text-[11px] font-medium sm:text-xs", active ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-gray-300")}>
+              <span className={cx("text-[11px] font-medium sm:text-xs", active ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300")}>
                 {STEP_LABELS[s]}
               </span>
             )}
@@ -136,7 +136,7 @@ const STATUS_TONE: Record<string, { tone: string; live?: boolean }> = {
   CONFIRMED: { tone: "emerald" },
 };
 const TONES: Record<string, { pill: string; dot: string }> = {
-  slate: { pill: "bg-slate-100 text-slate-700 dark:bg-gray-700/60 dark:text-gray-200", dot: "bg-slate-400" },
+  slate: { pill: "bg-gray-100 text-gray-700 dark:bg-gray-800/70 dark:text-gray-200", dot: "bg-gray-400" },
   sky: { pill: "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200", dot: "bg-blue-500" },
   amber: { pill: "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200", dot: "bg-amber-500" },
   violet: { pill: "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200", dot: "bg-blue-500" },
@@ -147,8 +147,12 @@ const TONES: Record<string, { pill: string; dot: string }> = {
 export const statusLabel = (s: string) =>
   s === "APPROVED_AWAITING_PAYMENT" ? "Awaiting payment" : s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, " ");
 
-export const StatusPill: React.FC<{ status: string; label?: string; className?: string }> = ({ status, label, className }) => {
-  const { tone, live } = STATUS_TONE[status] ?? { tone: "slate" };
+/**
+ * Status pill. A pulsing dot only when `live` is passed: the caller sets it when the status
+ * is waiting on the person looking at it (plan F8), so a list never pulses on every row.
+ */
+export const StatusPill: React.FC<{ status: string; label?: string; className?: string; live?: boolean }> = ({ status, label, className, live = false }) => {
+  const { tone } = STATUS_TONE[status] ?? { tone: "slate" };
   const t = TONES[tone];
   const reduced = useReducedMotion();
   return (
@@ -162,6 +166,27 @@ export const StatusPill: React.FC<{ status: string; label?: string; className?: 
   );
 };
 
+/** True when a status is one that should pulse for the person who has to act on it. */
+export const isLiveStatus = (status: string) => !!STATUS_TONE[status]?.live;
+
+/** A small labelled chip (roles, flags). The one chip style for tenant screens. */
+export const Pill: React.FC<{ tone?: "blue" | "gray" | "amber" | "red" | "emerald"; icon?: React.ElementType; children: React.ReactNode; className?: string }> = ({ tone = "gray", icon: Icon, children, className }) => (
+  <span
+    className={cx(
+      "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold",
+      tone === "blue" && "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+      tone === "gray" && "bg-gray-100 text-gray-700 dark:bg-gray-800/70 dark:text-gray-200",
+      tone === "amber" && "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200",
+      tone === "red" && "bg-red-100 text-red-700 dark:bg-red-400/15 dark:text-red-200",
+      tone === "emerald" && "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200",
+      className,
+    )}
+  >
+    {Icon && <Icon className="h-3 w-3" aria-hidden />}
+    {children}
+  </span>
+);
+
 // ---------------------------------------------------------------------------
 // Meter: animated ring for a usage limit (green -> amber at 75 % -> red at 90 %)
 // ---------------------------------------------------------------------------
@@ -174,7 +199,7 @@ export const Meter: React.FC<{ meter: UsageMeter; size?: number }> = ({ meter, s
   const c = 2 * Math.PI * r;
   // Blue while there is room, amber from 75 %, red from 90 %. Unlimited draws no arc at all:
   // a full green ring read as "at capacity".
-  const color = ratio >= 0.9 ? "stroke-red-500" : ratio >= 0.75 ? "stroke-amber-500" : "stroke-brand-600 dark:stroke-brand-500";
+  const color = ratio >= 0.9 ? "stroke-red-500" : ratio >= 0.75 ? "stroke-amber-500" : "stroke-blue-600 dark:stroke-blue-500";
   const reduced = useReducedMotion();
   const mb = meter.unit === "MB";
   const fmt = (v: number) => (mb ? formatMb(v) : v.toLocaleString());
@@ -184,7 +209,7 @@ export const Meter: React.FC<{ meter: UsageMeter; size?: number }> = ({ meter, s
     <div className="flex flex-col items-center gap-1.5" title={`${meter.label}: ${text}`}>
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90" aria-hidden>
-          <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={6} className="fill-none stroke-slate-100 dark:stroke-gray-800" />
+          <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={6} className="fill-none stroke-gray-100 dark:stroke-gray-800" />
           {!unlimited && meter.used > 0 && (
             <motion.circle
               cx={size / 2}
@@ -201,12 +226,12 @@ export const Meter: React.FC<{ meter: UsageMeter; size?: number }> = ({ meter, s
           )}
         </svg>
         <span className="absolute inset-0 flex flex-col items-center justify-center">
-          <Icon className="h-4 w-4 text-slate-500 dark:text-gray-400" aria-hidden />
-          <span className="text-sm font-bold text-slate-900 dark:text-white">{mb ? fmt(meter.used) : <CountUp value={meter.used} />}</span>
+          <Icon className="h-4 w-4 text-gray-500 dark:text-gray-400" aria-hidden />
+          <span className="text-sm font-bold text-gray-900 dark:text-white">{mb ? fmt(meter.used) : <CountUp value={meter.used} />}</span>
         </span>
       </div>
-      <span className="text-xs font-semibold text-slate-700 dark:text-gray-200">{meter.label}</span>
-      <span className="-mt-1 text-xs tabular-nums text-slate-500 dark:text-gray-400">
+      <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{meter.label}</span>
+      <span className="-mt-1 text-xs tabular-nums text-gray-500 dark:text-gray-400">
         {unlimited ? "Unlimited" : `of ${fmt(meter.limit!)}`}
         {unit}
       </span>
@@ -227,7 +252,7 @@ export const formatMb = (mb: number) => (mb >= 1024 ? `${(mb / 1024).toLocaleStr
  */
 export const MeterBar: React.FC<{ meter: UsageMeter; showLabel?: boolean }> = ({ meter, showLabel = false }) => {
   const ratio = meter.ratio === null ? 0 : Math.min(1, meter.ratio);
-  const color = ratio >= 0.9 ? "bg-red-500" : ratio >= 0.75 ? "bg-amber-500" : "bg-brand-600 dark:bg-brand-500";
+  const color = ratio >= 0.9 ? "bg-red-500" : ratio >= 0.75 ? "bg-amber-500" : "bg-blue-600 dark:bg-blue-500";
   const Icon = entIcon(meter.key);
   const mb = meter.unit === "MB";
   const fmt = (v: number) => (mb ? formatMb(v) : v.toLocaleString());
@@ -235,14 +260,14 @@ export const MeterBar: React.FC<{ meter: UsageMeter; showLabel?: boolean }> = ({
   const text = unlimited ? `${fmt(meter.used)} · Unlimited` : `${fmt(meter.used)} of ${fmt(meter.limit!)}`;
   return (
     <div className="flex items-center gap-2" title={`${meter.label}: ${text}`}>
-      <Icon className="h-4 w-4 shrink-0 text-slate-500 dark:text-gray-400" aria-hidden />
-      {showLabel && <span className="w-16 shrink-0 text-xs font-medium text-slate-600 dark:text-gray-300">{meter.label}</span>}
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-800" role="meter" aria-label={meter.label} aria-valuemin={0} aria-valuemax={unlimited ? undefined : meter.limit!} aria-valuenow={meter.used} aria-valuetext={text}>
+      <Icon className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden />
+      {showLabel && <span className="w-16 shrink-0 text-xs font-medium text-gray-600 dark:text-gray-300">{meter.label}</span>}
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800" role="meter" aria-label={meter.label} aria-valuemin={0} aria-valuemax={unlimited ? undefined : meter.limit!} aria-valuenow={meter.used} aria-valuetext={text}>
         {!unlimited && <motion.div className={cx("h-full rounded-full", color)} initial={{ width: 0 }} animate={{ width: `${Math.max(ratio * 100, meter.used > 0 ? 2 : 0)}%` }} transition={{ duration: 0.8 }} />}
       </div>
-      <span className="w-28 shrink-0 text-right text-xs tabular-nums text-slate-600 dark:text-gray-300">
+      <span className="w-28 shrink-0 text-right text-xs tabular-nums text-gray-600 dark:text-gray-300">
         {fmt(meter.used)}
-        <span className="text-slate-400 dark:text-gray-500">{unlimited ? " · ∞" : ` / ${fmt(meter.limit!)}`}</span>
+        <span className="text-gray-400 dark:text-gray-500">{unlimited ? " · ∞" : ` / ${fmt(meter.limit!)}`}</span>
       </span>
     </div>
   );
@@ -271,11 +296,11 @@ export const EntitlementIcons: React.FC<{ entitlements: Entitlement[]; all?: Ent
             className={cx(
               "relative flex items-center justify-center rounded-lg",
               box,
-              on ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200" : "bg-slate-100 text-slate-400 dark:bg-gray-800 dark:text-gray-500",
+              on ? "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400" : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500",
             )}
           >
             <Icon className="h-4 w-4" aria-hidden />
-            {!on && <Lock className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white p-px text-slate-500 dark:bg-gray-900" aria-hidden />}
+            {!on && <Lock className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white p-px text-gray-500 dark:bg-gray-900" aria-hidden />}
             <span className="sr-only">
               {e.label} {on ? "included" : "not included"}
             </span>
@@ -311,8 +336,8 @@ export const PackageCard: React.FC<{
       {...m("tap")}
       whileHover={{ y: -4 }}
       className={cx(
-        "relative flex w-full flex-col gap-3 rounded-2xl border bg-white p-4 text-left transition-shadow focus:outline-none focus-visible:ring-2 dark:bg-gray-900",
-        selected ? cx("ring-2", a.ring, "border-transparent") : "border-slate-200 hover:border-brand-500 dark:border-gray-700 dark:hover:border-brand-500",
+        "relative flex w-full flex-col gap-3 rounded-2xl border bg-white p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-gray-800/40",
+        selected ? cx("ring-2", a.ring, "border-transparent") : "border-gray-200 hover:border-blue-300 dark:border-gray-700/40 dark:hover:border-blue-500/50",
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -326,20 +351,20 @@ export const PackageCard: React.FC<{
         </AnimatePresence>
       </div>
       {(recommended || current) && (
-        <span className={cx("absolute -top-3 right-4 rounded-full px-2 py-0.5 text-[11px] font-bold text-white", current ? "bg-slate-700" : a.bg)}>
+        <span className={cx("absolute -top-3 right-4 rounded-full px-2 py-0.5 text-[11px] font-bold text-white", current ? "bg-gray-700" : a.bg)}>
           {current ? "Current" : "★ Best fit"}
         </span>
       )}
-      <div className="text-2xl font-extrabold text-slate-900 dark:text-white">
-        {price === null ? <span className="text-base font-semibold text-slate-600 dark:text-gray-300">Price on approval</span> : formatMoney(price, pkg.currency)}
-        {price !== null && <span className="ml-1 text-xs font-medium text-slate-600 dark:text-gray-300">/{cycle === "YEAR" ? "yr" : "term"}</span>}
+      <div className="text-2xl font-bold text-gray-900 dark:text-white">
+        {price === null ? <span className="text-base font-semibold text-gray-600 dark:text-gray-300">Price on approval</span> : formatMoney(price, pkg.currency)}
+        {price !== null && <span className="ml-1 text-xs font-medium text-gray-600 dark:text-gray-300">/{cycle === "YEAR" ? "yr" : "term"}</span>}
       </div>
       <div className="flex gap-3">
         {limits.map((l) => {
           const Icon = entIcon(l.key);
           return (
-            <span key={l.key} className="flex items-center gap-1 text-sm font-semibold text-slate-700 dark:text-gray-200" title={l.label}>
-              <Icon className="h-4 w-4 text-slate-500 dark:text-gray-300" aria-hidden />
+            <span key={l.key} className="flex items-center gap-1 text-sm font-semibold text-gray-700 dark:text-gray-200" title={l.label}>
+              <Icon className="h-4 w-4 text-gray-500 dark:text-gray-300" aria-hidden />
               {l.value === null ? "∞" : l.value.toLocaleString()}
               {l.key === "limit.storage_gb" ? "GB" : ""}
               <span className="sr-only">{l.label}</span>
@@ -359,23 +384,23 @@ export const PackageCard: React.FC<{
 export const Timeline: React.FC<{ events: TimelineEvent[]; iconFor?: (e: TimelineEvent) => LucideIcon }> = ({ events, iconFor }) => {
   const m = useMotion();
   return (
-    <ol className="relative space-y-3 border-l-2 border-slate-200 pl-5 dark:border-gray-700">
+    <ol className="relative space-y-3 border-l border-gray-200 pl-5 dark:border-gray-700/30">
       <AnimatePresence initial={false}>
         {events.map((e) => {
           const Icon = iconFor?.(e);
           return (
             <motion.li key={e.id} layout {...m("reveal")} className="relative">
-              <span className="absolute -left-[1.85rem] top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white ring-2 ring-slate-200 dark:bg-gray-900 dark:ring-gray-700">
-                {Icon ? <Icon className="h-3.5 w-3.5 text-brand-600 dark:text-brand-200" /> : <span className="h-2 w-2 rounded-full bg-brand-500" />}
+              <span className="absolute -left-[1.8rem] top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700/40">
+                {Icon ? <Icon className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" /> : <span className="h-2 w-2 rounded-full bg-blue-500" />}
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 {e.to && <StatusPill status={e.to} />}
-                <time className="text-xs text-slate-600 dark:text-gray-300" dateTime={e.at}>
+                <time className="text-xs text-gray-600 dark:text-gray-300" dateTime={e.at}>
                   {new Date(e.at).toLocaleString()}
                 </time>
-                {e.visibleToApplicant === false && <Lock className="h-3 w-3 text-slate-500" aria-label="Internal" />}
+                {e.visibleToApplicant === false && <Lock className="h-3 w-3 text-gray-500" aria-label="Internal" />}
               </div>
-              {e.message && <p className="mt-1 text-sm text-slate-700 dark:text-gray-200">{e.message}</p>}
+              {e.message && <p className="mt-1 text-sm text-gray-700 dark:text-gray-200">{e.message}</p>}
             </motion.li>
           );
         })}
@@ -400,28 +425,28 @@ export const ActionCard: React.FC<{
   const reduced = useReducedMotion();
   const tones = {
     // Flat, platform palette: blue for actions, green / amber / red only for status.
-    brand: "bg-brand-600",
+    brand: "bg-blue-600",
     amber: "bg-amber-500",
     red: "bg-red-600",
     emerald: "bg-emerald-600",
-    violet: "bg-brand-700",
+    violet: "bg-blue-700",
   };
   return (
-    <motion.section {...m("reveal")} className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+    <motion.section {...m("reveal")} className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-700/40 dark:bg-gray-800/40">
       <div className="flex items-start gap-3 p-4">
         <motion.span
           className={cx("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white", tones[tone])}
           animate={pulse && !reduced ? { rotate: [0, -8, 8, -4, 0] } : undefined}
-          transition={pulse ? { duration: 0.8, repeat: Infinity, repeatDelay: 3 } : undefined}
+          transition={pulse ? { duration: 0.8 } : undefined}
         >
           <Icon className="h-5 w-5" aria-hidden />
         </motion.span>
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-slate-900 dark:text-white">{title}</h3>
-          {children && <div className="mt-1 text-sm text-slate-600 dark:text-gray-300">{children}</div>}
+          <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
+          {children && <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">{children}</div>}
         </div>
       </div>
-      {action && <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800/50">{action}</div>}
+      {action && <div className="flex flex-wrap justify-end gap-2 px-4 pb-4">{action}</div>}
     </motion.section>
   );
 };
@@ -434,7 +459,7 @@ export const KpiTile: React.FC<{ icon: LucideIcon; label: string; value: number;
   icon: Icon,
   label,
   value,
-  tone = "text-brand-600 dark:text-brand-200",
+  tone = "text-blue-600 dark:text-blue-400",
   format,
   onClick,
   alert,
@@ -446,16 +471,17 @@ export const KpiTile: React.FC<{ icon: LucideIcon; label: string; value: number;
       {...m("reveal")}
       {...(onClick ? { ...m("tap"), whileHover: { y: -3 }, onClick, type: "button" } : {})}
       className={cx(
-        "relative flex w-full flex-col items-start gap-2 rounded-2xl border bg-white p-4 text-left transition-colors dark:bg-gray-900",
-        alert && value > 0 ? "border-red-300 dark:border-red-500/50" : "border-slate-200 dark:border-gray-700",
+        "relative flex w-full flex-col items-start gap-2 rounded-2xl p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+        alert && value > 0 ? "bg-red-50 dark:bg-red-500/10" : "bg-white dark:bg-gray-800/40",
+        onClick && (alert && value > 0 ? "hover:bg-red-100/70 dark:hover:bg-red-500/15" : "hover:bg-gray-50 dark:hover:bg-gray-800/60"),
       )}
     >
       <Icon className={cx("h-5 w-5", tone)} aria-hidden />
-      <span className="text-2xl font-extrabold text-slate-900 dark:text-white">
+      <span className="text-2xl font-bold text-gray-900 dark:text-white">
         <CountUp value={value} format={format} />
       </span>
-      <span className="text-xs font-medium text-slate-600 dark:text-gray-300">{label}</span>
-      {alert && value > 0 && <span className="absolute right-3 top-3 h-2.5 w-2.5 animate-ping rounded-full bg-red-500" aria-hidden />}
+      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{label}</span>
+      {alert && value > 0 && <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-red-500" aria-hidden />}
     </Tag>
   );
 };
@@ -501,23 +527,23 @@ export const DropZone: React.FC<{
       }}
       animate={over ? { scale: 1.02 } : error ? m("shake").animate : { scale: 1 }}
       className={cx(
-        "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed p-5 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-        over ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10" : done ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-400/10" : "border-slate-300 dark:border-gray-600",
+        "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed p-5 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+        over ? "border-blue-500 bg-blue-50 dark:bg-blue-500/10" : done ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-400/10" : "border-gray-300 dark:border-gray-700/50",
       )}
     >
       <input ref={input} type="file" accept={accept} className="hidden" onChange={(e) => take(e.target.files?.[0])} />
       {busy ? (
-        <Loader2 className="h-7 w-7 animate-spin text-brand-500" />
+        <Loader2 className="h-7 w-7 animate-spin text-blue-500" />
       ) : done ? (
         <motion.span {...m("check")}>
           <Check className="h-7 w-7 text-emerald-600" />
         </motion.span>
       ) : (
         <motion.span animate={over ? { y: -4 } : { y: 0 }}>
-          <Icon className="h-7 w-7 text-slate-500 dark:text-gray-300" />
+          <Icon className="h-7 w-7 text-gray-500 dark:text-gray-300" />
         </motion.span>
       )}
-      <span className="text-sm font-medium text-slate-700 dark:text-gray-200">{label}</span>
+      <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{label}</span>
       {error && (
         <span className="flex items-center gap-1 text-xs text-red-600">
           <X className="h-3 w-3" />
@@ -537,14 +563,15 @@ export const EmptyState: React.FC<{ icon: LucideIcon; title: string; children?: 
   return (
     <div className="flex flex-col items-center gap-3 py-10 text-center">
       <motion.span
-        className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-300"
-        animate={reduced ? undefined : { y: [0, -6, 0] }}
-        transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+        className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-500 dark:bg-gray-800/70 dark:text-gray-400"
+        initial={reduced ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
       >
         <Icon className="h-8 w-8" aria-hidden />
       </motion.span>
-      <p className="font-semibold text-slate-800 dark:text-gray-100">{title}</p>
-      {children && <div className="text-sm text-slate-600 dark:text-gray-300">{children}</div>}
+      <p className="font-semibold text-gray-800 dark:text-gray-100">{title}</p>
+      {children && <div className="text-sm text-gray-600 dark:text-gray-300">{children}</div>}
     </div>
   );
 };
@@ -553,7 +580,7 @@ export const EmptyState: React.FC<{ icon: LucideIcon; title: string; children?: 
 export const Burst: React.FC<{ show: boolean }> = ({ show }) => {
   const reduced = useReducedMotion();
   if (!show || reduced) return null;
-  const colors = ["bg-brand-500", "bg-blue-300", "bg-amber-400", "bg-blue-700", "bg-emerald-500"];
+  const colors = ["bg-blue-500", "bg-blue-300", "bg-amber-400", "bg-blue-700", "bg-emerald-500"];
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       {Array.from({ length: 28 }).map((_, i) => (
@@ -572,7 +599,7 @@ export const Burst: React.FC<{ show: boolean }> = ({ show }) => {
 /** Segmented toggle (billing cycle, filters). */
 export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: Array<{ value: T; label: string; icon?: LucideIcon }>; onChange: (v: T) => void; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="relative inline-flex rounded-full bg-slate-100 p-1 dark:bg-gray-800">
+    <div role="radiogroup" aria-label={label} className="relative inline-flex rounded-full bg-gray-100 p-1 dark:bg-gray-800/70">
       {options.map((o) => {
         const on = o.value === value;
         const Icon = o.icon;
@@ -583,7 +610,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
             role="radio"
             aria-checked={on}
             onClick={() => onChange(o.value)}
-            className={cx("relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors", on ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-gray-300")}
+            className={cx("relative z-10 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors", on ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300")}
           >
             {on && <motion.span layoutId={`seg-${label}`} className="absolute inset-0 -z-10 rounded-full bg-white dark:bg-gray-700" transition={{ type: "spring", stiffness: 500, damping: 35 }} />}
             {Icon && <Icon className="h-4 w-4" aria-hidden />}

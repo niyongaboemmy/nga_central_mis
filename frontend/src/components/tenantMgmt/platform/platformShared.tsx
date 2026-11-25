@@ -5,11 +5,14 @@
  */
 import React, { createContext, useCallback, useContext, useEffect, useId, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { Loader2, Minus, Plus, type LucideIcon } from "lucide-react";
+import { ChevronDown, Loader2, Minus, Plus, type LucideIcon } from "lucide-react";
 import Modal from "../../ui/Modal";
 import { ToastStore } from "../../../services/api";
 import { platformApi, type PlatformOverview } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
+import { accent, sectionTitle, surface } from "../../../design/surfaces";
+
+export { accent, sectionTitle, surface };
 
 export const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(" ");
 
@@ -126,12 +129,12 @@ export const initials = (name: string) =>
 // ---------------------------------------------------------------------------
 
 const BTN_TONES = {
-  primary: "bg-brand-600 text-white hover:bg-brand-700 focus-visible:ring-brand-500",
+  primary: "bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-500",
   danger: "bg-red-600 text-white hover:bg-red-500 focus-visible:ring-red-500",
   success: "bg-emerald-600 text-white hover:bg-emerald-500 focus-visible:ring-emerald-500",
   warning: "bg-amber-500 text-white hover:bg-amber-400 focus-visible:ring-amber-500",
-  ghost:
-    "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus-visible:ring-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800",
+  // the MIS secondary button: a filled gray pill, no outline (ui/Button "secondary")
+  ghost: "bg-gray-100 text-gray-800 hover:bg-gray-200 focus-visible:ring-gray-400 dark:bg-gray-800/70 dark:text-gray-100 dark:hover:bg-gray-800",
 } as const;
 
 export const Btn: React.FC<
@@ -144,7 +147,7 @@ export const Btn: React.FC<
       {...(m("tap") as object)}
       disabled={disabled || busy}
       className={cx(
-        "inline-flex items-center justify-center gap-1.5 rounded-full font-semibold transition-colors focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-1.5 rounded-full font-medium transition-colors focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
         size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm",
         BTN_TONES[tone],
         className,
@@ -170,10 +173,10 @@ export const IconBtn: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & {
     title={label}
     aria-label={label}
     className={cx(
-      "inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-40",
+      "inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-40",
       tone === "danger"
         ? "text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-400/10"
-        : "text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800",
+        : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800",
       className,
     )}
     {...rest}
@@ -183,24 +186,80 @@ export const IconBtn: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & {
 );
 
 export const Card: React.FC<{ className?: string; children: React.ReactNode }> = ({ className, children }) => (
-  <div className={cx("rounded-2xl border border-slate-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900", className)}>{children}</div>
+  <div className={cx(surface.card, "p-4", className)}>{children}</div>
 );
 
+/** Inline / in-button loading only. Content that loads gets a skeleton (below). */
 export const Spinner: React.FC = () => (
   <div className="flex justify-center py-16" role="status">
-    <Loader2 className="h-7 w-7 animate-spin text-brand-500" aria-hidden />
+    <Loader2 className="h-7 w-7 animate-spin text-blue-500" aria-hidden />
     <span className="sr-only">Loading</span>
   </div>
 );
 
-export const inputCls =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100";
+/** One loading block. */
+export const Skeleton: React.FC<{ className?: string }> = ({ className }) => <span className={cx("block", surface.skeleton, className)} aria-hidden />;
+
+/** Rows of a list while it loads (avatar + two lines), inside one section. */
+export const SkeletonRows: React.FC<{ rows?: number; label?: string; avatar?: boolean }> = ({ rows = 4, label = "Loading", avatar = true }) => (
+  <div className={cx(surface.card, "p-2")} role="status" aria-busy="true" aria-label={label}>
+    <ul className={cx("divide-y", surface.divide)}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <li key={i} className="flex items-center gap-3 px-2 py-3">
+          {avatar && <Skeleton className="h-10 w-10 shrink-0 !rounded-full" />}
+          <span className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-40 max-w-[60%]" />
+            <Skeleton className="h-3 w-64 max-w-[80%]" />
+          </span>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
+/** Cards in a grid while they load. */
+export const SkeletonGrid: React.FC<{ cards?: number; label?: string; className?: string; cardClassName?: string }> = ({ cards = 6, label = "Loading", className = "grid gap-3 sm:grid-cols-2 xl:grid-cols-3", cardClassName = "h-40" }) => (
+  <ul className={className} role="status" aria-busy="true" aria-label={label}>
+    {Array.from({ length: cards }).map((_, i) => (
+      <li key={i} className={cx(surface.card, "space-y-3 p-4", cardClassName)}>
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-3 w-3/4" />
+        <Skeleton className="h-3 w-2/3" />
+      </li>
+    ))}
+  </ul>
+);
+
+/** A detail page while it loads: title row, tab rail, two sections. */
+export const SkeletonPage: React.FC<{ label?: string }> = ({ label = "Loading" }) => (
+  <div className="space-y-4" role="status" aria-busy="true" aria-label={label}>
+    <div className="flex items-center gap-3">
+      <Skeleton className="h-9 w-9 !rounded-full" />
+      <Skeleton className="h-6 w-56" />
+    </div>
+    <Skeleton className="h-9 w-full max-w-xl" />
+    <div className="grid gap-4 lg:grid-cols-2">
+      <div className={cx(surface.card, "space-y-3 p-4")}>
+        <Skeleton className="h-4 w-1/3" />
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-5/6" />
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+      <div className={cx(surface.card, "space-y-3 p-4")}>
+        <Skeleton className="h-4 w-1/4" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    </div>
+  </div>
+);
+
+export const inputCls = surface.input;
 
 export const Field: React.FC<{ label: string; icon?: LucideIcon; children: (id: string) => React.ReactNode; className?: string }> = ({ label, icon: Icon, children, className }) => {
   const id = useId();
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-gray-300">
+      <label htmlFor={id} className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
         {Icon && <Icon className="h-3.5 w-3.5" aria-hidden />}
         {label}
       </label>
@@ -230,16 +289,16 @@ export const Switch: React.FC<{ checked: boolean; onChange: (v: boolean) => void
       title={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="inline-flex items-center gap-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
     >
-      <span className={cx("relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors", checked ? "bg-emerald-500" : "bg-slate-300 dark:bg-gray-600")}>
+      <span className={cx("relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors", checked ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-700")}>
         <motion.span
           className="h-5 w-5 rounded-full bg-white"
           animate={{ x: checked ? 20 : 0 }}
           transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 600, damping: 32 }}
         />
       </span>
-      {showLabel && <span className="text-sm font-medium text-slate-700 dark:text-gray-200">{label}</span>}
+      {showLabel && <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{label}</span>}
     </button>
   );
 };
@@ -252,7 +311,7 @@ export const Stepper: React.FC<{ value: number; onChange: (v: number) => void; m
   label,
   unit = "d",
 }) => (
-  <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800" role="group" aria-label={label}>
+  <div className="inline-flex items-center gap-1 rounded-full bg-gray-100 p-1 dark:bg-gray-800" role="group" aria-label={label}>
     <IconBtn icon={Minus} label={`${label}: less`} onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} className="h-7 w-7" />
     <input
       type="number"
@@ -261,9 +320,9 @@ export const Stepper: React.FC<{ value: number; onChange: (v: number) => void; m
       min={min}
       max={max}
       onChange={(e) => onChange(Math.min(max, Math.max(min, Number(e.target.value) || 0)))}
-      className="w-14 bg-transparent text-center text-sm font-bold tabular-nums text-slate-900 focus:outline-none dark:text-white"
+      className="w-14 bg-transparent text-center text-sm font-bold tabular-nums text-gray-900 focus:outline-none dark:text-white"
     />
-    <span className="pr-1 text-xs text-slate-600 dark:text-gray-300">{unit}</span>
+    <span className="pr-1 text-xs text-gray-600 dark:text-gray-300">{unit}</span>
     <IconBtn icon={Plus} label={`${label}: more`} onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} className="h-7 w-7" />
   </div>
 );
@@ -362,7 +421,7 @@ export const CountBadge: React.FC<{ n: number; tone?: "red" | "slate"; label?: s
     <span
       className={cx(
         "inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-bold leading-5",
-        tone === "red" ? "bg-red-500 text-white" : "bg-slate-200 text-slate-700 dark:bg-gray-700 dark:text-gray-200",
+        tone === "red" ? "bg-red-500 text-white" : "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
       )}
     >
       {n > 99 ? "99+" : n}
@@ -370,51 +429,135 @@ export const CountBadge: React.FC<{ n: number; tone?: "red" | "slate"; label?: s
     </span>
   ) : null;
 
-/** Animated tab bar with a sliding underline (layoutId). */
+/**
+ * Animated tab bar with a sliding underline (layoutId). One rail per screen (plan F12).
+ * `visible`: below lg only the first N tabs show and the rest go behind "More", so long
+ * bars (School detail has 8 tabs) never scroll sideways on a phone.
+ */
 export function TabBar<T extends string>({
   tabs,
   value,
   onChange,
   id,
   label,
+  visible,
+  visibleSm,
 }: {
   tabs: Array<{ value: T; label: string; icon?: LucideIcon; badge?: number }>;
   value: T;
   onChange: (v: T) => void;
   id: string;
   label: string;
+  /** below lg: only the first N tabs show, the rest go behind "More" */
+  visible?: number;
+  /** below sm (phones): a smaller N */
+  visibleSm?: number;
 }) {
   const reduced = useReducedMotion();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const cut = visible && visible < tabs.length ? visible : tabs.length;
+  const cutSm = visibleSm && visibleSm < cut ? visibleSm : cut;
+  const menu = tabs.slice(cutSm); // what "More" can hold on the smallest screen
+  const idx = tabs.findIndex((t) => t.value === value);
+  const active = tabs[idx];
+  const inMenuAlways = idx >= cut; // hidden below lg
+  const inMenuPhone = idx >= cutSm && idx < cut; // hidden below sm only
+  const menuBadge = (from: number) => tabs.slice(from).reduce((n, t) => n + (t.badge ?? 0), 0);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const close = (e: KeyboardEvent) => e.key === "Escape" && setMoreOpen(false);
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [moreOpen]);
+  const underline = (key: string, className?: string) => (
+    <motion.span
+      layoutId={`tab-${id}${key}`}
+      className={cx("absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-blue-600 dark:bg-blue-400", className)}
+      transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 35 }}
+    />
+  );
+  const tabCls = (on: boolean) =>
+    cx(
+      "relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+      on ? "text-blue-600 dark:text-blue-400" : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white",
+    );
   return (
-    <div role="tablist" aria-label={label} className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-gray-700">
-      {tabs.map((t) => {
-        const on = t.value === value;
-        const Icon = t.icon;
-        return (
+    <div className={cx("relative flex items-end border-b", surface.rail)}>
+      <div role="tablist" aria-label={label} className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+        {tabs.map((t, i) => {
+          const on = t.value === value;
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.value}
+              role="tab"
+              type="button"
+              aria-selected={on}
+              onClick={() => onChange(t.value)}
+              className={cx(tabCls(on), i >= cut ? "hidden lg:flex" : i >= cutSm && "hidden sm:flex")}
+            >
+              {Icon && <Icon className="h-4 w-4" aria-hidden />}
+              {t.label}
+              {!!t.badge && <CountBadge n={t.badge} />}
+              {on && underline("")}
+            </button>
+          );
+        })}
+      </div>
+      {menu.length > 0 && (
+        <div className={cx("relative lg:hidden", cut === tabs.length && "sm:hidden")}>
           <button
-            key={t.value}
-            role="tab"
             type="button"
-            aria-selected={on}
-            onClick={() => onChange(t.value)}
-            className={cx(
-              "relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-              on ? "text-brand-700 dark:text-brand-200" : "text-slate-600 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white",
-            )}
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen((o) => !o)}
+            className={cx(tabCls(inMenuAlways), inMenuPhone && "max-sm:text-blue-600 max-sm:dark:text-blue-400")}
           >
-            {Icon && <Icon className="h-4 w-4" aria-hidden />}
-            {t.label}
-            {!!t.badge && <CountBadge n={t.badge} />}
-            {on && (
-              <motion.span
-                layoutId={`tab-${id}`}
-                className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-brand-600 dark:bg-brand-200"
-                transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 500, damping: 35 }}
-              />
+            {inMenuAlways ? (
+              active.label
+            ) : inMenuPhone ? (
+              <>
+                <span className="sm:hidden">{active.label}</span>
+                <span className="hidden sm:inline">More</span>
+              </>
+            ) : (
+              "More"
             )}
+            {!inMenuAlways && !inMenuPhone && menuBadge(cutSm) > 0 && <CountBadge n={menuBadge(cutSm)} />}
+            <ChevronDown className={cx("h-4 w-4 transition-transform", moreOpen && "rotate-180")} aria-hidden />
+            {inMenuAlways && underline("-more")}
+            {inMenuPhone && underline("-more-sm", "sm:hidden")}
           </button>
-        );
-      })}
+          {moreOpen && (
+            <>
+              <button type="button" aria-label="Close menu" className="fixed inset-0 z-30 cursor-default" onClick={() => setMoreOpen(false)} />
+              <ul role="menu" aria-label={`More ${label}`} className="absolute right-0 top-full z-40 mt-1 min-w-[11rem] rounded-2xl border border-gray-200 bg-white p-1 dark:border-gray-700/40 dark:bg-gray-900">
+                {menu.map((t, k) => {
+                  const Icon = t.icon;
+                  const on = t.value === value;
+                  return (
+                    <li key={t.value} role="none" className={cx(cutSm + k < cut && "sm:hidden")}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMoreOpen(false);
+                          onChange(t.value);
+                        }}
+                        className={cx("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium", on ? accent.soft : "text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800/70")}
+                      >
+                        {Icon && <Icon className="h-4 w-4" aria-hidden />}
+                        <span className="flex-1">{t.label}</span>
+                        {!!t.badge && <CountBadge n={t.badge} />}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

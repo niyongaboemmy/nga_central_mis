@@ -29,18 +29,20 @@ import {
   Users,
   X,
   type LucideIcon,
+  Pencil,
 } from "lucide-react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import ConfirmDialog from "../../ui/ConfirmDialog";
-import { EmptyState, Meter, PackageCard, StatusPill, entIcon, statusLabel } from "../kit";
+import { EmptyState, Meter, PackageCard, StatusPill, entIcon, isLiveStatus, statusLabel } from "../kit";
 import SelectField from "../../ui/SelectField";
 import { platformApi, type Entitlement, type PackageInfo, type ProvisioningRun, type StepStatus, type TenantDetail, type TenantLifecycle } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
-import { Btn, Card, IconBtn, ReasonDialog, Spinner, Stepper, Switch, TabBar, act, cx, errorText, fmtDate, fmtDateTime, inputCls, usePlatform } from "./platformShared";
+import { Btn, Card, IconBtn, ReasonDialog, SkeletonGrid, SkeletonPage, Stepper, Switch, TabBar, act, cx, errorText, fmtDate, fmtDateTime, inputCls, sectionTitle, surface, usePlatform } from "./platformShared";
 import { InvoiceList } from "./BillingPage";
 import { PeriodChip } from "./SchoolsPage";
 import { useChartTheme } from "./chartTheme";
 import SchoolAdminsTab from "./SchoolAdminsTab";
+import EditSchoolDetailsDialog from "./EditSchoolDetailsDialog";
 
 type Tab = "overview" | "admins" | "package" | "apps" | "usage" | "billing" | "lifecycle" | "audit";
 type LAction = TenantDetail["allowedActions"][number];
@@ -54,31 +56,38 @@ const SchoolDetailPage: React.FC = () => {
   useEffect(() => {
     platformApi.tenant(tid).then(setD, (e) => setError(errorText(e)));
   }, [tid]);
-  if (deleted) return <EmptyState icon={Trash2} title="Deleted"><Link to="/platform/schools" className="text-brand-700 underline dark:text-brand-200">Schools</Link></EmptyState>;
+  if (deleted) return <EmptyState icon={Trash2} title="Deleted"><Link to="/platform/schools" className="text-blue-700 underline dark:text-blue-400">Schools</Link></EmptyState>;
   if (error) return <EmptyState icon={TriangleAlert} title={error} />;
-  if (!d) return <Spinner />;
+  if (!d) return <SkeletonPage label="Loading the school" />;
   const t = d.tenant;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Link to="/platform/schools" className="rounded-full p-2 text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800" aria-label="Back to schools">
-          <ArrowLeft className="h-5 w-5" aria-hidden />
+        <Link
+          to="/platform/schools"
+          className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 py-1.5 pl-2.5 pr-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-gray-800/70 dark:text-gray-200 dark:hover:bg-gray-800"
+          aria-label="Back to schools"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          <span aria-hidden>Schools</span>
         </Link>
-        <h1 className="flex min-w-0 flex-1 items-center gap-2 truncate text-xl font-bold text-slate-900 dark:text-white">
+        <h1 className="flex min-w-[12rem] flex-1 items-center gap-2 truncate text-xl font-bold text-gray-900 dark:text-white">
           {t.isPrimary && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200">
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
               <ShieldCheck className="h-4 w-4" aria-hidden />
               Primary
             </span>
           )}
           <span className="truncate">{t.name}</span>
         </h1>
-        <StatusPill status={t.status} />
+        <StatusPill status={t.status} live={isLiveStatus(t.status)} />
         <PeriodChip periodEnd={t.periodEnd} graceUntil={t.status === "GRACE" ? t.graceUntil : null} />
       </div>
       <TabBar
         id="school"
         label="School"
+        visible={5}
+        visibleSm={2}
         value={tab}
         onChange={setTab}
         tabs={[
@@ -93,7 +102,7 @@ const SchoolDetailPage: React.FC = () => {
         ]}
       />
       <div role="tabpanel">
-        {tab === "overview" && <OverviewTab d={d} onRun={(run) => setD({ ...d, provisioning: run })} />}
+        {tab === "overview" && <OverviewTab d={d} onChange={setD} onRun={(run) => setD({ ...d, provisioning: run })} />}
         {tab === "admins" && <SchoolAdminsTab d={d} />}
         {tab === "package" && <PackageTab d={d} onChange={setD} />}
         {tab === "apps" && <AppsTab d={d} onChange={setD} />}
@@ -110,47 +119,71 @@ const SchoolDetailPage: React.FC = () => {
 // Overview + provisioning
 // ---------------------------------------------------------------------------
 
-const OverviewTab: React.FC<{ d: TenantDetail; onRun: (r: ProvisioningRun) => void }> = ({ d, onRun }) => {
+const OverviewTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => void; onRun: (r: ProvisioningRun) => void }> = ({ d, onChange, onRun }) => {
   const t = d.tenant;
+  const [editing, setEditing] = useState(false);
+  const canEdit = d.allowedActions.includes("edit_details");
   const facts: Array<[string, React.ReactNode]> = [
-    ["Address", <span className="font-mono">{t.slug}</span>],
+    ["School name", t.name],
+    ["Legal name", t.legalName || <span className="font-normal text-gray-500 dark:text-gray-400">Same as the name</span>],
+    ["Web address", <span className="font-mono">{t.slug}</span>],
     ["Package", d.subscription ? `${d.subscription.packageCode} · ${d.subscription.billingCycle === "YEAR" ? "Year" : "Term"}` : t.pkg],
     ["Period", d.subscription ? `${fmtDate(d.subscription.periodStart)} → ${fmtDate(d.subscription.periodEnd)}` : "—"],
     ["Active 7d", t.activeUsers7d.toLocaleString()],
     ["Since", fmtDate(t.activatedAt ?? t.createdAt)],
-    ["Timezone", t.timezone],
+    ["Timezone", t.timezone.replace(/_/g, " ")],
+    ["Country", t.country ?? "—"],
   ];
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="space-y-4">
         <div className="flex flex-wrap justify-around gap-4">
           {d.usage.meters.map((m) => (
             <Meter key={m.key} meter={m} />
           ))}
         </div>
-      </Card>
-      <Card>
-        <dl className="grid gap-3 sm:grid-cols-3">
-          {facts.map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-xs text-slate-600 dark:text-gray-300">{k}</dt>
-              <dd className="text-sm font-semibold text-slate-900 dark:text-white">{v}</dd>
-            </div>
-          ))}
-        </dl>
-        {t.statusReason && <p className="mt-3 rounded-xl bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-400/10 dark:text-amber-100">{t.statusReason}</p>}
+        <div className={cx(surface.inset, "p-3")}>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Details</h2>
+            {canEdit && (
+              <Btn size="sm" icon={Pencil} onClick={() => setEditing(true)}>
+                Edit details
+              </Btn>
+            )}
+          </div>
+          <dl className="grid gap-3 sm:grid-cols-3">
+            {facts.map(([k, v]) => (
+              <div key={k} className="min-w-0">
+                <dt className="text-xs text-gray-600 dark:text-gray-300">{k}</dt>
+                <dd className="truncate text-sm font-semibold text-gray-900 dark:text-white">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        {t.statusReason && <p className="rounded-xl bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-400/10 dark:text-amber-100">{t.statusReason}</p>}
       </Card>
       {d.provisioning && <ProvisioningPanel run={d.provisioning} onRun={onRun} />}
+      {canEdit && (
+        <EditSchoolDetailsDialog
+          d={d}
+          open={editing}
+          onClose={() => setEditing(false)}
+          onSaved={(next) => {
+            setEditing(false);
+            onChange(next);
+          }}
+        />
+      )}
     </div>
   );
 };
 
 const STEP_ICON: Record<StepStatus, { icon: LucideIcon; cls: string; spin?: boolean }> = {
-  PENDING: { icon: Clock, cls: "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-300" },
+  PENDING: { icon: Clock, cls: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300" },
   RUNNING: { icon: Loader2, cls: "bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-200", spin: true },
   DONE: { icon: Check, cls: "bg-emerald-500 text-white" },
   FAILED: { icon: X, cls: "bg-red-500 text-white" },
-  SKIPPED: { icon: SkipForward, cls: "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-300" },
+  SKIPPED: { icon: SkipForward, cls: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300" },
 };
 
 export const ProvisioningPanel: React.FC<{ run: ProvisioningRun; onRun: (r: ProvisioningRun) => void }> = ({ run, onRun }) => {
@@ -168,7 +201,7 @@ export const ProvisioningPanel: React.FC<{ run: ProvisioningRun; onRun: (r: Prov
   return (
     <Card>
       <div className="mb-3 flex items-center gap-2">
-        <h2 className="flex-1 text-sm font-bold text-slate-900 dark:text-white">Setup · #{run.attempt}</h2>
+        <h2 className={cx(sectionTitle, "flex-1")}>Setup · #{run.attempt}</h2>
         <StatusPill status={run.status === "DONE" ? "CONFIRMED" : run.status === "FAILED" ? "PROVISIONING_FAILED" : "PROVISIONING"} label={statusLabel(run.status)} />
         {run.status === "FAILED" && can("lifecycle") && (
           <Btn
@@ -193,17 +226,17 @@ export const ProvisioningPanel: React.FC<{ run: ProvisioningRun; onRun: (r: Prov
           const Icon = meta.icon;
           return (
             <motion.li key={s.key} layout {...m("reveal")}>
-              <details className="group rounded-xl hover:bg-slate-50 dark:hover:bg-gray-800/60">
-                <summary className="flex cursor-pointer list-none items-center gap-3 p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+              <details className="group rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                <summary className="flex cursor-pointer list-none items-center gap-3 p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                   <span className={cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", meta.cls)}>
                     <Icon className={cx("h-4 w-4", meta.spin && "animate-spin")} aria-hidden />
                   </span>
-                  <span className="flex-1 text-sm font-medium text-slate-900 dark:text-white">{s.label}</span>
+                  <span className="flex-1 text-sm font-medium text-gray-900 dark:text-white">{s.label}</span>
                   <span className="sr-only">{statusLabel(s.status)}</span>
-                  {s.finishedAt && <span className="text-xs text-slate-600 dark:text-gray-300">{fmtDateTime(s.finishedAt)}</span>}
-                  {s.log && <ChevronDown className="h-4 w-4 text-slate-500 transition-transform group-open:rotate-180" aria-hidden />}
+                  {s.finishedAt && <span className="text-xs text-gray-600 dark:text-gray-300">{fmtDateTime(s.finishedAt)}</span>}
+                  {s.log && <ChevronDown className="h-4 w-4 text-gray-500 transition-transform group-open:rotate-180" aria-hidden />}
                 </summary>
-                {s.log && <pre className="mx-2 mb-2 max-h-60 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{s.log}</pre>}
+                {s.log && <pre className="mx-2 mb-2 max-h-60 overflow-auto rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{s.log}</pre>}
               </details>
             </motion.li>
           );
@@ -243,7 +276,7 @@ const PackageTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => voi
   return (
     <div className="space-y-4">
       {!packages ? (
-        <Spinner />
+        <SkeletonGrid cards={4} label="Loading packages" className="grid gap-4 pt-3 sm:grid-cols-2 lg:grid-cols-4" cardClassName="h-48" />
       ) : (
         <div className="grid gap-4 pt-3 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label="Package">
           {packages.map((p) => (
@@ -263,7 +296,7 @@ const PackageTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => voi
         {target && current && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
             <Card className="space-y-3">
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+              <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
                 {current.name}
                 <ArrowRight className="h-4 w-4" aria-hidden />
                 {target.name}
@@ -354,25 +387,25 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
   };
   return (
     <Card className="space-y-3">
-      <h2 className="text-sm font-bold text-slate-900 dark:text-white">Overrides</h2>
+      <h2 className={sectionTitle}>Overrides</h2>
       {d.overrides.length === 0 ? (
-        <p className="text-sm text-slate-600 dark:text-gray-300">—</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300">—</p>
       ) : (
         <ul className="space-y-1.5">
           {d.overrides.map((o) => {
             const Icon = entIcon(o.key);
             const kind = catalog.find((e) => e.key === o.key)?.kind ?? (o.key.startsWith("limit.") ? "LIMIT" : "FEATURE");
             return (
-              <li key={o.id} className="flex items-center gap-3 rounded-xl bg-slate-50 p-2 dark:bg-gray-800">
-                <Icon className="h-4 w-4 shrink-0 text-slate-600 dark:text-gray-300" aria-hidden />
+              <li key={o.id} className="flex items-center gap-3 rounded-xl bg-gray-50 p-2 dark:bg-gray-800/50">
+                <Icon className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-300" aria-hidden />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                  <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                     {labelOf(o.key)}{" "}
                     <span className={cx("ml-1 rounded-full px-1.5 text-xs", o.enabled ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200" : "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-200")}>
                       {kind === "LIMIT" ? (o.value === null ? "∞" : o.value.toLocaleString()) : o.enabled ? "On" : "Off"}
                     </span>
                   </p>
-                  <p className="truncate text-xs text-slate-600 dark:text-gray-300">
+                  <p className="truncate text-xs text-gray-600 dark:text-gray-300">
                     {o.reason}
                     {o.expiresAt && ` · ⏳ ${fmtDate(o.expiresAt)}`}
                     {o.grantedBy && ` · ${o.grantedBy}`}
@@ -399,7 +432,7 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
       )}
       {canEdit && (
         <form
-          className="grid gap-2 border-t border-slate-100 pt-3 dark:border-gray-800 sm:grid-cols-2"
+          className={cx(surface.inset, "grid gap-2 p-3 sm:grid-cols-2")}
           onSubmit={async (e) => {
             e.preventDefault();
             if (!ent || reason.trim().length < 3) return;
@@ -423,7 +456,7 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
           }}
         >
           <div className="flex items-center gap-2">
-            {ent && React.createElement(entIcon(ent.key), { className: "h-5 w-5 shrink-0 text-brand-600 dark:text-brand-200", "aria-hidden": true })}
+            {ent && React.createElement(entIcon(ent.key), { className: "h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400", "aria-hidden": true })}
             <SelectField aria-label="Entitlement" value={key} onChange={(e) => setKey(e.target.value)} className={inputCls}>
               <option value="">Entitlement…</option>
               {(["APP", "FEATURE", "LIMIT"] as const).map((k) => (
@@ -447,7 +480,7 @@ const Overrides: React.FC<{ d: TenantDetail; catalog: Entitlement[]; canEdit: bo
                   type="button"
                   aria-pressed={unlimited}
                   onClick={() => setUnlimited(!unlimited)}
-                  className={cx("flex h-9 w-9 items-center justify-center rounded-full", unlimited ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 dark:bg-gray-800 dark:text-gray-300")}
+                  className={cx("flex h-9 w-9 items-center justify-center rounded-full", unlimited ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300")}
                   title="Unlimited"
                 >
                   <InfinityIcon className="h-4 w-4" aria-hidden />
@@ -501,18 +534,18 @@ const AppsTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => void }
         const Icon = entIcon(appKeyOf(a.name, a.clientId));
         const on = a.status === "ACTIVE";
         return (
-          <li key={a.systemId} className={cx("flex items-center gap-3 rounded-2xl border p-3 transition-colors", on ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-400/30 dark:bg-emerald-400/5" : "border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900")}>
-            <span className={cx("flex h-10 w-10 items-center justify-center rounded-xl", on ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500 dark:bg-gray-800 dark:text-gray-300")}>
+          <li key={a.systemId} className={cx("flex items-center gap-3 rounded-2xl p-3 transition-colors", on ? "bg-blue-50 ring-1 ring-inset ring-blue-500/20 dark:bg-blue-500/10 dark:ring-blue-400/20" : "bg-white dark:bg-gray-800/40")}>
+            <span className={cx("flex h-10 w-10 items-center justify-center rounded-xl", on ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300")}>
               <Icon className="h-5 w-5" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-slate-900 dark:text-white">{a.name}</p>
-              <span className={cx("rounded-full px-1.5 text-[11px] font-bold", a.source === "OVERRIDE" ? "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200" : "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-200")}>
+              <p className="truncate font-semibold text-gray-900 dark:text-white">{a.name}</p>
+              <span className={cx("rounded-full px-1.5 text-[11px] font-bold", a.source === "OVERRIDE" ? "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200" : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200")}>
                 {a.source === "OVERRIDE" ? "Override" : "Package"}
               </span>
             </div>
             {busy === a.systemId ? (
-              <Loader2 className="h-5 w-5 animate-spin text-brand-500" aria-label="Saving" />
+              <Loader2 className="h-5 w-5 animate-spin text-blue-500" aria-label="Saving" />
             ) : (
               <Switch
                 checked={on}
@@ -542,15 +575,13 @@ const UsageTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
   const data = d.usage.daily.map((x) => ({ ...x, day: x.day.slice(5) }));
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="space-y-4">
         <div className="flex flex-wrap justify-around gap-4">
           {d.usage.meters.map((m) => (
             <Meter key={m.key} meter={m} />
           ))}
         </div>
-      </Card>
-      <Card>
-        <h2 className="mb-2 text-sm font-bold text-slate-900 dark:text-white">30 days</h2>
+        <h2 className={sectionTitle}>30 days</h2>
         <div className="h-60" role="img" aria-label="Active users, AI requests and code runs per day, last 30 days">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
@@ -575,10 +606,10 @@ const UsageTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
 // ---------------------------------------------------------------------------
 
 const STATES: Array<{ s: TenantLifecycle; icon: LucideIcon; ring: string; fill: string }> = [
-  { s: "ACTIVE", icon: PlayCircle, ring: "ring-emerald-400", fill: "bg-emerald-500" },
-  { s: "GRACE", icon: Timer, ring: "ring-amber-400", fill: "bg-amber-500" },
-  { s: "SUSPENDED", icon: PauseCircle, ring: "ring-red-400", fill: "bg-red-500" },
-  { s: "ARCHIVED", icon: Archive, ring: "ring-slate-400", fill: "bg-slate-500" },
+  { s: "ACTIVE", icon: PlayCircle, ring: "ring-emerald-400/30", fill: "bg-emerald-500" },
+  { s: "GRACE", icon: Timer, ring: "ring-amber-400/30", fill: "bg-amber-500" },
+  { s: "SUSPENDED", icon: PauseCircle, ring: "ring-red-400/30", fill: "bg-red-500" },
+  { s: "ARCHIVED", icon: Archive, ring: "ring-gray-400/30", fill: "bg-gray-500" },
 ];
 
 const LifecycleTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => void; onDeleted: () => void }> = ({ d, onChange, onDeleted }) => {
@@ -612,7 +643,7 @@ const LifecycleTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => v
             const Icon = st.icon;
             return (
               <React.Fragment key={st.s}>
-                {i > 0 && <ArrowRight className="mx-auto h-5 w-5 rotate-90 text-slate-400 sm:rotate-0" aria-hidden />}
+                {i > 0 && <ArrowRight className="mx-auto h-5 w-5 rotate-90 text-gray-400 sm:rotate-0" aria-hidden />}
                 <li aria-current={on ? "step" : undefined} className="relative flex flex-1 flex-col items-center gap-2 rounded-2xl p-3">
                   <span className="relative">
                     {on && !reduced && (
@@ -621,14 +652,14 @@ const LifecycleTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => v
                     <span
                       className={cx(
                         "relative flex h-14 w-14 items-center justify-center rounded-full transition-all",
-                        on ? cx(st.fill, "text-white ring-4", st.ring) : "bg-slate-100 text-slate-400 dark:bg-gray-800 dark:text-gray-500",
+                        on ? cx(st.fill, "text-white ring-4", st.ring) : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500",
                       )}
                     >
                       <Icon className="h-7 w-7" aria-hidden />
                     </span>
                   </span>
-                  <span className={cx("text-sm font-semibold", on ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-gray-300")}>{statusLabel(st.s)}</span>
-                  {on && st.s === "GRACE" && t.graceUntil && <span className="text-xs text-slate-600 dark:text-gray-300">→ {fmtDate(t.graceUntil)}</span>}
+                  <span className={cx("text-sm font-semibold", on ? "text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300")}>{statusLabel(st.s)}</span>
+                  {on && st.s === "GRACE" && t.graceUntil && <span className="text-xs text-gray-600 dark:text-gray-300">→ {fmtDate(t.graceUntil)}</span>}
                 </li>
               </React.Fragment>
             );
@@ -636,7 +667,7 @@ const LifecycleTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => v
         </ol>
       </Card>
       {t.isPrimary && (
-        <p className="flex items-center gap-2 text-sm font-semibold text-brand-700 dark:text-brand-200">
+        <p className="flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-400">
           <ShieldCheck className="h-5 w-5" aria-hidden />
           Primary
         </p>
@@ -699,23 +730,23 @@ export const AuditList: React.FC<{ entries: TenantDetail["audit"]; schoolName?: 
   const m = useMotion();
   if (!entries.length) return <EmptyState icon={ScrollText} title="No entries" />;
   return (
-    <ol className="relative space-y-3 border-l-2 border-slate-200 pl-5 dark:border-gray-700" aria-label="Audit">
+    <ol className={cx("relative space-y-3 border-l pl-5", surface.rail)} aria-label="Audit">
       <AnimatePresence initial={false}>
         {entries.map((e) => (
           <motion.li key={e.id} layout {...m("reveal")} className="relative">
-            <span className="absolute -left-[1.6rem] top-1.5 h-3 w-3 rounded-full bg-brand-500 ring-4 ring-white dark:ring-gray-950" aria-hidden />
+            <span className="absolute -left-[1.6rem] top-1.5 h-2.5 w-2.5 rounded-full bg-blue-500" aria-hidden />
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold text-slate-900 dark:text-white">{auditLabel(e.action)}</span>
-              {schoolName && e.targetTid !== null && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-gray-800 dark:text-gray-200">{schoolName(e.targetTid) ?? `#${e.targetTid}`}</span>}
-              <time className="text-xs text-slate-600 dark:text-gray-300" dateTime={e.at}>
+              <span className="text-sm font-semibold text-gray-900 dark:text-white">{auditLabel(e.action)}</span>
+              {schoolName && e.targetTid !== null && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-200">{schoolName(e.targetTid) ?? `#${e.targetTid}`}</span>}
+              <time className="text-xs text-gray-600 dark:text-gray-300" dateTime={e.at}>
                 {fmtDateTime(e.at)}
               </time>
-              {e.actor && <span className="text-xs text-slate-600 dark:text-gray-300">· {e.actor}</span>}
+              {e.actor && <span className="text-xs text-gray-600 dark:text-gray-300">· {e.actor}</span>}
             </div>
             {e.payload !== null && e.payload !== undefined && typeof e.payload === "object" && Object.keys(e.payload as object).length > 0 && (
               <details className="mt-1">
-                <summary className="cursor-pointer text-xs text-slate-600 dark:text-gray-300">Details</summary>
-                <pre className="mt-1 max-h-48 overflow-auto rounded-lg bg-slate-50 p-2 text-xs text-slate-800 dark:bg-gray-800 dark:text-gray-100">{JSON.stringify(e.payload, null, 2)}</pre>
+                <summary className="cursor-pointer text-xs text-gray-600 dark:text-gray-300">Details</summary>
+                <pre className="mt-1 max-h-48 overflow-auto rounded-lg bg-gray-50 p-2 text-xs text-gray-800 dark:bg-gray-800/50 dark:text-gray-100">{JSON.stringify(e.payload, null, 2)}</pre>
               </details>
             )}
           </motion.li>

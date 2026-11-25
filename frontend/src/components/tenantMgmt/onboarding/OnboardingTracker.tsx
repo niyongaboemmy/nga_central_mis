@@ -18,8 +18,8 @@ const SignedIn: React.FC<{ token: string; initial: OnboardingMe | null; onExpire
   const { me, error, reload, setMe } = useOnboardingMe(token, onExpired, initial);
   if (!me)
     return (
-      <main className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-950">
-        <Loader2 className="h-8 w-8 animate-spin text-brand-500" aria-label="Loading" />
+      <main className="flex min-h-screen items-center justify-center bg-white dark:bg-black">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" aria-label="Loading" />
       </main>
     );
   return <TrackerView me={me} error={error} reload={reload} onPatch={(p) => setMe((x) => (x ? { ...x, ...p } : x))} onSignOut={onSignOut} />;

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { ChevronsDown, Search } from "lucide-react";
 import SelectField from "../../ui/SelectField";
 import { platformApi, type AuditEntry, type TenantListItem } from "../../../api/tenantMgmt";
-import { Btn, Card, Spinner, cx, errorText, inputCls } from "./platformShared";
+import { Btn, Card, Skeleton, cx, errorText, inputCls } from "./platformShared";
 import { AuditList } from "./SchoolDetailPage";
 
 /** Page size the "load more" expects; a shorter page means the end. */
@@ -54,7 +54,7 @@ const AuditPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         <div className="relative min-w-[12rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" aria-hidden />
           <input aria-label="Action" placeholder="Action" value={action} onChange={(e) => setAction(e.target.value)} className={cx(inputCls, "pl-9")} />
         </div>
         <SelectField aria-label="School" value={tid} onChange={(e) => setTid(e.target.value ? Number(e.target.value) : "")} className={cx(inputCls, "w-auto")}>
@@ -68,7 +68,18 @@ const AuditPage: React.FC = () => {
       </div>
       {error && <p className="text-sm text-red-600 dark:text-red-300">{error}</p>}
       <Card>
-        {!rows ? <Spinner /> : <AuditList entries={rows} schoolName={nameOf} />}
+        {!rows ? (
+          <ul className="space-y-4" role="status" aria-busy="true" aria-label="Loading audit entries">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <li key={i} className="space-y-2">
+                <Skeleton className="h-3.5 w-48 max-w-[60%]" />
+                <Skeleton className="h-3 w-72 max-w-[85%]" />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <AuditList entries={rows} schoolName={nameOf} />
+        )}
         {rows && more && (
           <div className="mt-4 flex justify-center">
             <Btn

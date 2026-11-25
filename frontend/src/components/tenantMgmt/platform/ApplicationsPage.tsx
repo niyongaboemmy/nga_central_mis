@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Clock, FileStack, Inbox, Search, UserRound } from "lucide-react";
 import { EmptyState, Segmented, StatusPill, accentOf } from "../kit";
 import SelectField from "../../ui/SelectField";
 import { platformApi, type ApplicationListItem, type ApplicationStatus, type PackageInfo, type TrackerStep } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
-import { CountBadge, Spinner, Switch, cx, errorText, initials, inputCls } from "./platformShared";
+import { CountBadge, SkeletonRows, Switch, cx, errorText, initials, inputCls, surface } from "./platformShared";
 import { STEP_STATUSES } from "./OverviewPage";
 
 type Filter = "all" | "new" | "review" | "changes" | "payment" | "setup" | "closed";
@@ -105,7 +105,7 @@ const ApplicationsPage: React.FC = () => {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[12rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" aria-hidden />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" aria-hidden />
           <input aria-label="Search" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} className={cx(inputCls, "pl-9")} />
         </div>
         <SelectField aria-label="Package" value={pkg} onChange={(e) => setPkg(e.target.value)} className={cx(inputCls, "w-auto")}>
@@ -121,11 +121,11 @@ const ApplicationsPage: React.FC = () => {
 
       {error && <p className="text-sm text-red-600 dark:text-red-300">{error}</p>}
       {!rows ? (
-        <Spinner />
+        <SkeletonRows rows={6} label="Loading applications" />
       ) : shown.length === 0 ? (
         <EmptyState icon={Inbox} title="Nothing here" />
       ) : (
-        <ul className="space-y-2" aria-label="Applications">
+        <ul className={cx(surface.card, "divide-y p-1.5", surface.divide)} aria-label="Applications">
           <AnimatePresence initial={false}>
             {shown.map((r) => (
               <AppRow key={r.id} row={r} accent={accentOf(pkgByCode[r.requestedPackage ?? ""]?.accent).bg} pkgName={pkgByCode[r.requestedPackage ?? ""]?.name ?? r.requestedPackage} />
@@ -139,52 +139,49 @@ const ApplicationsPage: React.FC = () => {
 
 const AppRow: React.FC<{ row: ApplicationListItem; accent: string; pkgName: string | null }> = ({ row: r, accent, pkgName }) => {
   const m = useMotion();
-  const reduced = useReducedMotion();
   return (
-    <motion.li layout {...m("reveal")}>
+    <motion.li layout {...m("reveal")} className="py-0.5">
       <Link
         to={`/platform/applications/${r.id}`}
-        className="relative flex flex-col gap-2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 pl-4 transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 md:grid md:grid-cols-[1fr_auto_auto_auto_auto] md:items-center md:gap-4"
+        className={cx("relative flex flex-col gap-2 p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 md:grid md:grid-cols-[1fr_auto_auto_auto_auto] md:items-center md:gap-4", surface.insetHover)}
       >
-        <span className={cx("absolute inset-y-0 left-0 w-1", accent)} aria-hidden />
         <span className="min-w-0">
           <span className="flex items-center gap-2">
             {r.unread > 0 && (
-              <span className="h-2 w-2 shrink-0 rounded-full bg-brand-500" title={`${r.unread} unread`}>
+              <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" title={`${r.unread} unread`}>
                 <span className="sr-only">{r.unread} unread</span>
               </span>
             )}
-            <span className="truncate font-semibold text-slate-900 dark:text-white">{r.schoolName}</span>
+            <span className="truncate font-semibold text-gray-900 dark:text-white">{r.schoolName}</span>
           </span>
-          <span className="block truncate text-xs text-slate-600 dark:text-gray-300">
+          <span className="block truncate text-xs text-gray-600 dark:text-gray-300">
             {[r.ref, r.district, r.applicantName].filter(Boolean).join(" · ")}
           </span>
         </span>
         <span className="flex flex-wrap items-center gap-2">
           <StatusPill status={r.status} />
-          {pkgName && <span className="text-xs font-semibold text-slate-700 dark:text-gray-200">{pkgName}</span>}
-        </span>
-        <span className={cx("inline-flex items-center gap-1 text-xs font-semibold tabular-nums", r.slaBreached ? "text-red-700 dark:text-red-300" : "text-slate-600 dark:text-gray-300")}>
-          {r.slaBreached && !reduced ? (
-            <motion.span animate={{ scale: [1, 1.25, 1] }} transition={{ duration: 1.2, repeat: Infinity }} className="inline-flex">
-              <Clock className="h-3.5 w-3.5" aria-hidden />
-            </motion.span>
-          ) : (
-            <Clock className="h-3.5 w-3.5" aria-hidden />
+          {pkgName && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200">
+              <span className={cx("h-2 w-2 rounded-full", accent)} aria-hidden />
+              {pkgName}
+            </span>
           )}
+        </span>
+        <span className={cx("inline-flex items-center gap-1 text-xs font-semibold tabular-nums", r.slaBreached ? "text-red-700 dark:text-red-300" : "text-gray-600 dark:text-gray-300")}>
+          <Clock className="h-3.5 w-3.5" aria-hidden />
           {r.ageDays}d{r.slaBreached && <span className="sr-only"> past review time</span>}
         </span>
         <span className="flex items-center gap-1">
           {r.assignedTo ? (
             <span
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-[11px] font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[11px] font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300"
               title={r.assignedTo.name}
             >
               {initials(r.assignedTo.name)}
               <span className="sr-only">Assigned to {r.assignedTo.name}</span>
             </span>
           ) : (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-slate-300 text-slate-400 dark:border-gray-600" title="Unassigned">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800/70 dark:text-gray-500" title="Unassigned">
               <UserRound className="h-3.5 w-3.5" aria-hidden />
               <span className="sr-only">Unassigned</span>
             </span>
@@ -192,7 +189,7 @@ const AppRow: React.FC<{ row: ApplicationListItem; accent: string; pkgName: stri
         </span>
         <span className="hidden md:block">
           <CountBadge n={r.unread} tone="slate" label="unread" />
-          {!r.unread && <FileStack className="h-4 w-4 text-slate-300 dark:text-gray-600" aria-hidden />}
+          {!r.unread && <FileStack className="h-4 w-4 text-gray-300 dark:text-gray-600" aria-hidden />}
         </span>
       </Link>
     </motion.li>

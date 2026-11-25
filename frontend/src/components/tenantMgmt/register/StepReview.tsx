@@ -16,18 +16,18 @@ export const DOC_LABELS: Record<DocumentKind, { label: string; icon: LucideIcon 
 };
 
 const SummaryCard: React.FC<{ icon: LucideIcon; title: string; onEdit: () => void; children: React.ReactNode }> = ({ icon: Icon, title, onEdit, children }) => (
-  <section className="rounded-2xl border border-slate-200 p-4 dark:border-gray-700">
+  <section className="rounded-2xl bg-gray-50 p-4 dark:bg-gray-800/50">
     <div className="flex items-center gap-2">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-100">
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
         <Icon className="h-4 w-4" aria-hidden />
       </span>
-      <h3 className="flex-1 font-semibold text-slate-900 dark:text-white">{title}</h3>
+      <h3 className="flex-1 font-semibold text-gray-900 dark:text-white">{title}</h3>
       <button type="button" className={iconBtn} onClick={onEdit}>
         <Pencil className="h-4 w-4" aria-hidden />
         <span className="sr-only">Edit {title}</span>
       </button>
     </div>
-    <div className="mt-2 space-y-0.5 text-sm text-slate-600 dark:text-gray-300">{children}</div>
+    <div className="mt-2 space-y-0.5 text-sm text-gray-600 dark:text-gray-300">{children}</div>
   </section>
 );
 
@@ -142,33 +142,33 @@ const StepReview: React.FC<{
     <form onSubmit={onSubmit} noValidate>
       <div className="grid gap-3 sm:grid-cols-3">
         <SummaryCard icon={Building2} title="School" onEdit={() => onEdit(0)}>
-          <p className="font-medium text-slate-900 dark:text-white">{s.schoolName}</p>
+          <p className="font-medium text-gray-900 dark:text-white">{s.schoolName}</p>
           <p className="flex items-center gap-1">{type && <type.icon className="h-3.5 w-3.5" aria-hidden />}{type?.label}</p>
           <p>{[s.sector, s.district, s.province].filter(Boolean).join(", ")}</p>
           <p className="truncate font-mono text-xs">{s.desiredSlug}.amashuri.com</p>
         </SummaryCard>
         <SummaryCard icon={PackageIcon} title="Package" onEdit={() => onEdit(1)}>
-          <p className="font-medium text-slate-900 dark:text-white">{pkg?.name ?? wiz.requestedPackage}</p>
+          <p className="font-medium text-gray-900 dark:text-white">{pkg?.name ?? wiz.requestedPackage}</p>
           <p>{wiz.billingCycle === "YEAR" ? "Yearly" : "Per term"}</p>
         </SummaryCard>
         <SummaryCard icon={UserRound} title="Administrator" onEdit={() => onEdit(2)}>
-          <p className="font-medium text-slate-900 dark:text-white">{wiz.admin.fullName}</p>
+          <p className="font-medium text-gray-900 dark:text-white">{wiz.admin.fullName}</p>
           <p className="truncate">{wiz.admin.email}</p>
         </SummaryCard>
       </div>
 
       {wiz.applicationId && required.length > 0 && (
         <div className="mt-5">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
             <FileCheck2 className="h-4 w-4" aria-hidden />
-            Documents <span className="font-normal text-slate-600 dark:text-gray-300">(or later)</span>
+            Documents <span className="font-normal text-gray-600 dark:text-gray-300">(or later)</span>
           </h3>
           <DocumentDrops applicationId={wiz.applicationId} kinds={required} documents={docs} onUploaded={(d) => setDocs((x) => [...x, d])} />
         </div>
       )}
 
       <Shake error={termsError} className="mt-5">
-        <label className={cx("flex items-start gap-3 rounded-2xl border p-3", termsError ? "border-red-500" : "border-slate-200 dark:border-gray-700")}>
+        <label className={cx("flex items-start gap-3 rounded-2xl p-3", termsError ? "bg-red-50 ring-1 ring-red-500 dark:bg-red-500/10" : "bg-gray-50 dark:bg-gray-800/50")}>
           <input
             id="register-terms"
             type="checkbox"
@@ -178,15 +178,15 @@ const StepReview: React.FC<{
               setTermsError(null);
             }}
             aria-invalid={!!termsError}
-            className="mt-0.5 h-5 w-5 rounded border-slate-400 text-brand-600 focus:ring-brand-500"
+            className="mt-0.5 h-5 w-5 rounded border-gray-400 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-slate-800 dark:text-gray-100">
+          <span className="text-sm text-gray-800 dark:text-gray-100">
             I accept the{" "}
-            <a href="/terms/" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-700 underline dark:text-brand-200">
+            <a href="/terms/" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-700 underline dark:text-blue-400">
               terms
             </a>{" "}
             and{" "}
-            <a href="/privacy/" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-700 underline dark:text-brand-200">
+            <a href="/privacy/" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-700 underline dark:text-blue-400">
               data processing
             </a>
           </span>

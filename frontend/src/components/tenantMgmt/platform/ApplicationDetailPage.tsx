@@ -33,7 +33,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Modal from "../../ui/Modal";
-import { Burst, EmptyState, JourneyStepper, PackageCard, Segmented, StatusPill, Timeline, entIcon } from "../kit";
+import { Burst, EmptyState, JourneyStepper, PackageCard, Segmented, StatusPill, Timeline, entIcon, isLiveStatus } from "../kit";
 import {
   APP_LABELS,
   platformApi,
@@ -46,7 +46,7 @@ import {
   type ThreadMessage,
 } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
-import { Btn, Card, IconBtn, Lightbox, ReasonDialog, Spinner, TabBar, act, cx, errorText, fmtDate, fmtDateTime, initials, inputCls, isPdf, usePlatform } from "./platformShared";
+import { Btn, Card, IconBtn, Lightbox, ReasonDialog, Skeleton, SkeletonGrid, SkeletonPage, TabBar, act, cx, errorText, fmtDate, fmtDateTime, initials, inputCls, isPdf, surface, usePlatform } from "./platformShared";
 import { InvoiceList } from "./BillingPage";
 
 type Action = ApplicationDetail["allowedActions"][number];
@@ -80,7 +80,7 @@ const ApplicationDetailPage: React.FC = () => {
   }, [id]);
 
   if (error) return <EmptyState icon={TriangleAlert} title={error} />;
-  if (!d) return <Spinner />;
+  if (!d) return <SkeletonPage label="Loading the application" />;
   const a = d.application;
   const failed = ["REJECTED", "PAYMENT_REJECTED", "PROVISIONING_FAILED", "EXPIRED", "WITHDRAWN"].includes(a.status);
 
@@ -101,13 +101,13 @@ const ApplicationDetailPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Link to="/platform/applications" className="rounded-full p-2 text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800" aria-label="Back to applications">
+        <Link to="/platform/applications" className="rounded-full p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800/70" aria-label="Back to applications">
           <ArrowLeft className="h-5 w-5" aria-hidden />
         </Link>
-        <h1 className="min-w-0 flex-1 truncate text-xl font-bold text-slate-900 dark:text-white">{a.schoolName}</h1>
-        <StatusPill status={a.status} />
+        <h1 className="min-w-0 flex-1 truncate text-xl font-bold text-gray-900 dark:text-white">{a.schoolName}</h1>
+        <StatusPill status={a.status} live={isLiveStatus(a.status)} />
         {d.assignedTo && (
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200" title={d.assignedTo.name}>
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" title={d.assignedTo.name}>
             {initials(d.assignedTo.name)}
             <span className="sr-only">Assigned to {d.assignedTo.name}</span>
           </span>
@@ -166,7 +166,7 @@ const ApplicationDetailPage: React.FC = () => {
       </div>
 
       {actions.length > 0 && (
-        <div className="sticky bottom-0 z-30 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-gray-700 dark:bg-gray-900/95 sm:-mx-6 sm:px-6">
+        <div className={cx("sticky bottom-0 z-30 -mx-4 px-4 py-3 sm:-mx-6 sm:px-6", surface.sticky)}>
           <div className="flex flex-wrap justify-end gap-2" role="toolbar" aria-label="Decision">
             {actions.map((x) => {
               const meta = ACTION_META[x];
@@ -245,15 +245,15 @@ const SchoolTab: React.FC<{ d: ApplicationDetail }> = ({ d }) => {
     [Receipt, "Package", a.requestedPackage && `${a.requestedPackage} · ${a.billingCycle === "YEAR" ? "Year" : "Term"}`],
   ];
   return (
-    <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-      <Card>
+    <Card className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+      <div>
         <dl className="grid gap-3 sm:grid-cols-2">
           {rows.map(([Icon, label, value]) => (
             <div key={label} className="flex items-start gap-2">
-              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500 dark:text-gray-300" aria-hidden />
+              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-500 dark:text-gray-300" aria-hidden />
               <div className="min-w-0">
-                <dt className="text-xs text-slate-600 dark:text-gray-300">{label}</dt>
-                <dd className="break-words text-sm font-medium text-slate-900 dark:text-white">{value || "—"}</dd>
+                <dt className="text-xs text-gray-600 dark:text-gray-300">{label}</dt>
+                <dd className="break-words text-sm font-medium text-gray-900 dark:text-white">{value || "—"}</dd>
               </div>
             </div>
           ))}
@@ -263,7 +263,7 @@ const SchoolTab: React.FC<{ d: ApplicationDetail }> = ({ d }) => {
             {a.requestedApps.map((k) => {
               const Icon = entIcon(k);
               return (
-                <li key={k} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-gray-800 dark:text-gray-200">
+                <li key={k} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700 dark:bg-gray-800/70 dark:text-gray-200">
                   <Icon className="h-3.5 w-3.5" aria-hidden />
                   {APP_LABELS[k] ?? k}
                 </li>
@@ -271,24 +271,24 @@ const SchoolTab: React.FC<{ d: ApplicationDetail }> = ({ d }) => {
             })}
           </ul>
         )}
-        {a.notes && <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700 dark:bg-gray-800 dark:text-gray-200">{a.notes}</p>}
-      </Card>
-      <Card>
+        {a.notes && <p className={cx("mt-4 p-3 text-sm text-gray-700 dark:text-gray-200", surface.inset)}>{a.notes}</p>}
+      </div>
+      <div className={cx("self-start p-4", surface.inset)}>
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200">{initials(d.applicant.fullName)}</span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">{initials(d.applicant.fullName)}</span>
           <div className="min-w-0">
-            <p className="truncate font-semibold text-slate-900 dark:text-white">{d.applicant.fullName}</p>
-            <p className="flex items-center gap-1 truncate text-xs text-slate-600 dark:text-gray-300">
+            <p className="truncate font-semibold text-gray-900 dark:text-white">{d.applicant.fullName}</p>
+            <p className="flex items-center gap-1 truncate text-xs text-gray-600 dark:text-gray-300">
               {d.applicant.email}
               {d.applicant.emailVerified && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-label="Verified" />}
             </p>
-            {d.applicant.phone && <p className="text-xs text-slate-600 dark:text-gray-300">{d.applicant.phone}</p>}
+            {d.applicant.phone && <p className="text-xs text-gray-600 dark:text-gray-300">{d.applicant.phone}</p>}
           </div>
         </div>
-        <dl className="mt-4 space-y-1 text-xs text-slate-600 dark:text-gray-300">
+        <dl className="mt-4 space-y-1 text-xs text-gray-600 dark:text-gray-300">
           <div className="flex justify-between">
             <dt>Ref</dt>
-            <dd className="font-semibold text-slate-900 dark:text-white">{a.ref ?? "—"}</dd>
+            <dd className="font-semibold text-gray-900 dark:text-white">{a.ref ?? "—"}</dd>
           </div>
           <div className="flex justify-between">
             <dt>Submitted</dt>
@@ -297,12 +297,12 @@ const SchoolTab: React.FC<{ d: ApplicationDetail }> = ({ d }) => {
           {a.decisionReason && (
             <div>
               <dt>Decision</dt>
-              <dd className="text-slate-900 dark:text-white">{a.decisionReason}</dd>
+              <dd className="text-gray-900 dark:text-white">{a.decisionReason}</dd>
             </div>
           )}
         </dl>
-      </Card>
-    </div>
+      </div>
+    </Card>
   );
 };
 
@@ -348,14 +348,14 @@ const DocCard: React.FC<{ appId: number; doc: ApplicationDocument; onPreview: ()
     if (next) onDoc(next);
   };
   return (
-    <li className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-      <button type="button" onClick={onPreview} className="flex h-36 w-full items-center justify-center bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-gray-800">
-        {isPdf(doc.url) ? <FileText className="h-12 w-12 text-slate-400" aria-hidden /> : <img src={doc.url} alt="" className="h-full w-full object-cover" />}
+    <li className={cx("overflow-hidden", surface.card)}>
+      <button type="button" onClick={onPreview} className="flex h-36 w-full items-center justify-center bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-gray-800/50">
+        {isPdf(doc.url) ? <FileText className="h-12 w-12 text-gray-400" aria-hidden /> : <img src={doc.url} alt="" className="h-full w-full object-cover" />}
         <span className="sr-only">Preview {DOC_LABELS[doc.kind] ?? doc.kind}</span>
       </button>
       <div className="space-y-2 p-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">{DOC_LABELS[doc.kind] ?? doc.kind}</span>
+          <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">{DOC_LABELS[doc.kind] ?? doc.kind}</span>
           <StatusPill status={doc.status === "ACCEPTED" ? "CONFIRMED" : doc.status} label={doc.status === "PENDING" ? "Pending" : doc.status === "ACCEPTED" ? "Accepted" : "Rejected"} />
         </div>
         <input aria-label="Note" placeholder="Note" value={note} onChange={(e) => setNote(e.target.value)} className={cx(inputCls, "py-1.5")} />
@@ -404,10 +404,10 @@ const ChecklistTab: React.FC<{ d: ApplicationDetail; onChange: (c: ApplicationDe
   return (
     <Card>
       <div className="mb-3 flex items-center gap-3">
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-gray-700" aria-hidden>
-          <motion.div className="h-full rounded-full bg-emerald-500" animate={{ width: `${d.checklist.length ? (done / d.checklist.length) * 100 : 0}%` }} />
+        <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800" aria-hidden>
+          <motion.div className="h-full rounded-full bg-blue-600 dark:bg-blue-500" animate={{ width: `${d.checklist.length ? (done / d.checklist.length) * 100 : 0}%` }} />
         </div>
-        <span className="text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+        <span className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
           {done}/{d.checklist.length}
         </span>
       </div>
@@ -425,14 +425,14 @@ const ChecklistTab: React.FC<{ d: ApplicationDetail; onChange: (c: ApplicationDe
                 setBusy(null);
                 if (next) onChange(next);
               }}
-              className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-gray-800"
+              className={cx("flex w-full items-center gap-3 p-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500", surface.insetHover)}
             >
-              <span className={cx("flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-colors", c.checked ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 dark:border-gray-600")}>
-                <AnimatePresence>{c.checked && <motion.span {...m("check")}><Check className="h-4 w-4" aria-hidden /></motion.span>}</AnimatePresence>
+              <span className={cx("flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors", c.checked ? "border-blue-600 bg-blue-600 text-white" : "border-gray-300 bg-white dark:border-gray-600/60 dark:bg-gray-900/50")}>
+                <AnimatePresence>{c.checked && <motion.span {...m("check")}><Check className="h-3.5 w-3.5" aria-hidden /></motion.span>}</AnimatePresence>
               </span>
-              <span className={cx("flex-1 text-sm", c.checked ? "text-slate-600 line-through dark:text-gray-300" : "font-medium text-slate-900 dark:text-white")}>{c.label}</span>
+              <span className={cx("flex-1 text-sm", c.checked ? "text-gray-600 line-through dark:text-gray-300" : "font-medium text-gray-900 dark:text-white")}>{c.label}</span>
               {c.checked && c.checkedBy && (
-                <span className="text-right text-[11px] text-slate-600 dark:text-gray-300">
+                <span className="text-right text-xs text-gray-600 dark:text-gray-300">
                   {c.checkedBy}
                   <br />
                   {fmtDateTime(c.checkedAt)}
@@ -479,15 +479,15 @@ const MessagesTab: React.FC<{ d: ApplicationDetail; onSent: (m: ThreadMessage) =
                   className={cx(
                     "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
                     msg.internal
-                      ? "border border-dashed border-amber-400 bg-amber-50 text-amber-950 dark:bg-amber-400/10 dark:text-amber-50"
+                      ? "bg-amber-50 text-amber-950 dark:bg-amber-400/10 dark:text-amber-50"
                       : mine
-                        ? "bg-brand-600 text-white"
+                        ? "bg-blue-600 text-white"
                         : msg.author === "SYSTEM"
-                          ? "bg-slate-100 text-slate-700 dark:bg-gray-800 dark:text-gray-200"
-                          : "bg-slate-100 text-slate-900 dark:bg-gray-800 dark:text-white",
+                          ? "bg-gray-100 text-gray-700 dark:bg-gray-800/70 dark:text-gray-200"
+                          : "bg-gray-100 text-gray-900 dark:bg-gray-800/70 dark:text-white",
                   )}
                 >
-                  <div className={cx("mb-0.5 flex items-center gap-1 text-[11px] font-semibold", mine && !msg.internal ? "text-white/85" : "text-slate-600 dark:text-gray-300")}>
+                  <div className={cx("mb-0.5 flex items-center gap-1 text-xs font-semibold", mine && !msg.internal ? "text-white/85" : "text-gray-600 dark:text-gray-300")}>
                     {msg.internal && <Lock className="h-3 w-3" aria-label="Internal" />}
                     {msg.authorName ?? msg.author.toLowerCase()} · {fmtDateTime(msg.at)}
                   </div>
@@ -511,14 +511,14 @@ const MessagesTab: React.FC<{ d: ApplicationDetail; onSent: (m: ThreadMessage) =
           e.preventDefault();
           void send();
         }}
-        className={cx("flex items-end gap-2 rounded-2xl p-2", internal ? "bg-amber-50 ring-1 ring-amber-300 dark:bg-amber-400/10" : "bg-slate-50 dark:bg-gray-800")}
+        className={cx("flex items-end gap-2 rounded-2xl p-2", internal ? "bg-amber-50 dark:bg-amber-400/10" : "bg-gray-50 dark:bg-gray-800/50")}
       >
         <button
           type="button"
           aria-pressed={internal}
           onClick={() => setInternal(!internal)}
           title="Internal note"
-          className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", internal ? "bg-amber-500 text-white" : "text-slate-600 hover:bg-slate-200 dark:text-gray-300 dark:hover:bg-gray-700")}
+          className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", internal ? "bg-amber-500 text-white" : "text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700")}
         >
           <Lock className="h-4 w-4" aria-hidden />
           <span className="sr-only">Internal note</span>
@@ -532,9 +532,9 @@ const MessagesTab: React.FC<{ d: ApplicationDetail; onSent: (m: ThreadMessage) =
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send();
           }}
-          className="max-h-32 min-h-[2.25rem] flex-1 resize-y bg-transparent px-1 py-2 text-sm text-slate-900 placeholder-slate-500 focus:outline-none dark:text-white"
+          className="max-h-32 min-h-[2.25rem] flex-1 resize-y bg-transparent px-1 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none dark:text-white"
         />
-        <IconBtn icon={busy ? Loader2 : Send} label="Send" type="submit" disabled={busy || !body.trim()} className="bg-brand-600 text-white hover:bg-brand-700 dark:text-white dark:hover:bg-brand-700" />
+        <IconBtn icon={busy ? Loader2 : Send} label="Send" type="submit" disabled={busy || !body.trim()} className="bg-blue-600 text-white hover:bg-blue-700 dark:text-white dark:hover:bg-blue-700" />
       </form>
     </Card>
   );
@@ -555,7 +555,11 @@ const AssignDialog: React.FC<{ open: boolean; current: number | null; onClose: (
     <Modal isOpen={open} onClose={onClose} title={<span className="flex items-center gap-2"><UserPlus className="h-5 w-5" aria-hidden />Assign</span>} size="sm">
       <input aria-label="Search staff" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} className={inputCls} />
       {!staff ? (
-        <Spinner />
+        <div className="mt-3 space-y-2" role="status" aria-busy="true" aria-label="Loading staff">
+          {[0, 1, 2].map((k) => (
+            <Skeleton key={k} className="h-11 !rounded-xl" />
+          ))}
+        </div>
       ) : (
         <ul className="mt-3 max-h-72 space-y-1 overflow-y-auto">
           {current !== null && (
@@ -572,11 +576,11 @@ const AssignDialog: React.FC<{ open: boolean; current: number | null; onClose: (
                 type="button"
                 aria-pressed={s.id === current}
                 onClick={() => onPick(s.id)}
-                className={cx("flex w-full items-center gap-3 rounded-xl p-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-gray-800", s.id === current && "bg-brand-50 dark:bg-brand-500/10")}
+                className={cx("flex w-full items-center gap-3 rounded-xl p-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800", s.id === current && "bg-blue-50 dark:bg-blue-500/10")}
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200">{initials(s.name)}</span>
-                <span className="flex-1 font-medium text-slate-900 dark:text-white">{s.name}</span>
-                {s.id === current && <Check className="h-4 w-4 text-brand-600" aria-hidden />}
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">{initials(s.name)}</span>
+                <span className="flex-1 font-medium text-gray-900 dark:text-white">{s.name}</span>
+                {s.id === current && <Check className="h-4 w-4 text-blue-600" aria-hidden />}
               </button>
             </li>
           ))}
@@ -673,7 +677,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white">
                 <Check className="h-9 w-9" aria-hidden />
               </span>
-              <span className="text-lg font-bold text-slate-900 dark:text-white">Approved</span>
+              <span className="text-lg font-bold text-gray-900 dark:text-white">Approved</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -683,7 +687,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
               <Segmented label="Billing cycle" value={cycle} onChange={setCycle} options={[{ value: "TERM", label: "Term" }, { value: "YEAR", label: "Year" }]} />
             </div>
             {!packages ? (
-              <Spinner />
+              <SkeletonGrid cards={4} label="Loading packages" className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-4" cardClassName="h-48" />
             ) : (
               <div className="grid gap-4 pt-2 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label="Package">
                 {packages.map((p) => (
@@ -693,7 +697,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
             )}
 
             <div>
-              <label htmlFor="approve-slug" className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-gray-300">
+              <label htmlFor="approve-slug" className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
                 <Link2 className="h-3.5 w-3.5" aria-hidden />
                 Address
               </label>
@@ -701,7 +705,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
                 <input id="approve-slug" value={slug} onChange={(e) => setSlug(slugify(e.target.value) || e.target.value.toLowerCase())} className={cx(inputCls, "font-mono")} aria-describedby="approve-slug-state" />
                 <span id="approve-slug-state" className="flex h-8 w-8 shrink-0 items-center justify-center" aria-live="polite">
                   {slugState.checking ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-slate-500" aria-label="Checking" />
+                    <Loader2 className="h-4 w-4 animate-spin text-gray-500" aria-label="Checking" />
                   ) : slugState.available === true ? (
                     <CheckCircle2 className="h-5 w-5 text-emerald-600" aria-label="Available" />
                   ) : slugState.available === false ? (
@@ -710,7 +714,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
                 </span>
               </div>
               {slugState.available === false && slugState.suggestion && (
-                <button type="button" onClick={() => setSlug(slugState.suggestion!)} className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 font-mono text-xs text-slate-800 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-100">
+                <button type="button" onClick={() => setSlug(slugState.suggestion!)} className="mt-1 inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 font-mono text-xs text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100">
                   <Copy className="h-3 w-3" aria-hidden />
                   {slugState.suggestion}
                 </button>
@@ -719,7 +723,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
 
             {pkgApps.length > 0 && (
               <div>
-                <p className="mb-1 text-xs font-semibold text-slate-600 dark:text-gray-300">Apps</p>
+                <p className="mb-1 text-xs font-semibold text-gray-600 dark:text-gray-300">Apps</p>
                 <div className="flex flex-wrap gap-2">
                   {pkgApps.map((k) => {
                     const on = apps?.includes(k) ?? false;
@@ -733,7 +737,7 @@ const ApproveDialog: React.FC<{ d: ApplicationDetail; onClose: () => void; onApp
                         onClick={() => setApps((cur) => (on ? (cur ?? []).filter((x) => x !== k) : [...(cur ?? []), k]))}
                         className={cx(
                           "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed",
-                          on ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-300",
+                          on ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800/70 dark:text-gray-300",
                         )}
                       >
                         <Icon className="h-3.5 w-3.5" aria-hidden />

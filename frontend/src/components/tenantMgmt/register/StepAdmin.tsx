@@ -147,8 +147,8 @@ const StepAdmin: React.FC<{
           <motion.span {...m("check")} className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white">
             <BadgeCheck className="h-9 w-9" aria-hidden />
           </motion.span>
-          <p className="font-semibold text-slate-900 dark:text-white">{admin.email}</p>
-          <span className="text-sm text-slate-600 dark:text-gray-300">Verified</span>
+          <p className="font-semibold text-gray-900 dark:text-white">{admin.email}</p>
+          <span className="text-sm text-gray-600 dark:text-gray-300">Verified</span>
         </motion.div>
         <StepFooter onBack={onBack} primary="Next" />
       </form>
@@ -159,20 +159,21 @@ const StepAdmin: React.FC<{
     return (
       <div className="flex flex-col items-center gap-4 py-4 text-center">
         <motion.span
-          className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-100"
-          animate={{ y: [0, -5, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
+          className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300"
+          initial={{ y: 6, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.3 }}
         >
           <MailCheck className="h-8 w-8" aria-hidden />
         </motion.span>
         <div>
-          <p className="text-sm text-slate-600 dark:text-gray-300">Code sent to</p>
-          <p className="font-semibold text-slate-900 dark:text-white">{sentTo}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">Code sent to</p>
+          <p className="font-semibold text-gray-900 dark:text-white">{sentTo}</p>
         </div>
         <Shake error={codeError ? String(codeKey) : null}>
           <VerificationCode key={codeKey} length={6} error={codeError} onComplete={(c) => void verify(c)} />
         </Shake>
-        {busy && <span className="text-sm text-slate-600 dark:text-gray-300" role="status">Checking…</span>}
+        {busy && <span className="text-sm text-gray-600 dark:text-gray-300" role="status">Checking…</span>}
         {banner}
         <div className="flex flex-wrap items-center justify-center gap-2">
           <button type="button" className={ghostBtn} onClick={() => setPhase("form")}>
@@ -220,7 +221,7 @@ const StepAdmin: React.FC<{
                   aria-describedby={describedBy}
                   className={`${inputCls(errors.password)} pr-11`}
                 />
-                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-600 dark:text-gray-300" aria-pressed={showPw}>
+                <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-gray-600 dark:text-gray-300" aria-pressed={showPw}>
                   {showPw ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
                   <span className="sr-only">{showPw ? "Hide password" : "Show password"}</span>
                 </button>

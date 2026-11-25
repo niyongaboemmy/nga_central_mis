@@ -27,14 +27,14 @@ import api from "../../../services/api";
 import { EmptyState, Segmented, StatusPill } from "../kit";
 import { formatMoney, platformApi, type Invoice, type InvoiceLine, type Payment, type PaymentMethod } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
-import { Btn, Card, IconBtn, Lightbox, ReasonDialog, Spinner, TabBar, act, cx, fmtDate, inputCls, isPdf, toast, usePlatform } from "./platformShared";
+import { Btn, Card, IconBtn, Lightbox, ReasonDialog, Skeleton, SkeletonGrid, act, cx, fmtDate, inputCls, isPdf, surface, toast, usePlatform } from "./platformShared";
 
 export const METHOD_META: Record<PaymentMethod, { label: string; icon: LucideIcon; tone: string }> = {
   MOMO: { label: "MoMo", icon: Smartphone, tone: "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200" },
   AIRTEL_MONEY: { label: "Airtel", icon: Smartphone, tone: "bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-200" },
   BANK_TRANSFER: { label: "Bank", icon: Landmark, tone: "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200" },
   CASH: { label: "Cash", icon: Banknote, tone: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200" },
-  OTHER: { label: "Other", icon: CircleDollarSign, tone: "bg-slate-100 text-slate-700 dark:bg-gray-700/60 dark:text-gray-200" },
+  OTHER: { label: "Other", icon: CircleDollarSign, tone: "bg-gray-100 text-gray-700 dark:bg-gray-800/70 dark:text-gray-200" },
 };
 
 export const MethodChip: React.FC<{ method: PaymentMethod }> = ({ method }) => {
@@ -103,7 +103,7 @@ export const PaymentsQueue: React.FC = () => {
     setDialog(null);
     void reload();
   };
-  if (!rows) return <Spinner />;
+  if (!rows) return <SkeletonGrid cards={4} label="Loading payments" className="grid gap-3 md:grid-cols-2" cardClassName="h-32" />;
   if (!rows.length) return <EmptyState icon={CheckCircle2} title="All confirmed" />;
   const allowed = can("confirm");
   return (
@@ -113,23 +113,23 @@ export const PaymentsQueue: React.FC = () => {
           {rows.map((p) => {
             const match = p.amount === p.invoice.amount;
             return (
-              <motion.li key={p.id} layout {...m("reveal")} className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+              <motion.li key={p.id} layout {...m("reveal")} className={cx("flex gap-3 p-3", surface.card)}>
                 <button
                   type="button"
                   onClick={() => p.proofUrl && setPreview(p)}
                   disabled={!p.proofUrl}
-                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default dark:bg-gray-800"
+                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default dark:bg-gray-800"
                 >
-                  {p.proofUrl && !isPdf(p.proofUrl) ? <img src={p.proofUrl} alt="" className="h-full w-full object-cover" /> : <FileText className="h-8 w-8 text-slate-400" aria-hidden />}
+                  {p.proofUrl && !isPdf(p.proofUrl) ? <img src={p.proofUrl} alt="" className="h-full w-full object-cover" /> : <FileText className="h-8 w-8 text-gray-400" aria-hidden />}
                   <span className="sr-only">{p.proofUrl ? "View proof" : "No proof"}</span>
                 </button>
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate font-semibold text-slate-900 dark:text-white">{p.schoolName}</span>
+                    <span className="truncate font-semibold text-gray-900 dark:text-white">{p.schoolName}</span>
                     <MethodChip method={p.method} />
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 text-sm">
-                    <span className="font-bold tabular-nums text-slate-900 dark:text-white">{formatMoney(p.amount, p.invoice.currency)}</span>
+                    <span className="font-bold tabular-nums text-gray-900 dark:text-white">{formatMoney(p.amount, p.invoice.currency)}</span>
                     {match ? (
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-label="Matches invoice" />
                     ) : (
@@ -140,7 +140,7 @@ export const PaymentsQueue: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-gray-300">
+                  <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
                     <span className="truncate font-mono">{p.reference ?? "—"}</span>
                     {p.reference && <CopyBtn text={p.reference} />}
                     <span className="ml-auto">{fmtDate(p.paidAt ?? p.submittedAt)}</span>
@@ -214,7 +214,7 @@ export const InvoiceList: React.FC<{ invoices: Invoice[]; onChange: (inv: Invoic
   if (!invoices.length) return <EmptyState icon={Inbox} title="No invoices" />;
   return (
     <>
-      <ul className="space-y-2" aria-label="Invoices">
+      <ul className={cx("divide-y", surface.divide)} aria-label="Invoices">
         <AnimatePresence initial={false}>
           {invoices.map((inv) => {
             const open = inv.status === "ISSUED" || inv.status === "OVERDUE";
@@ -223,22 +223,22 @@ export const InvoiceList: React.FC<{ invoices: Invoice[]; onChange: (inv: Invoic
                 key={inv.id}
                 layout
                 {...m("reveal")}
-                className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 md:flex-row md:items-center md:gap-4"
+                className="flex flex-col gap-2 py-3 first:pt-1 last:pb-1 md:flex-row md:items-center md:gap-4"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-sm font-semibold text-slate-900 dark:text-white">{inv.number ?? `#${inv.id}`}</span>
+                    <span className="font-mono text-sm font-semibold text-gray-900 dark:text-white">{inv.number ?? `#${inv.id}`}</span>
                     <StatusPill status={inv.status} />
-                    <span className="text-xs text-slate-600 dark:text-gray-300">
+                    <span className="text-xs text-gray-600 dark:text-gray-300">
                       {inv.packageCode} · {inv.billingCycle === "YEAR" ? "Year" : "Term"} · {inv.kind.toLowerCase()}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-600 dark:text-gray-300">
+                  <div className="text-xs text-gray-600 dark:text-gray-300">
                     {inv.dueAt ? `Due ${fmtDate(inv.dueAt)}` : inv.issuedAt ? fmtDate(inv.issuedAt) : "Draft"}
                     {inv.paidAt && ` · Paid ${fmtDate(inv.paidAt)}`}
                   </div>
                 </div>
-                <span className="text-lg font-extrabold tabular-nums text-slate-900 dark:text-white">{formatMoney(inv.amount, inv.currency)}</span>
+                <span className="text-lg font-bold tabular-nums text-gray-900 dark:text-white">{formatMoney(inv.amount, inv.currency)}</span>
                 <div className="flex items-center justify-end gap-1">
                   {manage && inv.status === "DRAFT" && (
                     <>
@@ -342,7 +342,7 @@ const EditInvoiceDialog: React.FC<{ inv: Invoice; onClose: () => void; onSaved: 
         </Btn>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="inv-amount" className="mb-1 block text-xs font-semibold text-slate-600 dark:text-gray-300">
+            <label htmlFor="inv-amount" className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
               Total
             </label>
             <input
@@ -358,7 +358,7 @@ const EditInvoiceDialog: React.FC<{ inv: Invoice; onClose: () => void; onSaved: 
             />
           </div>
           <div>
-            <label htmlFor="inv-due" className="mb-1 block text-xs font-semibold text-slate-600 dark:text-gray-300">
+            <label htmlFor="inv-due" className="mb-1 block text-xs font-semibold text-gray-600 dark:text-gray-300">
               Due
             </label>
             <input id="inv-due" type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className={inputCls} />
@@ -415,7 +415,9 @@ const BillingPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <TabBar id="billing" label="Billing" value={pane} onChange={setPane} tabs={panes} />
+      {panes.length > 1 && (
+        <Segmented label="Billing" value={pane} onChange={setPane} options={panes.map((p) => ({ value: p.value, icon: p.icon, label: p.badge ? `${p.label} ${p.badge}` : p.label }))} />
+      )}
       {pane === "confirm" && canConfirm ? (
         <PaymentsQueue />
       ) : (
@@ -435,7 +437,13 @@ const BillingPage: React.FC = () => {
               ]}
             />
           </div>
-          {!invoices ? <Spinner /> : <InvoiceList invoices={invoices} onChange={(inv) => setInvoices((list) => (list ?? []).map((x) => (x.id === inv.id ? inv : x)))} />}
+          {!invoices ? (
+            <div className="space-y-3 py-1" role="status" aria-busy="true" aria-label="Loading invoices">
+              {[0, 1, 2, 3].map((k) => (
+                <Skeleton key={k} className="h-12" />
+              ))}
+            </div>
+          ) : <InvoiceList invoices={invoices} onChange={(inv) => setInvoices((list) => (list ?? []).map((x) => (x.id === inv.id ? inv : x)))} />}
         </Card>
       )}
     </div>

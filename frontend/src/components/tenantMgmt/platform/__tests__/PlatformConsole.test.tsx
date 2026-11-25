@@ -30,6 +30,7 @@ const api = vi.hoisted(() => ({
   people: vi.fn(),
   tenantRoles: vi.fn(),
   assignPerson: vi.fn(),
+  updateDetails: vi.fn(),
 }));
 
 vi.mock("../../../../api/tenantMgmt", async (orig) => {
@@ -416,6 +417,37 @@ const tenantDetail = (over: Partial<{ isPrimary: boolean; allowed: string[]; sta
   provisioning: null,
   audit: [],
   allowedActions: over.allowed ?? ["delete", "reactivate"],
+});
+
+describe("school details", () => {
+  it("edits the name and timezone with a reason, sending only what changed", async () => {
+    api.tenant.mockResolvedValue(tenantDetail({ status: "ACTIVE", allowed: ["suspend", "edit_details"] }));
+    api.updateDetails.mockImplementation(async (_tid: number, body: any) => {
+      const d = tenantDetail({ status: "ACTIVE", allowed: ["suspend", "edit_details"] });
+      return { ...d, tenant: { ...d.tenant, name: body.name ?? d.tenant.name } };
+    });
+    const user = userEvent.setup();
+    inProvider(<SchoolDetailPage />, "/platform/schools/:tid", "/platform/schools/5");
+    await user.click(await screen.findByRole("button", { name: /Edit details/ }));
+    const dialog = await screen.findByRole("dialog");
+    const save = within(dialog).getByRole("button", { name: /Save details/ });
+    expect(save).toBeDisabled();
+    const name = within(dialog).getByLabelText("School name");
+    await user.clear(name);
+    await user.type(name, "Green Hills International");
+    expect(save).toBeDisabled(); // no reason yet
+    await user.type(within(dialog).getByLabelText("Reason"), "New registered name");
+    await user.click(save);
+    await waitFor(() => expect(api.updateDetails).toHaveBeenCalledWith(5, { name: "Green Hills International", reason: "New registered name" }));
+    expect(await screen.findByRole("heading", { name: /Green Hills International/ })).toBeInTheDocument();
+  });
+
+  it("hides the edit button without the lifecycle capability", async () => {
+    api.tenant.mockResolvedValue(tenantDetail({ status: "ACTIVE", allowed: [] }));
+    inProvider(<SchoolDetailPage />, "/platform/schools/:tid", "/platform/schools/5");
+    await screen.findByText("Details");
+    expect(screen.queryByRole("button", { name: /Edit details/ })).toBeNull();
+  });
 });
 
 describe("school lifecycle", () => {
