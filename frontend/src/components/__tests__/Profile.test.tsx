@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -73,13 +73,11 @@ describe("Profile page", () => {
     render(<Profile />, { wrapper: MemoryRouter });
     expect(screen.getByRole("heading", { name: "Jane Doe" })).toBeInTheDocument();
     const picture = screen.getByRole("img", { name: "Jane Doe" }) as HTMLImageElement;
-    // The labelled picture is the one in the Profile photo row (64 px: the small rendition);
-    // the header copy beside the name is decorative.
-    expect(picture.getAttribute("src")).toBe(AVATAR.sm);
+    // The header avatar is the photo control (120 px: the medium rendition).
+    expect(picture.getAttribute("src")).toBe(AVATAR.md);
     expect(screen.getByRole("button", { name: /change profile picture/i })).toBeInTheDocument();
-    expect(screen.getByText("NGA-2025-0042")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("NGA-2025-0042")).toBeInTheDocument();
     expect(screen.getByText(/@jdoe/)).toBeInTheDocument();
-    expect(screen.getByText(/Task Mentor, Tendo and Tupo/)).toBeInTheDocument();
   });
 
   it("shows the cover, or plain system blue without one", () => {
@@ -97,9 +95,10 @@ describe("Profile page", () => {
   it("offers to add a picture when there is none", () => {
     mockUser = { ...mockUser, avatar: null, user: { ...mockUser.user, avatar_url: null } };
     render(<Profile />, { wrapper: MemoryRouter });
-    expect(screen.getByRole("button", { name: /add a profile picture/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /upload photo/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^remove$/i })).not.toBeInTheDocument();
+    const add = screen.getByRole("button", { name: /add a profile picture/i });
+    // No photo yet: the avatar opens the file picker straight away, no menu.
+    expect(add).not.toHaveAttribute("aria-haspopup");
+    expect(screen.queryByRole("menuitem", { name: /remove photo/i })).not.toBeInTheDocument();
   });
 
   it("fills the form from the profile, with the date in input format", () => {
@@ -176,5 +175,26 @@ describe("Profile page", () => {
     await userEvent.type(screen.getByLabelText("Address"), " 2");
     await userEvent.keyboard("{Control>}s{/Control}");
     await waitFor(() => expect(updateProfileMock).toHaveBeenCalledWith({ address: "Kicukiro 2" }));
+  });
+
+  it("changes or removes the photo from the header avatar's menu", async () => {
+    render(<Profile />, { wrapper: MemoryRouter });
+    expect(screen.queryByRole("heading", { name: "Profile photo" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /change profile picture/i }));
+    const menu = screen.getByRole("menu", { name: "Profile picture" });
+    expect(within(menu).getByRole("menuitem", { name: "Change photo" })).toBeInTheDocument();
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Remove photo" }));
+    expect(screen.getByText("Remove profile picture?")).toBeInTheDocument();
+  });
+
+  it("shows the office-managed account facts inside Personal details, read-only", () => {
+    render(<Profile />, { wrapper: MemoryRouter });
+    expect(screen.queryByRole("heading", { name: "Account", level: 2 })).not.toBeInTheDocument();
+    const form = document.getElementById("profile-form")!;
+    expect(within(form).getByText(/managed by the school office/i)).toBeInTheDocument();
+    const email = within(form).getByLabelText("Email");
+    expect(email).toHaveValue("jane.doe@example.com");
+    expect(email).toHaveAttribute("readonly");
+    expect(within(form).getByLabelText("Username")).toHaveValue("jdoe");
   });
 });

@@ -10,6 +10,7 @@ import {
   Hash,
   KeyRound,
   LayoutGrid,
+  Lock,
   Mail,
   MapPin,
   Phone,
@@ -25,9 +26,8 @@ import { Permissions } from "../constants/permissions";
 import { surface, accent, sectionTitle } from "../design/surfaces";
 import { useMotion } from "../design/motion";
 import { requestAppsDialog } from "./apps/openAppsDialog";
-import AvatarControl from "./profile/AvatarControl";
+import AvatarControl, { AvatarControlHandle } from "./profile/AvatarControl";
 import ProfileCover from "./profile/ProfileCover";
-import UserAvatar from "./ui/UserAvatar";
 import ChangePasswordModal from "./ChangePasswordModal";
 
 type FormState = {
@@ -101,34 +101,46 @@ const Card: React.FC<{
 );
 
 /** An account fact the office manages: label above value so long emails never truncate. */
-const Fact: React.FC<{
+/** An account fact the school office manages: shown like a field, but locked. */
+const ReadOnlyField: React.FC<{
+  id: string;
+  className?: string;
   icon: React.ReactNode;
   label: string;
   value?: string | null;
   mono?: boolean;
   onCopy?: (value: string, label: string) => void;
-}> = ({ icon, label, value, mono, onCopy }) => (
-  <div className={`group flex items-center gap-3 px-2 py-2.5 ${surface.insetHover}`}>
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700/40 dark:text-gray-300">
-      {icon}
-    </span>
-    <div className="min-w-0 flex-1">
-      <dt className="text-xs text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className={`break-all text-sm text-gray-900 dark:text-gray-100 ${mono ? "font-mono" : "font-medium"}`}>
-        {value || <span className="font-normal text-gray-400 dark:text-gray-500">Not set</span>}
-      </dd>
+}> = ({ id, icon, label, value, mono, onCopy, className = "" }) => (
+  <div className={`min-w-0 ${className}`}>
+    <label htmlFor={id} className={labelCls}>
+      {label}
+    </label>
+    <div className="group relative">
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{icon}</span>
+      <input
+        id={id}
+        readOnly
+        value={value || ""}
+        placeholder="Not set"
+        title={value ? `${value} (managed by the school office)` : "Managed by the school office"}
+        className={`w-full cursor-default truncate rounded-full border border-dashed border-gray-200 bg-transparent py-2 pl-10 pr-10 text-sm text-gray-700 outline-none placeholder:text-gray-400 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/30 dark:border-gray-700/50 dark:text-gray-300 dark:placeholder:text-gray-500 ${
+          mono ? "font-mono" : ""
+        }`}
+      />
+      {value && onCopy ? (
+        <button
+          type="button"
+          onClick={() => onCopy(value, label)}
+          aria-label={`Copy ${label.toLowerCase()}`}
+          title={`Copy ${label.toLowerCase()}`}
+          className={`absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700/50 dark:hover:text-gray-200 ${accent.focus}`}
+        >
+          <Copy className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      ) : (
+        <Lock className="pointer-events-none absolute right-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-300 dark:text-gray-600" aria-hidden />
+      )}
     </div>
-    {value && onCopy && (
-      <button
-        type="button"
-        onClick={() => onCopy(value, label)}
-        aria-label={`Copy ${label.toLowerCase()}`}
-        title={`Copy ${label.toLowerCase()}`}
-        className={`shrink-0 rounded-full p-1.5 text-gray-400 opacity-100 transition hover:bg-gray-100 hover:text-gray-700 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 dark:hover:bg-gray-700/50 dark:hover:text-gray-200 ${accent.focus}`}
-      >
-        <Copy className="h-4 w-4" aria-hidden />
-      </button>
-    )}
   </div>
 );
 
@@ -167,6 +179,7 @@ const Profile: React.FC = () => {
   const navigate = useNavigate();
   const m = useMotion();
   const formRef = useRef<HTMLFormElement>(null);
+  const photoRef = useRef<AvatarControlHandle>(null);
   const initial = useMemo(() => fromProfile(user?.profile), [user?.profile]);
   const [form, setForm] = useState<FormState>(initial);
   const [saving, setSaving] = useState(false);
@@ -232,7 +245,7 @@ const Profile: React.FC = () => {
   };
   const steps = [
     { key: "name", label: "Your name", cta: "Add your name", done: !!(initial.first_name && initial.last_name), go: () => focusField("pf-first") },
-    { key: "photo", label: "Profile photo", cta: "Add a profile photo", done: !!user.avatar, go: () => focusField("profile-photo-card") },
+    { key: "photo", label: "Profile photo", cta: "Add a profile photo", done: !!user.avatar, go: () => photoRef.current?.openPicker() },
     { key: "cover", label: "Cover image", cta: "Add a cover image", done: !!user.cover, go: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
     { key: "gender", label: "Gender", cta: "Set your gender", done: !!initial.gender, go: () => focusField("pf-gender-MALE") },
     { key: "dob", label: "Date of birth", cta: "Add your date of birth", done: !!initial.date_of_birth, go: () => focusField("pf-dob") },
@@ -301,11 +314,12 @@ const Profile: React.FC = () => {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 pb-16 pt-6 md:px-6">
       {/* Identity: how you appear in every NGA app */}
-      <motion.section {...m("reveal")} className={`${surface.card} overflow-hidden`}>
-        <ProfileCover cover={user.cover} editable onChange={() => refreshUser()} className="h-36 md:h-52" />
+      <motion.section {...m("reveal")} className={surface.card}>
+        <ProfileCover cover={user.cover} editable onChange={() => refreshUser()} className="h-36 rounded-t-2xl md:h-52" />
         <div className="flex flex-col gap-5 px-5 pb-6 sm:px-6 md:flex-row md:items-end">
           <div className="-mt-14 w-fit shrink-0 rounded-full bg-white p-1 dark:bg-gray-900 md:-mt-16">
-            <UserAvatar name={fullName} avatar={user.avatar} size={120} decorative fallback="person" />
+            {/* Click or drop a picture to change it; with a photo, a menu offers Change / Remove. */}
+            <AvatarControl ref={photoRef} name={fullName} avatar={user.avatar} onChange={() => refreshUser()} size={120} showActions={false} menu />
           </div>
           <div className="min-w-0 flex-1 space-y-2">
             <div>
@@ -450,6 +464,27 @@ const Profile: React.FC = () => {
               </div>
             </div>
 
+            {/* Account facts: part of who you are, but the school office changes them. */}
+            <div className={`mx-5 border-t pb-5 pt-5 sm:mx-6 ${surface.divider}`}>
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Account</h3>
+                <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500 dark:bg-gray-700/40 dark:text-gray-400">
+                  <Lock className="h-3 w-3" aria-hidden />
+                  Managed by the school office
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                {userType === "STUDENT" && (
+                  <ReadOnlyField id="pf-regno" icon={<Hash className="h-4 w-4" aria-hidden />} label="Registration no." value={profile?.registration_number} mono onCopy={copy} />
+                )}
+                <ReadOnlyField id="pf-username" icon={<AtSign className="h-4 w-4" aria-hidden />} label="Username" value={account.username} onCopy={copy} />
+                <ReadOnlyField id="pf-email" className="sm:col-span-2" icon={<Mail className="h-4 w-4" aria-hidden />} label="Email" value={account.email} onCopy={copy} />
+                <ReadOnlyField id="pf-phone" icon={<Phone className="h-4 w-4" aria-hidden />} label="Phone" value={account.phone_number} onCopy={copy} />
+                <ReadOnlyField id="pf-since" icon={<CalendarDays className="h-4 w-4" aria-hidden />} label="Member since" value={memberSince} />
+              </div>
+              <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">Something wrong here? Ask the school office to change it.</p>
+            </div>
+
             {/* Sticky while you scroll the form, so Save is always in reach. */}
             <footer
               className={`sticky bottom-0 flex flex-wrap items-center justify-end gap-2 rounded-b-2xl border-t px-5 py-3 sm:px-6 ${
@@ -570,25 +605,6 @@ const Profile: React.FC = () => {
                 </li>
               ))}
             </ul>
-          </Card>
-
-          <Card id="profile-photo-card" title="Profile photo" description="Shown next to your name in NGA MIS, Task Mentor, Tendo and Tupo.">
-            <div tabIndex={-1} className="outline-none">
-              <AvatarControl name={fullName} avatar={user.avatar} onChange={() => refreshUser()} size={64} layout="inline" />
-              <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">Tip: drop a picture onto the banner above to change your cover.</p>
-            </div>
-          </Card>
-
-          <Card title="Account" description="Managed by the school office. Ask them to change these.">
-            <dl className="-mx-2 -my-1 space-y-0.5">
-              {userType === "STUDENT" && (
-                <Fact icon={<Hash className="h-4 w-4" aria-hidden />} label="Registration no." value={profile?.registration_number} mono onCopy={copy} />
-              )}
-              <Fact icon={<AtSign className="h-4 w-4" aria-hidden />} label="Username" value={account.username} onCopy={copy} />
-              <Fact icon={<Mail className="h-4 w-4" aria-hidden />} label="Email" value={account.email} onCopy={copy} />
-              <Fact icon={<Phone className="h-4 w-4" aria-hidden />} label="Phone" value={account.phone_number} onCopy={copy} />
-              <Fact icon={<CalendarDays className="h-4 w-4" aria-hidden />} label="Member since" value={memberSince} />
-            </dl>
           </Card>
 
           <Card title="Security">
