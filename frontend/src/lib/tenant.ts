@@ -69,7 +69,10 @@ const PERSONAL_PREFIXES = [
 ];
 
 /** Service-worker caches that hold data (the app-shell cache is shared and safe). */
-const DATA_CACHE = /(api|data|elearning|offline|user|tenant)/i;
+export const DATA_CACHE = /(api|data|elearning|offline|user|tenant|agenda)/i;
+
+/** The sign-in picker's memory (lib/schoolSwitch.ts), dropped on sign-out (WEB-ISO-9). */
+export const SCHOOL_CHOICE_KEY = "nga.schoolChoice";
 
 /** Drop everything cached for whoever used this browser before. */
 export async function clearIdentityCaches(): Promise<void> {
@@ -95,6 +98,12 @@ export async function clearIdentityCaches(): Promise<void> {
     }
   } catch {
     /* no Cache Storage here */
+  }
+  // The worker also holds the previous person's API token for its agenda refresh.
+  try {
+    if (typeof navigator !== "undefined") navigator.serviceWorker?.controller?.postMessage({ type: "nga:agenda-clear" });
+  } catch {
+    /* no service worker */
   }
 }
 
@@ -127,6 +136,8 @@ export async function forgetIdentity(): Promise<void> {
   await clearIdentityCaches();
   try {
     localStorage.removeItem(IDENTITY_KEY);
+    // Which schools this device remembered for which sign-in (shared devices).
+    localStorage.removeItem(SCHOOL_CHOICE_KEY);
   } catch {
     /* storage unavailable */
   }

@@ -332,7 +332,8 @@ export function buildNavAreas(ctx: NavContext): NavArea[] {
             },
             { label: "Schools", path: "/schools", icon: School, requiredPermission: Permissions.MANAGE_SCHOOLS },
             { label: "Systems", path: "/systems", icon: Server, requiredPermission: Permissions.MANAGE_SYSTEMS },
-            { label: "Database Management", path: "/database-management", icon: Database, requiredPermission: Permissions.DATABASE_MANAGEMENT },
+            // Platform-owner tool, primary school only (MIS-ISO-1): PLATFORM_* caps never exist elsewhere.
+            { label: "Database Management", path: "/database-management", icon: Database, requiredPermission: Permissions.DATABASE_MANAGEMENT, requiredCapability: "PLATFORM_PACKAGES_MANAGE" },
           ],
         },
       ],

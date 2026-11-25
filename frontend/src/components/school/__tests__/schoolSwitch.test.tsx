@@ -14,7 +14,7 @@ import SwitchSchoolDialog from "../SwitchSchoolDialog";
 import SchoolPicker from "../../auth/SchoolPicker";
 
 const A = { tid: 1, slug: "nga", name: "New Generation Academy", logoUrl: null, status: "ACTIVE", current: true, roles: ["TEACHER"] };
-const B = { tid: 2, slug: "ghs", name: "Green Hills School", logoUrl: null, status: "ACTIVE", current: false, roles: ["ADMIN"] };
+const B = { tid: 2, slug: "ghs", name: "Green Hills School", logoUrl: null, status: "ACTIVE", current: false };
 
 beforeEach(() => {
   http.get.mockReset();

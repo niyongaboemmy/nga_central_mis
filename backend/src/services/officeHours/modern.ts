@@ -1,4 +1,5 @@
 import { tenantHeaders } from "../../tenancy/claims";
+import { scopeTid } from "../../tenancy/scoped";
 import crypto from "crypto";
 import { and, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "../../db";
@@ -45,12 +46,16 @@ export const trackOfficeHours = (name: "assign" | "register_save" | "checkin" | 
 // ---------------------------------------------------------------- QR check-in
 const WINDOW_MS = 30_000;
 const key = () => crypto.createHash("sha256").update(`office-hours-qr:${process.env.JWT_SECRET ?? "dev"}`).digest();
-const sign = (sessionId: number, window: number) => crypto.createHmac("sha256", key()).update(`${sessionId}:${window}`).digest("base64url").slice(0, 22);
+// Bound to the school (MIS-ISO-7): session ids repeat across school databases, so a
+// token or code shown in one school must not check a student in to another's session.
+const sign = (sessionId: number, window: number) => crypto.createHmac("sha256", key()).update(`t${scopeTid("office-hours QR")}:${sessionId}:${window}`).digest("base64url").slice(0, 22);
 const codeOf = (sessionId: number, window: number) => {
-  const h = crypto.createHmac("sha256", key()).update(`code:${sessionId}:${window}`).digest();
+  const h = crypto.createHmac("sha256", key()).update(`code:t${scopeTid("office-hours QR")}:${sessionId}:${window}`).digest();
   return String(h.readUInt32BE(0) % 1_000_000).padStart(6, "0");
 };
 const windowNow = () => Math.floor(now().getTime() / WINDOW_MS);
+/** Tests only. */
+export const qrSigningForTests = { sign, codeOf };
 
 /** Is the session open for check-in right now (15 min before start until the end)? */
 const checkInOpen = (s: { session_date: string; start_time: string; end_time: string; status: string }) =>

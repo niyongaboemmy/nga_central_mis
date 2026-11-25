@@ -21,6 +21,7 @@ import { primaryDb } from "../db";
 import { System } from "../db/schema";
 import { assignTestSystems } from "../test/systems";
 import { ensurePlatform, provisionSchool, removeSchool, sessionToken, stampOf } from "../test/tenantMgmtFixtures";
+import { areLinked } from "../tenancy/personLinks";
 
 let school: Awaited<ReturnType<typeof provisionSchool>>;
 const PW = "Switch-Schools-pw1";
@@ -82,7 +83,31 @@ describe("my schools", () => {
       [1, true],
       [school.tid, false],
     ]);
-    expect(r.body.data.schools[1]).toMatchObject({ slug: school.slug, roles: ["TEACHER"] });
+    expect(r.body.data.schools[1]).toMatchObject({ slug: school.slug });
+    // MIS-ISO-5: another school's roles are never revealed; the current school's are.
+    expect(r.body.data.schools[1].roles).toBeUndefined();
+    expect(Object.keys(r.body.data.schools[1]).sort()).toEqual(["current", "logoUrl", "name", "slug", "status", "tid"]);
+    expect(Array.isArray(r.body.data.schools[0].roles)).toBe(true);
+  });
+
+  it("MIS-ISO-5: an e-mail match alone is listed only when both accounts chose their own password; a link always is", async () => {
+    const p = await primaryPerson("Lookalike");
+    // A school admin types this person's e-mail on an account of their own school.
+    const pool = poolFor(school.tid);
+    const [u]: any = await pool.query("INSERT INTO `User` (username, email, status) VALUES (?, ?, 'ACTIVE')", [`look_${stamp}`, p.email]);
+    const otherId = Number(u.insertId);
+    await pool.query("INSERT INTO AuthCredential (user_id, password_hash, force_password_change) VALUES (?, ?, 1)", [otherId, await bcrypt.hash("Admin-set-pw1", 4)]);
+    await syncDirectoryUser(otherId, school.tid);
+    const list = async () => (await request(app).get("/auth/my-schools").set(auth(await sessionToken(p.id, 1)))).body.data.schools.map((s: any) => s.tid);
+    expect(await list()).toEqual([1]); // admin-set (one-time) password: not trusted
+    await pool.query("UPDATE AuthCredential SET force_password_change = 0 WHERE user_id = ?", [otherId]);
+    await poolFor(1).query("UPDATE AuthCredential SET force_password_change = 0 WHERE user_id = ?", [p.id]);
+    expect(await list()).toEqual([1, school.tid]); // both chose their own: listed, without roles
+    // And a copied account (one-time password, force_password_change = 1) is linked, so listed.
+    const q = await primaryPerson("Linked");
+    await copyPersonInto({ sourceTid: 1, sourceUserId: q.id, targetTid: school.tid, roleIds: [await teacherRole(school.tid)], actorUserId: null, via: "platform" });
+    const r = await request(app).get("/auth/my-schools").set(auth(await sessionToken(q.id, 1)));
+    expect(r.body.data.schools.map((s: any) => s.tid)).toEqual([1, school.tid]);
   });
 
   it("never lists a school where the account is not ACTIVE", async () => {
@@ -96,25 +121,56 @@ describe("my schools", () => {
 });
 
 describe("switch school", () => {
-  it("switches without a password when the accounts share it, sets nga_school, and ends only this session in the old school", async () => {
+  it("MIS-ISO-2: a copy needs its one-time password (no equal-hash shortcut), sets nga_school, links the pair and ends only this session in the old school", async () => {
     const p = await primaryPerson("Mover");
     const copy = await copyPersonInto({ sourceTid: 1, sourceUserId: p.id, targetTid: school.tid, roleIds: [await teacherRole(school.tid)], actorUserId: null, via: "platform" });
+    expect(copy.tempPassword).toMatch(/^[A-Za-z0-9]{12}$/);
     const logout = vi.spyOn(backchannel, "notifyLogout").mockResolvedValue([]);
     const token = await sessionToken(p.id, 1, { sid: "oldSession123" });
-    const r = await request(app).post("/auth/switch-school").set(auth(token)).send({ tenant: school.slug });
+    const need = await request(app).post("/auth/switch-school").set(auth(token)).send({ tenant: school.slug });
+    expect([need.status, need.body.code]).toEqual([403, "PASSWORD_REQUIRED"]);
+    // The source password does not open the copy.
+    const old = await request(app).post("/auth/switch-school").set(auth(token)).send({ tenant: school.slug, password: PW });
+    expect([old.status, old.body.code]).toEqual([403, "WRONG_PASSWORD"]);
+    resetSwitchFailures();
+    const r = await request(app).post("/auth/switch-school").set(auth(token)).send({ tenant: school.slug, password: copy.tempPassword });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(r.body.data.tenant).toMatchObject({ tid: school.tid, slug: school.slug });
     const claims = jwt.decode(r.body.data.token) as any;
-    expect(claims).toMatchObject({ userId: copy.userId, tid: school.tid });
+    expect(claims).toMatchObject({ userId: copy.userId, tid: school.tid, amr: "pwd" });
     expect(claims.sid).toMatch(/^[A-Za-z0-9_-]{8,32}$/);
     expect(claims.sid).not.toBe("oldSession123");
     expect(parseSchoolCookie(cookieOf(r, "nga_school"))).toEqual({ tid: school.tid, sid: claims.sid });
     expect(cookieOf(r, "nga_auth_token")).toBe(r.body.data.token);
     await vi.waitFor(() => expect(logout).toHaveBeenCalledWith(p.id, { sid: "oldSession123" }));
+    expect(await areLinked({ tid: 1, uid: p.id }, { tid: school.tid, uid: copy.userId })).toBe(true);
     // The new session works in the new school and says so.
     const me = await request(app).get("/auth/my-schools").set(auth(r.body.data.token));
     expect(me.body.data.schools.find((s: any) => s.current).tid).toBe(school.tid);
     logout.mockRestore();
+  });
+
+  it("MIS-ISO-2: an equal password hash is not proof", async () => {
+    const p = await primaryPerson("Samehash");
+    const copy = await copyPersonInto({ sourceTid: 1, sourceUserId: p.id, targetTid: school.tid, roleIds: [await teacherRole(school.tid)], actorUserId: null, via: "platform" });
+    const [[src]]: any = await poolFor(1).query("SELECT password_hash FROM AuthCredential WHERE user_id = ?", [p.id]);
+    await poolFor(school.tid).query("UPDATE AuthCredential SET password_hash = ? WHERE user_id = ?", [src.password_hash, copy.userId]);
+    const r = await request(app).post("/auth/switch-school").set(auth(await sessionToken(p.id, 1))).send({ tenant: school.slug });
+    expect([r.status, r.body.code]).toEqual([403, "PASSWORD_REQUIRED"]);
+  });
+
+  it("MIS-ISO-2: the same Google account counts only for a session opened by Google sign-in", async () => {
+    const p = await primaryPerson("Googler");
+    const copy = await copyPersonInto({ sourceTid: 1, sourceUserId: p.id, targetTid: school.tid, roleIds: [await teacherRole(school.tid)], actorUserId: null, via: "platform" });
+    const gid = `g-${stamp}-${p.id}`;
+    await poolFor(1).query("UPDATE AuthCredential SET google_id = ? WHERE user_id = ?", [gid, p.id]);
+    await poolFor(school.tid).query("UPDATE AuthCredential SET google_id = ? WHERE user_id = ?", [gid, copy.userId]);
+    vi.spyOn(backchannel, "notifyLogout").mockResolvedValue([]);
+    const pwdSession = await request(app).post("/auth/switch-school").set(auth(await sessionToken(p.id, 1, { amr: "pwd" }))).send({ tenant: school.slug });
+    expect([pwdSession.status, pwdSession.body.code]).toEqual([403, "PASSWORD_REQUIRED"]);
+    const google = await request(app).post("/auth/switch-school").set(auth(await sessionToken(p.id, 1, { amr: "google" }))).send({ tenant: school.slug });
+    expect(google.status, JSON.stringify(google.body)).toBe(200);
+    expect(jwt.decode(google.body.data.token)).toMatchObject({ userId: copy.userId, tid: school.tid, amr: "google" });
   });
 
   it("asks for the target password when the passwords differ, refuses a wrong one, rate-limits, then accepts the right one", async () => {

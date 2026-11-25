@@ -1,4 +1,5 @@
 import { ImportedElement } from "./curriculumImportJobStore";
+import { scopeTid } from "../tenancy/scoped";
 import type { AiRouteMeta } from "./ai/personal/run";
 
 export type AISchemeJobStatus =
@@ -12,6 +13,8 @@ export type AISchemeJobStatus =
 
 export interface AISchemeJobState {
   userId: number;
+  /** The school that created the job (MIS-ISO-7): user ids repeat across schools. */
+  tid?: number;
   status: AISchemeJobStatus;
   stepIndex: number;
   totalSteps: number;
@@ -63,6 +66,7 @@ const jobs = new Map<string, AISchemeJobState>();
 export const createJob = (jobId: string, userId: number): void => {
   jobs.set(jobId, {
     userId,
+    tid: scopeTid("AI job"),
     status: "parsing",
     stepIndex: STEP_INDEX.parsing,
     totalSteps: TOTAL_STEPS,
@@ -86,8 +90,11 @@ export const updateJob = (
   });
 };
 
-export const getJob = (jobId: string): AISchemeJobState | undefined =>
-  jobs.get(jobId);
+export const getJob = (jobId: string): AISchemeJobState | undefined => {
+  // Another school's job with a colliding id is not this person's (MIS-ISO-7).
+  const job = jobs.get(jobId);
+  return job && job.tid === scopeTid("AI job") ? job : undefined;
+};
 
 setInterval(() => {
   const cutoff = Date.now() - JOB_TTL_MS;

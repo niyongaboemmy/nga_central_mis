@@ -251,7 +251,7 @@ export function sideProjectsGitRouter(auth: express.RequestHandler = authenticat
       requireGitHub();
       const a = await teamAccess(req);
       assertManage(a);
-      return { url: installUrl(signState({ k: "install", u: uid(req), t: currentTid(), p: Number(a.project.project_id) }, 30 * 60)) };
+      return { url: installUrl(signState({ k: "install", u: uid(req), t: currentTid(), p: Number(a.project.project_id) }, 15 * 60)) };
     }),
   );
   router.post(

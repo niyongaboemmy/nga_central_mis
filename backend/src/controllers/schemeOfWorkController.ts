@@ -1340,6 +1340,19 @@ export const getSchemeVerification = asyncHandler(async (req: any, res: any) => 
   if (isNaN(schemeId)) {
     return res.status(400).json({ valid: false, message: "Invalid scheme ID" });
   }
+  // MIS-ISO-4: the QR names its school (signed); a legacy QR without `t` is an NGA
+  // document (tenant 1). Never the scanner's own session school.
+  const { schemeVerifyTid } = await import("../services/schemeVerifyLink");
+  const { usableTenant, enterTenant } = await import("../tenancy/express");
+  const tid = schemeVerifyTid(schemeId, req.query?.t, req.query?.s);
+  const tenant = tid ? await usableTenant(tid) : null;
+  if (!tenant) {
+    return res.status(404).json({ valid: false, message: "No Scheme of Work found for this document" });
+  }
+  return enterTenant(req, tenant, () => schemeVerificationIn(schemeId, res));
+});
+
+const schemeVerificationIn = async (schemeId: number, res: any) => {
 
   const [row] = await db
     .select({
@@ -1382,7 +1395,7 @@ export const getSchemeVerification = asyncHandler(async (req: any, res: any) => 
     validation_status: row.validation_status,
     created_at: row.created_at,
   });
-});
+};
 
 /**
  * Get all teachers with their scheme of work status

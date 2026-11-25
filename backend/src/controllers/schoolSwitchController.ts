@@ -12,9 +12,16 @@
  * old school's apps to end THIS browser session (back-channel logout with sid).
  * Other devices keep their sessions (owner decision 2026-11-25).
  *
- * Proof of identity: the same e-mail, and either the same password hash (an
- * account copied between schools), the same Google account, or the target
- * account's password typed now (owner decision: ask once when they differ).
+ * Proof of identity (MIS-ISO-2): the target account's password typed now, or the
+ * same Google account -- only when THIS session was itself opened by Google sign-in
+ * (claim amr = "google") and both accounts carry the same google_id. An equal
+ * password hash is never proof: independent bcrypt hashes never match, so equality
+ * only ever meant "copied", and copies no longer carry credentials.
+ *
+ * Which schools are listed (MIS-ISO-5): accounts linked to this one (a cross-school
+ * copy or an earlier switch -- tenancy/personLinks.ts), plus e-mail matches where
+ * both accounts already chose their own password. Another school's roles are
+ * never shown; switching still needs the proof above.
  */
 import bcrypt from "bcryptjs";
 import { RowDataPacket } from "mysql2/promise";
@@ -33,6 +40,7 @@ import { checkBlocked } from "../services/activity/blocklist";
 import { recordActivity } from "../utils/activityLogger";
 import { successResponse } from "../utils/response";
 import { isSessionId } from "../tenancy/schoolCookie";
+import { linkPersons, linkedAccounts } from "../tenancy/personLinks";
 import logger from "../utils/logger";
 
 export interface MySchool {
@@ -42,7 +50,8 @@ export interface MySchool {
   logoUrl: string | null;
   status: string;
   current: boolean;
-  roles: string[];
+  /** Only for the current school: another school's roles are not shown (MIS-ISO-5). */
+  roles?: string[];
 }
 
 const one = async (tid: number, q: string, p: unknown[] = []) => ((await poolFor(tid).query<RowDataPacket[]>(q, p))[0][0] ?? null) as RowDataPacket | null;
@@ -50,7 +59,7 @@ const one = async (tid: number, q: string, p: unknown[] = []) => ((await poolFor
 async function accountIn(tid: number, email: string): Promise<RowDataPacket | null> {
   return one(
     tid,
-    `SELECT u.user_id, u.username, u.email, u.status, a.password_hash, a.google_id
+    `SELECT u.user_id, u.username, u.email, u.status, a.password_hash, a.google_id, a.force_password_change
        FROM \`User\` u LEFT JOIN AuthCredential a ON a.user_id = u.user_id
       WHERE LOWER(u.email) = ? LIMIT 1`,
     [email],
@@ -70,30 +79,52 @@ async function emailOf(tid: number, uid: number): Promise<string | null> {
   return normIdentifier(r?.email);
 }
 
+async function accountById(tid: number, uid: number): Promise<RowDataPacket | null> {
+  return one(
+    tid,
+    `SELECT u.user_id, u.status, a.force_password_change
+       FROM \`User\` u LEFT JOIN AuthCredential a ON a.user_id = u.user_id WHERE u.user_id = ? LIMIT 1`,
+    [uid],
+  );
+}
+
+const ownPassword = (acc: RowDataPacket | null) => !!acc && acc.force_password_change !== null && acc.force_password_change !== undefined && Number(acc.force_password_change) === 0;
+
 /** The schools this person can switch to (the current one first). Never throws for one bad school. */
 export async function mySchools(current: TenantCtx, userId: number): Promise<MySchool[]> {
   const email = await emailOf(current.tid, userId);
-  const tids = new Set<number>([current.tid]);
-  if (email) for (const h of (await lookupDirectory(email)) ?? []) if (String(h.status) === "ACTIVE") tids.add(h.tid);
+  const me = await accountById(current.tid, userId);
+  // tid -> how the other account is known: by a link (trusted) or by e-mail only.
+  const candidates = new Map<number, { uid: number | null }>();
+  for (const l of await linkedAccounts({ tid: current.tid, uid: userId })) if (!candidates.has(l.tid)) candidates.set(l.tid, { uid: l.uid });
+  if (email) {
+    for (const h of (await lookupDirectory(email)) ?? []) {
+      if (String(h.status) === "ACTIVE" && h.tid !== current.tid && !candidates.has(h.tid)) candidates.set(h.tid, { uid: null });
+    }
+  }
   const out: MySchool[] = [];
-  for (const tid of tids) {
+  const brand = async (t: TenantCtx) => brandingFor(t).catch(() => null);
+  {
+    const b = await brand(current);
+    out.push({ tid: current.tid, slug: current.slug, name: b?.school_name || current.name, logoUrl: b?.logoUrl ?? null, status: current.status, current: true, roles: await rolesOf(current.tid, userId).catch(() => []) });
+  }
+  for (const [tid, c] of candidates) {
     try {
-      const t = tid === current.tid ? current : await getTenant(tid);
+      const t = await getTenant(tid);
       if (!t) continue;
-      const isCurrent = tid === current.tid;
-      if (!isCurrent && !isTenantUsable(t.status) && t.status !== "SUSPENDED") continue;
-      const acc = isCurrent ? await one(tid, "SELECT user_id, status FROM `User` WHERE user_id = ?", [userId]) : email ? await accountIn(tid, email) : null;
+      if (!isTenantUsable(t.status) && t.status !== "SUSPENDED") continue;
+      let acc: RowDataPacket | null;
+      if (c.uid) {
+        acc = await accountById(tid, c.uid);
+      } else {
+        // E-mail only: any school can type any e-mail on its accounts, so list it only
+        // when both accounts already chose their own password (no admin-set or one-time one).
+        acc = email ? await accountIn(tid, email) : null;
+        if (!ownPassword(acc) || !ownPassword(me)) continue;
+      }
       if (!acc || String(acc.status) !== "ACTIVE") continue;
-      const brand = await brandingFor(t).catch(() => null);
-      out.push({
-        tid,
-        slug: t.slug,
-        name: brand?.school_name || t.name,
-        logoUrl: brand?.logoUrl ?? null,
-        status: t.status,
-        current: isCurrent,
-        roles: await rolesOf(tid, Number(acc.user_id)),
-      });
+      const b = await brand(t);
+      out.push({ tid, slug: t.slug, name: b?.school_name || t.name, logoUrl: b?.logoUrl ?? null, status: t.status, current: false });
     } catch (err) {
       logger.warn("[schoolSwitch] school skipped", { tid, error: (err as Error)?.message });
     }
@@ -136,18 +167,18 @@ export const switchSchool = asyncHandler(async (req: any, res: any) => {
   }
 
   const email = await emailOf(current.tid, userId);
-  const here = await one(current.tid, "SELECT password_hash, google_id FROM AuthCredential WHERE user_id = ? LIMIT 1", [userId]);
+  const here = await one(current.tid, "SELECT google_id FROM AuthCredential WHERE user_id = ? LIMIT 1", [userId]);
   const there = email ? await accountIn(target.tid, email) : null;
   if (!there || String(there.status) !== "ACTIVE") {
     return refuse(res, 404, "NOT_IN_SCHOOL", "You don't have an active account in this school.");
   }
   const targetUid = Number(there.user_id);
 
-  // Proof: same password hash / same Google account, else the target password now.
+  // Proof (MIS-ISO-2): the same Google account when this session came from Google
+  // sign-in, else the target password now. Never an equal password hash.
   const key = failKey(target.tid, targetUid);
-  const samePassword = !!here?.password_hash && here.password_hash === there.password_hash;
-  const sameGoogle = !!here?.google_id && here.google_id === there.google_id;
-  if (!samePassword && !sameGoogle) {
+  const sameGoogle = req.user?.amr === "google" && !!here?.google_id && !!there.google_id && String(here.google_id) === String(there.google_id);
+  if (!sameGoogle) {
     const password = typeof req.body?.password === "string" ? req.body.password : "";
     if (!password) {
       return refuse(res, 403, "PASSWORD_REQUIRED", `Enter your password for ${target.name}.`);
@@ -178,10 +209,12 @@ export const switchSchool = asyncHandler(async (req: any, res: any) => {
     targetTid: target.tid,
     actorUserId: userId,
     ip: clientIpOf(req) ?? null,
-    payload: { fromTid: current.tid, fromUserId: userId, toUserId: targetUid, proof: samePassword ? "same_password" : sameGoogle ? "google" : "password" },
+    payload: { fromTid: current.tid, fromUserId: userId, toUserId: targetUid, proof: sameGoogle ? "google" : "password" },
   });
+  // Proven to be the same person: my-schools trusts this pair from now on.
+  await linkPersons({ tid: current.tid, uid: userId }, { tid: target.tid, uid: targetUid }, "switch");
 
   // The new school's session: exactly a sign-in (cookie, claims, nga_school, response).
   req.tenant = target;
-  await runWithTenant(target, () => completeLogin(targetUid, res, "SCHOOL_SWITCH", req));
+  await runWithTenant(target, () => completeLogin(targetUid, res, "SCHOOL_SWITCH", req, { amr: sameGoogle ? "google" : "pwd" }));
 });

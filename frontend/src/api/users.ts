@@ -1142,9 +1142,9 @@ export const findUserElsewhere = async (identifier: string): Promise<PersonElsew
   return response.data.data ?? [];
 };
 
-/** Add that person to this school with roles of this school (they keep their password). */
+/** Add that person to this school with roles of this school (a one-time password is e-mailed to them). */
 export const importUserFromSchool = async (body: { identifier: string; sourceTid: number; roles: number[] }) => {
-  const response = await api.post<BackendResponse<{ userId: number; username: string; roles: string[] }>>("/users/elsewhere/import", body);
+  const response = await api.post<BackendResponse<{ userId: number; username: string; roles: string[]; emailed: boolean }>>("/users/elsewhere/import", body);
   return response.data.data!;
 };
 

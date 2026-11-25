@@ -1,10 +1,12 @@
 /**
  * One person, several schools (services/tenantMgmt/crossSchool.ts):
  * a school admin finds a person of another school by exact e-mail and adds them
- * with a role of their own school (same password); platform staff search every
- * school and assign.
+ * with a role of their own school; platform staff search every school and assign.
+ * MIS-ISO-2: a copy never carries the source's password hash or google_id -- it
+ * gets its own one-time password (e-mailed; shown once to platform staff only).
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import emailService from "../utils/email";
 import bcrypt from "bcryptjs";
 import request from "supertest";
 import app from "../app";
@@ -68,23 +70,46 @@ describe("school side: add a person from another school", () => {
     expect(partial.body.data).toEqual([]);
   });
 
-  it("adds them with a role of this school; the same password signs in there", async () => {
+  it("MIS-ISO-2: adds them with a role of this school and their own one-time password (never the source's hash or Google id)", async () => {
     const teacherRole = await roleId(school.tid, "TEACHER");
     expect(teacherRole).toBeGreaterThan(0);
+    await poolFor(1).query("UPDATE AuthCredential SET google_id = ? WHERE user_id = ?", [`g-src-${stamp}`, teacher.id]);
+    vi.spyOn(emailService, "isAvailable").mockReturnValue(true);
+    const send = vi.spyOn(emailService, "sendEmail").mockResolvedValue(true);
+    send.mockClear();
     const r = await request(app).post("/users/elsewhere/import").set(auth(ownerToken)).send({ identifier: teacher.email, sourceTid: 1, roles: [teacherRole] });
     expect(r.status, JSON.stringify(r.body)).toBe(201);
     expect(r.body.data.roles).toEqual(["TEACHER"]);
+    expect(r.body.data.emailed).toBe(true);
+    // A school's admin never sees the person's password.
+    expect(r.body.data.tempPassword).toBeUndefined();
+    expect(JSON.stringify(r.body)).not.toMatch(/password/i);
     const [[u]] = await poolFor(school.tid).query<any[]>(
       "SELECT u.email, p.first_name, p.user_type FROM `User` u JOIN UserProfile p ON p.user_id = u.user_id WHERE u.user_id = ?",
       [r.body.data.userId],
     );
     expect(u).toMatchObject({ email: teacher.email, first_name: "Grace", user_type: "TEACHER" });
+    const [[src]] = await poolFor(1).query<any[]>("SELECT password_hash FROM AuthCredential WHERE user_id = ?", [teacher.id]);
+    const [[cred]] = await poolFor(school.tid).query<any[]>("SELECT password_hash, force_password_change, google_id FROM AuthCredential WHERE user_id = ?", [r.body.data.userId]);
+    expect(cred.password_hash).not.toBe(src.password_hash);
+    expect(Number(cred.force_password_change)).toBe(1);
+    expect(cred.google_id).toBeNull();
+    // The one-time password went to the person's e-mail.
+    const mail = send.mock.calls.map((c: any[]) => c[0]).find((m: any) => m?.to === teacher.email);
+    const pw = /One-time password: ([A-Za-z0-9]{12})/.exec(String(mail?.html ?? ""))?.[1];
+    expect(pw).toBeTruthy();
+    expect(await bcrypt.compare(pw!, cred.password_hash)).toBe(true);
+    vi.mocked(emailService.isAvailable).mockRestore();
     invalidateTenants();
-    const login = await request(app).post("/auth/login").send({ username: teacher.email, password: PW, tenant: school.slug });
+    // The source password does not open the copy; the one-time password does.
+    const withOld = await request(app).post("/auth/login").send({ username: teacher.email, password: PW, tenant: school.slug });
+    expect(withOld.status).toBe(401);
+    const login = await request(app).post("/auth/login").send({ username: teacher.email, password: pw, tenant: school.slug });
     expect(login.status, JSON.stringify(login.body)).toBe(200);
-    // Without a school, the sign-in asks which one.
+    // Without a school, the password picks the school it opens (no picker needed).
     const choose = await request(app).post("/auth/login").send({ username: teacher.email, password: PW });
-    expect(choose.body.choose?.map((c: any) => c.tid).sort()).toEqual([1, school.tid].sort());
+    expect(choose.status).toBe(200);
+    expect(choose.body.choose).toBeUndefined();
   });
 
   it("refuses a second copy and a forged source", async () => {
@@ -116,6 +141,12 @@ describe("platform side: search every school and assign", () => {
       .set(auth(operator.token))
       .send({ sourceTid: 1, sourceUserId: p.id, roleIds: [staff.roleId], reason: "Teaches in both schools" });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
+    // MIS-ISO-2: platform staff get the copy's one-time password once; it is not the source's.
+    expect(r.body.data.tempPassword).toMatch(/^[A-Za-z0-9]{12}$/);
+    const [[cred]] = await poolFor(school.tid).query<any[]>("SELECT password_hash, force_password_change FROM AuthCredential WHERE user_id = ?", [r.body.data.userId]);
+    expect(Number(cred.force_password_change)).toBe(1);
+    expect(await bcrypt.compare(PW, cred.password_hash)).toBe(false);
+    expect(await bcrypt.compare(r.body.data.tempPassword, cred.password_hash)).toBe(true);
     const after = await request(app).get("/platform/people").query({ q: `Platformtest${stamp}`, forTid: school.tid }).set(auth(operator.token));
     expect(after.body.data[0].alreadyInTarget).toBe(true);
   });

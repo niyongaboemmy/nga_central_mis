@@ -4,9 +4,9 @@ import { db } from "../db";
 import { getTenant, primaryTenantCtx, runWithTenant, type TenantCtx } from "../tenancy";
 import logger from "../utils/logger";
 import { appUrl, apiUrl } from "../services/reminders/webPush";
-import { exchangeCode, getInstallation, githubConfig, verifySignature } from "../services/sideProjects/git/github";
+import { exchangeCode, getInstallation, githubConfig, userInstallationIds, verifySignature } from "../services/sideProjects/git/github";
 import { processEvent, storeEvent } from "../services/sideProjects/git/ingest";
-import { readState, routeInstallation, tenantForInstallation } from "../services/sideProjects/git/store";
+import { installationRouteTid, readState, routeInstallation, tenantForInstallation } from "../services/sideProjects/git/store";
 import { submitDraft } from "../services/sideProjects/git/drafts";
 
 /**
@@ -29,6 +29,45 @@ const page = (title: string, body: string) =>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,-apple-system,sans-serif;background:#0b1220;color:#e2e8f0}
 main{max-width:420px;padding:32px;border:1px solid rgba(147,197,253,.2);border-radius:20px;text-align:center}h1{font-size:20px;margin:0 0 8px}p{color:#94a3b8;margin:0 0 20px}
 a{color:#fff;background:#2563eb;padding:10px 18px;border-radius:12px;text-decoration:none;font-weight:600}</style></head><body><main>${body}</main></body></html>`;
+
+/** How recent an installation must be when the setup redirect carries no OAuth code. */
+export const SETUP_FRESH_MS = 10 * 60_000;
+
+type OwnershipVerdict = "ok" | "already_ours" | "elsewhere" | "not_owner" | "stale" | "state_stale";
+
+/**
+ * MIS-ISO-3: may this setup redirect attach `installationId` to school `tid`?
+ *  - with an OAuth `code` ("request user authorization during installation"): the
+ *    GitHub user must be able to reach the installation (GET /user/installations);
+ *  - without one: the App itself must report an installation created in the last
+ *    10 minutes, after our signed state was issued (state ↔ school ↔ user ↔ expiry
+ *    are HMAC-bound by signState), and not yet routed to any school.
+ * An installation already routed to this school is a no-op; to another, refused.
+ */
+export async function verifyInstallationOwnership(
+  installationId: number,
+  tid: number,
+  st: { iat?: number },
+  code: unknown,
+): Promise<OwnershipVerdict> {
+  const routed = await installationRouteTid(installationId);
+  if (routed !== null && routed !== tid) return "elsewhere";
+  if (typeof code === "string" && code) {
+    const ids = await userInstallationIds(code);
+    if (!ids.includes(installationId)) return "not_owner";
+    return "ok";
+  }
+  if (routed === tid) return "already_ours";
+  const now = Date.now();
+  const issued = Number(st.iat) * 1000;
+  if (!Number.isFinite(issued) || now - issued > SETUP_FRESH_MS + 5 * 60_000) return "state_stale";
+  const inst = await getInstallation(installationId);
+  const created = Date.parse(String(inst?.created_at ?? ""));
+  if (!Number.isFinite(created)) return "stale";
+  // Created after this state was issued (60 s clock skew), and within the last 10 minutes.
+  if (created < issued - 60_000 || now - created > SETUP_FRESH_MS || created > now + 60_000) return "stale";
+  return "ok";
+}
 
 export function githubIntegrationRouter() {
   const router = express.Router();
@@ -65,7 +104,7 @@ export function githubIntegrationRouter() {
   });
 
   router.get("/setup", async (req, res) => {
-    const st = readState<{ k: string; u: number; t: number; p?: number }>(req.query.state);
+    const st = readState<{ k: string; u: number; t: number; p?: number; iat?: number }>(req.query.state);
     const installationId = Number(req.query.installation_id);
     if (!st || st.k !== "install" || !Number.isInteger(installationId) || installationId <= 0) {
       return res.status(400).send(page("Link expired", `<h1>That link has expired</h1><p>Start again from the project's GitHub tab.</p><a href="${appUrl("/my-projects")}">Back to My projects</a>`));
@@ -73,6 +112,18 @@ export function githubIntegrationRouter() {
     const tenant = await tenantOf(st.t);
     if (!tenant) return res.status(400).send(page("Unknown school", "<h1>Unknown school</h1>"));
     try {
+      // MIS-ISO-3: installation_id is only a query parameter -- prove it is this person's.
+      const verdict = await verifyInstallationOwnership(installationId, tenant.tid, st, req.query.code);
+      if (verdict === "already_ours") {
+        const back = st.p ? `/my-projects?project=${st.p}&tab=github&installation=${installationId}` : "/my-projects";
+        return res.redirect(302, appUrl(back));
+      }
+      if (verdict !== "ok") {
+        logger.warn("[git] setup refused: installation not proven", { installationId, tid: tenant.tid, verdict });
+        return res
+          .status(verdict === "elsewhere" ? 409 : 403)
+          .send(page("GitHub", `<h1>Couldn't verify this installation</h1><p>${verdict === "elsewhere" ? "This GitHub installation is already connected to another school." : "Install the app again from the project's GitHub tab and finish within 10 minutes."}</p><a href="${appUrl("/my-projects")}">Back to My projects</a>`));
+      }
       const inst = await getInstallation(installationId);
       await routeInstallation(installationId, tenant.tid, inst.account?.login ?? null);
       await runWithTenant(tenant, () =>

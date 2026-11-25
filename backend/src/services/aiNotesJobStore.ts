@@ -1,4 +1,5 @@
 import type { AiRouteMeta } from "./ai/personal/run";
+import { scopeTid } from "../tenancy/scoped";
 
 export type AINotesJobStatus =
   | "loading"
@@ -10,6 +11,8 @@ export type AINotesJobStatus =
 
 export interface AINotesJobState {
   userId: number;
+  /** The school that created the job (MIS-ISO-7): user ids repeat across schools. */
+  tid?: number;
   status: AINotesJobStatus;
   stepIndex: number;
   totalSteps: number;
@@ -41,6 +44,7 @@ const jobs = new Map<string, AINotesJobState>();
 export const createJob = (jobId: string, userId: number): void => {
   jobs.set(jobId, {
     userId,
+    tid: scopeTid("AI job"),
     status: "loading",
     stepIndex: STEP_INDEX.loading,
     totalSteps: TOTAL_STEPS,
@@ -64,8 +68,11 @@ export const updateJob = (
   });
 };
 
-export const getJob = (jobId: string): AINotesJobState | undefined =>
-  jobs.get(jobId);
+export const getJob = (jobId: string): AINotesJobState | undefined => {
+  // Another school's job with a colliding id is not this person's (MIS-ISO-7).
+  const job = jobs.get(jobId);
+  return job && job.tid === scopeTid("AI job") ? job : undefined;
+};
 
 setInterval(() => {
   const cutoff = Date.now() - JOB_TTL_MS;

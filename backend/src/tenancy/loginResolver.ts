@@ -24,7 +24,11 @@ import { TenantRefusal, isSuspendedRefusal, primaryTenant, tenantRefusal } from 
 export type LoginResolution =
   | { kind: "one"; tenant: TenantCtx; explicit: boolean }
   | { kind: "many"; tenants: TenantCtx[] }
-  | { kind: "refused"; refusal: TenantRefusal };
+  /**
+   * `tenant` + explicit=false: the refusal comes from the directory (the identifier
+   * alone), so the caller reveals it only after the credentials matched there (MIS-ISO-7).
+   */
+  | { kind: "refused"; refusal: TenantRefusal; tenant?: TenantCtx | null; explicit?: boolean };
 
 export async function resolveLoginTenants(identifier: string, explicitTenant?: unknown): Promise<LoginResolution> {
   if (explicitTenant !== undefined && explicitTenant !== null && explicitTenant !== "") {
@@ -32,7 +36,7 @@ export async function resolveLoginTenants(identifier: string, explicitTenant?: u
     const refusal = tenantRefusal(t);
     // A SUSPENDED school still signs in its billing owners (tenant management §6.7):
     // the sign-in checks the capability once the user is known (authController).
-    if (refusal && !isSuspendedRefusal(t, refusal)) return { kind: "refused", refusal: t ? refusal : { ...refusal, status: 400 } };
+    if (refusal && !isSuspendedRefusal(t, refusal)) return { kind: "refused", refusal: t ? refusal : { ...refusal, status: 400 }, tenant: t, explicit: true };
     return { kind: "one", tenant: t!, explicit: true };
   }
 
@@ -57,7 +61,7 @@ export async function resolveLoginTenants(identifier: string, explicitTenant?: u
   // owner in (checked after the password); otherwise say why (pending / suspended).
   const suspendedOne = tenants.find((t) => t.status === "SUSPENDED");
   if (suspendedOne) return { kind: "one", tenant: suspendedOne, explicit: false };
-  return { kind: "refused", refusal: tenantRefusal(tenants[0])! };
+  return { kind: "refused", refusal: tenantRefusal(tenants[0])!, tenant: tenants[0], explicit: false };
 }
 
 /** A tenant-1 user answering to this e-mail / username, straight from its database. */

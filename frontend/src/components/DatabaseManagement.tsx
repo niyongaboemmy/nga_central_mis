@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useUser } from "../contexts/UserContext";
 import { usePermissions } from "../hooks/usePermissions";
+import { useAccess } from "../hooks/useAccess";
 import { useToast } from "../contexts/ToastContext";
 import { Permissions } from "../constants/permissions";
 import {
@@ -181,6 +182,7 @@ const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
 const DatabaseManagement: React.FC = () => {
   const { user, isLoading } = useUser();
   const { hasPermission } = usePermissions();
+  const access = useAccess();
   const { showToast } = useToast();
   const confirm = useConfirm();
 
@@ -409,8 +411,9 @@ const DatabaseManagement: React.FC = () => {
     }
   };
 
-  if (isLoading) return null;
-  if (!user || !hasPermission(Permissions.DATABASE_MANAGEMENT)) {
+  if (isLoading || access.loading) return null;
+  // Platform-owner tool of the primary school only (MIS-ISO-1).
+  if (!user || !hasPermission(Permissions.DATABASE_MANAGEMENT) || !access.can("PLATFORM_PACKAGES_MANAGE")) {
     return <Navigate to="/dashboard" replace />;
   }
 

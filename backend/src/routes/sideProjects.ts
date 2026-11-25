@@ -1,4 +1,5 @@
 import express from "express";
+import { scopedKey } from "../tenancy/scoped";
 import multer from "multer";
 import os from "os";
 import { authenticate } from "../middleware/auth";
@@ -42,10 +43,13 @@ import { sql } from "drizzle-orm";
 const upload = multer({ storage: multer.diskStorage({ destination: os.tmpdir() }), limits: { fileSize: MAX_UPLOAD_BYTES, files: 10 } });
 const sheetUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 
-// 30 uploads per 10 minutes per person.
-const uploadHits = new Map<number, number[]>();
-function uploadRateLimit(req: any, res: express.Response, next: express.NextFunction) {
-  const id = Number(req.user?.userId);
+// 30 uploads per 10 minutes per person -- per school AND person (MIS-ISO-7): user ids
+// repeat across school databases, so a bare id would share one budget between people.
+const uploadHits = new Map<string, number[]>();
+/** Tests only. */
+export const uploadHitsForTests = uploadHits;
+export function uploadRateLimit(req: any, res: express.Response, next: express.NextFunction) {
+  const id = scopedKey("u", Number(req.user?.userId));
   const now = Date.now();
   const hits = (uploadHits.get(id) ?? []).filter((t) => now - t < 10 * 60_000);
   if (hits.length >= 30) return res.status(429).json({ success: false, code: "RATE_LIMITED", message: "Too many uploads. Wait a few minutes" });

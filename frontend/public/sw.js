@@ -39,7 +39,17 @@ self.addEventListener("activate", (event) => {
     })(),
   );
 });
-const AGENDA_KEY = "/__nga/agenda.json";
+// The offline agenda is one person's data (WEB-ISO-7): it lives in its own cache,
+// keyed by school + person (`?id=t<tid>.u<uid>`), and the page drops that cache
+// whenever the signed-in identity changes ("nga:agenda-clear", lib/tenant.ts).
+const AGENDA_PATH = "/__nga/agenda.json";
+const AGENDA_CACHE = "nga-agenda-v1";
+const agendaKey = (id) => `${AGENDA_PATH}?id=${encodeURIComponent(id)}`;
+const validId = (id) => typeof id === "string" && /^t\d+\.u\d+$/.test(id);
+// Older workers kept one unkeyed agenda in the shared app cache: drop it.
+self.addEventListener("activate", (event) => {
+  event.waitUntil(caches.open(APP_CACHE).then((c) => c.delete(AGENDA_PATH)).catch(() => null));
+});
 
 const showFromPayload = async (payload) => {
   const n = (payload && payload.notification) || {};
@@ -147,13 +157,16 @@ let agendaSource = null;
 
 const refreshAgenda = async () => {
   if (!agendaSource) return;
+  const source = agendaSource;
   try {
-    const res = await fetch(`${agendaSource.apiBase}/reminders/agenda?days=2`, {
-      headers: { Authorization: `Bearer ${agendaSource.token}` },
+    const res = await fetch(`${source.apiBase}/reminders/agenda?days=2`, {
+      headers: { Authorization: `Bearer ${source.token}` },
     });
     if (!res.ok) return;
-    const cache = await caches.open(APP_CACHE);
-    await cache.put(AGENDA_KEY, new Response(await res.text(), { headers: { "Content-Type": "application/json" } }));
+    // Someone else signed in meanwhile: never store under the new identity.
+    if (agendaSource !== source) return;
+    const cache = await caches.open(AGENDA_CACHE);
+    await cache.put(agendaKey(source.id), new Response(await res.text(), { headers: { "Content-Type": "application/json" } }));
   } catch (e) {
     /* offline: keep the last copy */
   }
@@ -161,15 +174,20 @@ const refreshAgenda = async () => {
 
 self.addEventListener("message", (event) => {
   const msg = event.data || {};
-  if (msg.type === "nga:agenda-source" && msg.apiBase && msg.token) {
-    agendaSource = { apiBase: msg.apiBase, token: msg.token };
+  if (msg.type === "nga:agenda-source" && msg.apiBase && msg.token && validId(msg.id)) {
+    agendaSource = { apiBase: msg.apiBase, token: msg.token, id: msg.id };
   }
-  if (msg.type === "nga:agenda-cache" && msg.body) {
+  if (msg.type === "nga:agenda-cache" && msg.body && validId(msg.id)) {
     event.waitUntil(
       caches
-        .open(APP_CACHE)
-        .then((cache) => cache.put(AGENDA_KEY, new Response(msg.body, { headers: { "Content-Type": "application/json" } }))),
+        .open(AGENDA_CACHE)
+        .then((cache) => cache.put(agendaKey(msg.id), new Response(msg.body, { headers: { "Content-Type": "application/json" } }))),
     );
+  }
+  // Sign-out / another person or school: forget the token and every cached agenda.
+  if (msg.type === "nga:agenda-clear") {
+    agendaSource = null;
+    event.waitUntil(caches.delete(AGENDA_CACHE).catch(() => null));
   }
   if (msg.type === "nga:skip-waiting") self.skipWaiting();
 });
@@ -180,11 +198,10 @@ self.addEventListener("periodicsync", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  if (url.origin === self.location.origin && url.pathname === AGENDA_KEY) {
+  if (url.origin === self.location.origin && url.pathname === AGENDA_PATH) {
+    const id = url.searchParams.get("id");
     event.respondWith(
-      caches
-        .open(APP_CACHE)
-        .then((c) => c.match(AGENDA_KEY))
+      (validId(id) ? caches.open(AGENDA_CACHE).then((c) => c.match(agendaKey(id))) : Promise.resolve(null))
         .then((hit) => hit || new Response("null", { status: 404, headers: { "Content-Type": "application/json" } })),
     );
   }

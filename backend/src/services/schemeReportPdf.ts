@@ -18,6 +18,8 @@ import {
 import storageService from "../utils/fileServer";
 import { NotFoundError } from "../errors/CustomError";
 import logger from "../utils/logger";
+import { schemeVerifyPath } from "./schemeVerifyLink";
+import { scopeTid } from "../tenancy/scoped";
 
 // Same design language as pdfExport.ts (Lesson Notes), kept as an independent, self-contained
 // copy rather than a shared import so this renderer's cover-page/table layout can evolve freely
@@ -137,7 +139,8 @@ const FRONTEND_BASE_URL = (process.env.FRONTEND_URL || "http://localhost:5173").
  * fails for any reason. */
 async function buildVerificationQr(schemeId: number): Promise<string | null> {
   try {
-    const verifyUrl = `${FRONTEND_BASE_URL}/verify/${schemeId}`;
+    // The link names its school, signed (MIS-ISO-4): the public verify page reads that school.
+    const verifyUrl = `${FRONTEND_BASE_URL}${schemeVerifyPath(scopeTid("scheme verify QR"), schemeId)}`;
     return await QRCode.toDataURL(verifyUrl, {
       margin: 0,
       width: 280,

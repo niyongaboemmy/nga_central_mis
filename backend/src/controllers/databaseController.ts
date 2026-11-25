@@ -13,6 +13,7 @@ import {
   JSONSchema,
 } from "../services/aiProviders";
 import { personalFor } from "../services/ai/personal/routes";
+import { assertOwnSchema, assertPlainTableName } from "../services/database/schemaPin";
 
 const DENYLIST_PATTERNS = [
   /DROP\s+DATABASE/i,
@@ -69,7 +70,17 @@ const assertNotDenylisted = (query: string) => {
   }
 };
 
-const assertTableExists = async (table: string) => {
+/** MIS-ISO-1: the statement must stay inside this connection's own database. */
+const assertStaysInOwnSchema = async (query: string) => {
+  const own: any = await db.execute(sql`SELECT DATABASE() AS db`);
+  const ownSchema = String(own[0]?.[0]?.db ?? "");
+  if (!ownSchema) throw new ValidationError("No database is selected");
+  const visible: any = await db.execute(sql`SELECT SCHEMA_NAME AS name FROM information_schema.SCHEMATA`);
+  assertOwnSchema(query, ownSchema, (visible[0] ?? []).map((r: any) => String(r.name)));
+};
+
+const assertTableExists = async (rawTable: string) => {
+  const table = assertPlainTableName(rawTable);
   const result: any = await db.execute(
     sql`SELECT COUNT(*) as cnt FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${table}`,
   );
@@ -384,6 +395,7 @@ export const runQuery = asyncHandler(async (req: any, res: Response) => {
 
   assertSingleStatement(query);
   assertNotDenylisted(query);
+  await assertStaysInOwnSchema(query);
 
   const { statementType, isWrite } = classifyStatement(query);
   if (isWrite && confirm !== true) {

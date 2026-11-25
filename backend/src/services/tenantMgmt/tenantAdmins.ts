@@ -145,7 +145,7 @@ export async function listTenantAdmins(tid: number): Promise<TenantAdmin[]> {
     .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "OWNER" ? -1 : 1));
 }
 
-const tempPassword = () => {
+export const tempPassword = (): string => {
   // 12 characters, no look-alikes, always a digit and a letter of each case.
   const pick = (set: string) => set[crypto.randomInt(set.length)];
   const lower = "abcdefghjkmnpqrstuvwxyz";

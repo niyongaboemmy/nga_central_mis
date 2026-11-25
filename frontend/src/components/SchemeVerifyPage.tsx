@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { ShieldCheck, ShieldAlert, Loader2, BookOpen, Users, Calendar, GraduationCap } from "lucide-react";
 import { API_BASE_URL } from "../services/api";
 
@@ -25,6 +25,10 @@ interface VerificationResult {
  * an anonymous visitor. */
 const SchemeVerifyPage: React.FC = () => {
   const { schemeId } = useParams<{ schemeId: string }>();
+  // The QR names its school, signed (t + s); old printed codes carry neither (NGA documents).
+  const [params] = useSearchParams();
+  const t = params.get("t");
+  const s = params.get("s");
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +36,8 @@ const SchemeVerifyPage: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/scheme-of-work/verify/${schemeId}`);
+        const q = t ? `?${new URLSearchParams({ t, s: s ?? "" }).toString()}` : "";
+        const res = await fetch(`${API_BASE_URL}/scheme-of-work/verify/${encodeURIComponent(schemeId ?? "")}${q}`, { credentials: "omit" });
         const data = await res.json();
         if (!cancelled) setResult(data);
       } catch {
@@ -44,7 +49,7 @@ const SchemeVerifyPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [schemeId]);
+  }, [schemeId, t, s]);
 
   const statusBadge = (status?: string) => {
     if (status === "APPROVED")

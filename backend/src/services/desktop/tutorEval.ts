@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { tenantLocal } from "../../tenancy/scoped";
 import { db } from "../../db";
 import logger from "../../utils/logger";
 import { completeChat, configuredChatProviders } from "../aiProviders/chat";
@@ -100,13 +101,17 @@ async function evaluateProvider(provider: string, model: string, judges: string[
   return score(provider, model, details);
 }
 
-let running: Promise<EvalResult[]> | null = null;
-export const evalRunning = () => !!running;
+// One run at a time PER SCHOOL (MIS-ISO-6): results are stored in the school's own
+// DesktopTutorEval table, so another school's run must neither block this one nor
+// hand its promise (and results) to this school.
+const inflight = tenantLocal(() => ({ running: null as Promise<EvalResult[]> | null }));
+export const evalRunning = () => !!inflight().running;
 
 /** Test every configured provider (or the given ones) and store the results. */
 export function runEvals(actorId: number, only?: string[]): Promise<EvalResult[]> {
-  if (running) return running;
-  running = (async () => {
+  const st = inflight();
+  if (st.running) return st.running;
+  st.running = (async () => {
     const providers = configuredChatProviders().filter((p) => !only || only.includes(p.name));
     const all = configuredChatProviders().map((p) => p.name);
     const out: EvalResult[] = [];
@@ -124,9 +129,9 @@ export function runEvals(actorId: number, only?: string[]): Promise<EvalResult[]
     }
     return out;
   })().finally(() => {
-    running = null;
+    st.running = null;
   });
-  return running;
+  return st.running;
 }
 
 /** The latest result per provider. */

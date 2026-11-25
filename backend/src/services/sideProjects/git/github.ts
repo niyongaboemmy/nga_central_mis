@@ -107,7 +107,7 @@ export async function installationToken(installationId: number): Promise<string>
   return r.token;
 }
 
-export async function getInstallation(installationId: number): Promise<{ id: number; account: { id: number; login: string; type: string } }> {
+export async function getInstallation(installationId: number): Promise<{ id: number; account: { id: number; login: string; type: string }; created_at?: string }> {
   const cfg = githubConfig();
   if (!cfg) throw new GitHubError(503, "GitHub isn't configured");
   return call(cfg, `/app/installations/${installationId}`, { bearer: appJwt(cfg) });
@@ -174,6 +174,31 @@ export async function exchangeCode(code: string, redirectUri: string): Promise<{
   }
   // The token is not kept: identity is all the MIS needs.
   return { user: { id: user.id, login: user.login, name: user.name ?? null, avatar_url: user.avatar_url ?? null }, emails };
+}
+
+/**
+ * "Request user authorization during installation": the setup redirect carries an
+ * OAuth code. Exchange it and list the installations this GitHub user can reach
+ * (MIS-ISO-3: proof that the person finishing the setup owns `installation_id`).
+ */
+export async function userInstallationIds(code: string): Promise<number[]> {
+  const cfg = githubConfig();
+  if (!cfg) throw new GitHubError(503, "GitHub isn't configured");
+  const res = await fetchImpl(`${cfg.webUrl}/login/oauth/access_token`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", "User-Agent": "nga-projects" },
+    body: JSON.stringify({ client_id: cfg.clientId, client_secret: cfg.clientSecret, code }),
+  });
+  const data: any = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) throw new GitHubError(400, data.error_description || "GitHub sign-in failed");
+  const ids: number[] = [];
+  for (let page = 1; page <= 5; page++) {
+    const r = await call(cfg, `/user/installations?per_page=100&page=${page}`, { bearer: data.access_token });
+    const list = Array.isArray(r?.installations) ? r.installations : [];
+    ids.push(...list.map((x: any) => Number(x.id)).filter((n: number) => Number.isSafeInteger(n)));
+    if (list.length < 100) break;
+  }
+  return ids;
 }
 
 // ─── Link mode: the plain REST API, without the app (migration 141) ───────────

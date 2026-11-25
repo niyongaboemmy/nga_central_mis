@@ -404,7 +404,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                         Already in another school?
                       </h3>
                       <p className="mb-3 text-xs text-gray-600 dark:text-gray-300">
-                        Find them by their exact e-mail or username and add them here with a new role. They keep their password.
+                        Find them by their exact e-mail or username and add them here with a new role. They get a one-time password for this school by e-mail.
                       </p>
                       <PersonSearchField
                         label="E-mail or username in another school"
@@ -446,7 +446,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                     <PickedPerson
                       person={existing}
                       detail={`From ${existing.schoolName} · ${existing.email} · @${existing.username}`}
-                      note="Choose their role in this school below. They sign in with the password they already use."
+                      note="Choose their role in this school below. We e-mail them a one-time password for this school; their password elsewhere does not change."
                     >
                       <button type="button" onClick={() => setExisting(null)} className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-300">
                         Create a new account instead

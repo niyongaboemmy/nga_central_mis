@@ -4,9 +4,11 @@
  * Every school has its own database, so a person who works in (or studies at)
  * two schools has one account in each. This module finds a person's account in
  * another school and copies it into a target school with a role of that school:
- * same e-mail, username (when free), names, phone and *password hash*, so the
- * person signs in with the password they already know (the sign-in asks which
- * school when one e-mail belongs to several -- tenancy/loginResolver.ts).
+ * same e-mail, username (when free), names and phone. Credentials are NEVER copied
+ * (MIS-ISO-2): the copy gets its own one-time password with force_password_change,
+ * e-mailed to the person (and shown once to platform staff), and no google_id -- the
+ * person links Google in that school by signing in with Google there. The copy and
+ * the source are recorded as the same person (tenancy/personLinks.ts).
  *
  * Two doors:
  *   school side    MANAGE_USERS in the target school; finds by EXACT e-mail or
@@ -22,7 +24,11 @@ import { TenantCtx, isTenantUsable, runWithTenant } from "../../vendor/nga-tenan
 import { getTenant, listTenants } from "../../tenancy/registry";
 import { lookupDirectory, normIdentifier, syncDirectoryUser } from "../../tenancy/directory";
 import { platformAudit } from "../../tenancy/audit";
+import { linkPersons } from "../../tenancy/personLinks";
 import logger from "../../utils/logger";
+import bcrypt from "bcryptjs";
+import { tempPassword } from "./tenantAdmins";
+import { sendMail } from "./notify";
 
 export interface PersonElsewhere {
   tid: number;
@@ -171,8 +177,18 @@ export interface CopyInput {
   ip?: string | null;
 }
 
+export interface CopyResult {
+  userId: number;
+  username: string;
+  roles: string[];
+  /** The one-time password was e-mailed to the person. */
+  emailed: boolean;
+  /** Platform side only, shown once: the copy's one-time password. Never returned to a school. */
+  tempPassword?: string;
+}
+
 /** Copy a person's account from one school into another, with roles of the target. */
-export async function copyPersonInto(input: CopyInput): Promise<{ userId: number; username: string; roles: string[] }> {
+export async function copyPersonInto(input: CopyInput): Promise<CopyResult> {
   const { sourceTid, sourceUserId, targetTid, via } = input;
   if (sourceTid === targetTid) throw new ValidationError("This person is already in this school");
   const roleIds = Array.from(new Set((input.roleIds ?? []).map(Number).filter((n) => Number.isSafeInteger(n) && n > 0)));
@@ -185,7 +201,6 @@ export async function copyPersonInto(input: CopyInput): Promise<{ userId: number
   const email = src.email ? String(src.email).toLowerCase() : null;
   if (!email) throw new ConflictError("This person has no e-mail, so they can't sign in to a second school");
   if (await emailInTarget(target.tid, email)) throw new ConflictError(`${email} already has an account in ${target.name}`);
-  const cred = await one(source.tid, "SELECT password_hash, force_password_change, google_id FROM AuthCredential WHERE user_id = ? LIMIT 1", [sourceUserId]);
 
   // Roles: of the target, active, never platform-only; SUPER_ADMIN only from a school's own admins.
   const allowed = await assignableRoles(target.tid, { includeSuperAdmin: via === "school" });
@@ -196,6 +211,7 @@ export async function copyPersonInto(input: CopyInput): Promise<{ userId: number
   const firstType = roleNames[0].toUpperCase();
   const userType = VALID_TYPES.includes(firstType) ? firstType : src.user_type && VALID_TYPES.includes(String(src.user_type)) && src.user_type !== "STUDENT" ? String(src.user_type) : "STAFF";
 
+  const pw = tempPassword();
   const created = await runWithTenant(target, async () => {
     const { checkPeopleLimit, PackageLimitError } = await import("./featureGate");
     const limit = await checkPeopleLimit(userType);
@@ -213,15 +229,10 @@ export async function copyPersonInto(input: CopyInput): Promise<{ userId: number
       "INSERT INTO UserProfile (user_id, first_name, last_name, gender, date_of_birth, address, user_type, registration_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [uid, src.first_name ?? null, src.last_name ?? null, src.gender ?? null, src.date_of_birth ?? null, src.address ?? null, userType, regNo],
     );
-    if (cred?.password_hash) {
-      // Same password in both schools. google_id is unique per school database only.
-      await pool.query("INSERT INTO AuthCredential (user_id, password_hash, force_password_change, google_id) VALUES (?, ?, ?, ?)", [
-        uid,
-        cred.password_hash,
-        Number(cred.force_password_change) === 1 ? 1 : 0,
-        cred.google_id ?? null,
-      ]);
-    }
+    // Own credentials, never the source's (MIS-ISO-2): an equal hash would let one
+    // school's copy vouch for the other in switch-school, and google_id is the
+    // source school's binding.
+    await pool.query("INSERT INTO AuthCredential (user_id, password_hash, force_password_change) VALUES (?, ?, 1)", [uid, await bcrypt.hash(pw, 12)]);
     for (const rid of roleIds) await pool.query("INSERT INTO UserRole (user_id, role_id) VALUES (?, ?)", [uid, rid]);
     const { applyPlacementChange } = await import("../access/ruleEngine");
     await applyPlacementChange([uid], via === "school" ? input.actorUserId : null);
@@ -233,6 +244,15 @@ export async function copyPersonInto(input: CopyInput): Promise<{ userId: number
   });
 
   await syncDirectoryUser(created.uid, target.tid).catch(() => undefined);
+  await linkPersons({ tid: source.tid, uid: sourceUserId }, { tid: target.tid, uid: created.uid }, "copy");
+  const name = [src.first_name, src.last_name].filter(Boolean).join(" ") || created.username;
+  const emailed = await sendMail(
+    email,
+    `Your ${target.name} account`,
+    `Hello ${name},\n\nYou have been added to ${target.name}${via === "school" ? ` (from your account at ${source.name})` : ""}.\n\nSchool address: ${target.slug}\nUsername: ${created.username} (or this e-mail)\nOne-time password: ${pw}\n\nThis account has its own password: you will choose it when you first sign in to ${target.name}. Your password at ${source.name} does not change.`,
+    `/login?tenant=${encodeURIComponent(target.slug)}`,
+    "Sign in",
+  ).catch(() => false);
   await platformAudit({
     action: via === "platform" ? "platform.tenant.person_assign" : "tenant.person_import",
     targetTid: target.tid,
@@ -240,7 +260,14 @@ export async function copyPersonInto(input: CopyInput): Promise<{ userId: number
     ip: input.ip ?? null,
     payload: { fromTid: source.tid, fromUserId: sourceUserId, userId: created.uid, email, roles: roleNames, reason: input.reason ?? null },
   });
-  return { userId: created.uid, username: created.username, roles: roleNames };
+  return {
+    userId: created.uid,
+    username: created.username,
+    roles: roleNames,
+    emailed: !!emailed,
+    // Platform staff see it once (as for a new administrator); a school's admin never does.
+    ...(via === "platform" ? { tempPassword: pw } : {}),
+  };
 }
 
 /** School side: copy by the exact identifier the admin looked up (re-checked here). */
