@@ -39,13 +39,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   // Sync with user preference when user data loads
   useEffect(() => {
     // If logged in and user has a preferred theme, it takes priority
-    if (isAuthenticated && user?.user.preferred_theme) {
-      if (user.user.preferred_theme !== theme) {
-        setTheme(user.user.preferred_theme);
-        localStorage.setItem("theme", user.user.preferred_theme);
+    const preferred = user?.user?.preferred_theme;
+    if (isAuthenticated && preferred) {
+      if (preferred !== theme) {
+        setTheme(preferred);
+        localStorage.setItem("theme", preferred);
       }
     }
-  }, [user?.user.preferred_theme, isAuthenticated]);
+  }, [user?.user?.preferred_theme, isAuthenticated]);
 
   // Apply theme to document root whenever theme state changes
   useEffect(() => {
