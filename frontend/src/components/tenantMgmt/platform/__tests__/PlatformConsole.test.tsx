@@ -23,6 +23,10 @@ const api = vi.hoisted(() => ({
   savePackage: vi.fn(),
   savePackageEntitlements: vi.fn(),
   slugAvailable: vi.fn(),
+  admins: vi.fn(),
+  createAdmin: vi.fn(),
+  resetAdminPassword: vi.fn(),
+  removeAdmin: vi.fn(),
 }));
 
 vi.mock("../../../../api/tenantMgmt", async (orig) => {
@@ -378,12 +382,12 @@ describe("billing", () => {
 
 // ---------------------------------------------------------------------------
 
-const tenantDetail = (over: Partial<{ isPrimary: boolean; allowed: string[] }> = {}) => ({
+const tenantDetail = (over: Partial<{ isPrimary: boolean; allowed: string[]; status: string }> = {}) => ({
   tenant: {
     tid: 5,
     slug: "ghacademy",
     name: "Green Hills Academy",
-    status: "ARCHIVED",
+    status: over.status ?? "ARCHIVED",
     isPrimary: over.isPrimary ?? false,
     pkg: "gold",
     students: 400,
@@ -440,6 +444,80 @@ describe("school lifecycle", () => {
     expect(within(bar).queryByRole("button", { name: /Suspend/ })).toBeNull();
     expect(within(bar).queryByRole("button", { name: /Archive/ })).toBeNull();
     expect(within(bar).getByRole("button", { name: /grace/i })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+const ADMIN = (over: Record<string, unknown> = {}) => ({
+  userId: 7,
+  name: "Jane Owner",
+  username: "jane",
+  email: "jane@school.test",
+  phone: null,
+  status: "ACTIVE",
+  kind: "OWNER",
+  roles: ["SUPER_ADMIN", "School Owner"],
+  mustChangePassword: false,
+  lockedUntil: null,
+  lastLoginAt: null,
+  createdAt: "2026-11-20T00:00:00Z",
+  ...over,
+});
+
+describe("school administrators", () => {
+  it("lists the admins; the last owner can't be removed", async () => {
+    api.tenant.mockResolvedValue(tenantDetail({ status: "ACTIVE" }));
+    api.admins.mockResolvedValue([ADMIN()]);
+    const user = userEvent.setup();
+    inProvider(<SchoolDetailPage />, "/platform/schools/:tid", "/platform/schools/5");
+    await user.click(await screen.findByRole("tab", { name: /Admins/ }));
+    const list = await screen.findByRole("list", { name: "Administrators" });
+    expect(within(list).getByText("Jane Owner")).toBeInTheDocument();
+    expect(within(list).getByText("Owner")).toBeInTheDocument();
+    expect(within(list).getByText("Never signed in")).toBeInTheDocument();
+    expect(within(list).getByRole("button", { name: "The last owner can't be removed" })).toBeDisabled();
+    expect(api.admins).toHaveBeenCalledWith(5);
+  });
+
+  it("adds an administrator and shows the one-time password once", async () => {
+    api.tenant.mockResolvedValue(tenantDetail({ status: "ACTIVE" }));
+    api.admins.mockResolvedValue([ADMIN()]);
+    api.createAdmin.mockResolvedValue({
+      admin: ADMIN({ userId: 9, name: "Ada Admin", username: "ada", email: "ada@school.test", kind: "ADMIN", mustChangePassword: true }),
+      created: true,
+      tempPassword: "Abc234defGhj",
+      emailed: false,
+    });
+    const user = userEvent.setup();
+    inProvider(<SchoolDetailPage />, "/platform/schools/:tid", "/platform/schools/5");
+    await user.click(await screen.findByRole("tab", { name: /Admins/ }));
+    await user.click(await screen.findByRole("button", { name: /Add administrator/ }));
+    const dialog = await screen.findByRole("dialog");
+    const add = within(dialog).getByRole("button", { name: "Add" });
+    expect(add).toBeDisabled();
+    await user.type(within(dialog).getByLabelText("First name"), "Ada");
+    await user.type(within(dialog).getByLabelText("Last name"), "Admin");
+    await user.type(within(dialog).getByLabelText("E-mail"), "ada@school.test");
+    await user.type(within(dialog).getByLabelText("Reason"), "Second admin requested");
+    await user.click(add);
+    await waitFor(() =>
+      expect(api.createAdmin).toHaveBeenCalledWith(5, expect.objectContaining({ firstName: "Ada", lastName: "Admin", email: "ada@school.test", kind: "ADMIN" })),
+    );
+    expect(await screen.findByText("Abc234defGhj")).toBeInTheDocument();
+    expect(screen.getByText(/could not be sent/)).toBeInTheDocument();
+  });
+
+  it("is read-only without the lifecycle capability", async () => {
+    api.overview.mockResolvedValue(overview(["PLATFORM_TENANTS_VIEW"]));
+    api.tenant.mockResolvedValue(tenantDetail({ status: "ACTIVE" }));
+    api.admins.mockResolvedValue([ADMIN()]);
+    const user = userEvent.setup();
+    inProvider(<SchoolDetailPage />, "/platform/schools/:tid", "/platform/schools/5");
+    await user.click(await screen.findByRole("tab", { name: /Admins/ }));
+    await screen.findByText("Jane Owner");
+    expect(screen.queryByRole("button", { name: /Add administrator/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Reset/ })).toBeNull();
   });
 });
 

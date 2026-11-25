@@ -24,6 +24,7 @@ import {
 } from "../services/tenantMgmt/lifecycle";
 import { retryRun, runForTenant, serializeRun } from "../services/tenantMgmt/provisioning";
 import { listActiveSessions, openSession } from "../services/tenantMgmt/support";
+import { createTenantAdmin, listTenantAdmins, removeTenantAdmin, resetTenantAdminPassword } from "../services/tenantMgmt/tenantAdmins";
 
 /**
  * Tenant directory, lifecycle, provisioning and support access of the primary
@@ -31,7 +32,7 @@ import { listActiveSessions, openSession } from "../services/tenantMgmt/support"
  * contract: `platformApi` in frontend/src/api/tenantMgmt.ts.
  *
  * Aggregates only (§6.9 / §10): counts, sizes, statuses -- never a school's
- * people or records. Every route: primary tenant + a PLATFORM_* capability.
+ * people or records, except its administrators (tenantAdmins.ts). Every route: primary tenant + a PLATFORM_* capability.
  */
 const router = express.Router();
 
@@ -304,6 +305,34 @@ router.put(
     await setTenantApp(tid, idParam(req.params.systemId), req.body?.status, platformActor(req));
     ok(res, await detailFor(req, tid));
   }),
+);
+
+// --- administrators (the one list of people the console shows) -------------
+
+router.get(
+  "/tenants/:id/admins",
+  ...VIEW,
+  wrap(async (req, res) => ok(res, await listTenantAdmins(idParam(req.params.id)))),
+);
+
+router.post(
+  "/tenants/:id/admins",
+  ...LIFECYCLE,
+  wrap(async (req, res) => ok(res, await createTenantAdmin(idParam(req.params.id), req.body ?? {}, platformActor(req)))),
+);
+
+router.post(
+  "/tenants/:id/admins/:userId/reset-password",
+  ...LIFECYCLE,
+  wrap(async (req, res) =>
+    ok(res, await resetTenantAdminPassword(idParam(req.params.id), idParam(req.params.userId), req.body?.reason, platformActor(req))),
+  ),
+);
+
+router.delete(
+  "/tenants/:id/admins/:userId",
+  ...LIFECYCLE,
+  wrap(async (req, res) => ok(res, await removeTenantAdmin(idParam(req.params.id), idParam(req.params.userId), req.body?.reason, platformActor(req)))),
 );
 
 // --- provisioning -----------------------------------------------------------
