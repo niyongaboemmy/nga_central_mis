@@ -104,10 +104,15 @@ describe("SwitchSchoolDialog", () => {
     const user = userEvent.setup();
     render(<SwitchSchoolDialog from={A} to={B} next="/home" onClose={vi.fn()} />);
     expect(screen.queryByLabelText(/Your password for/)).toBeNull();
-    await user.click(screen.getByRole("button", { name: /Switch to Green Hills School/ }));
+    // Both schools are shown in full, labelled, with the target emphasised.
+    expect(screen.getByText("Currently in")).toBeInTheDocument();
+    expect(screen.getByText("Switching to")).toBeInTheDocument();
+    expect(screen.getByText("New Generation Academy")).toBeInTheDocument();
+    expect(screen.getByText("Green Hills School")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Switch school/ }));
     const pw = await screen.findByLabelText("Your password for Green Hills School");
     await user.type(pw, "Other-pw1");
-    await user.click(screen.getByRole("button", { name: /Switch to Green Hills School/ }));
+    await user.click(screen.getByRole("button", { name: /^Switch school/ }));
     await waitFor(() => expect(http.post).toHaveBeenLastCalledWith("/auth/switch-school", { tenant: "ghs", password: "Other-pw1" }));
     await waitFor(() => expect(assign).toHaveBeenCalledWith("/home"));
     expect(toast).toHaveBeenCalledWith("Switched to Green Hills School", "success");
@@ -117,7 +122,7 @@ describe("SwitchSchoolDialog", () => {
     http.post.mockRejectedValue({ response: { data: { code: "WRONG_PASSWORD", message: "That isn't your password for Green Hills School." } } });
     const user = userEvent.setup();
     render(<SwitchSchoolDialog from={A} to={B} onClose={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: /Switch to Green Hills School/ }));
+    await user.click(screen.getByRole("button", { name: /^Switch school/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("That isn't your password");
     expect(toast).toHaveBeenCalledWith(expect.stringContaining("isn't your password"), "error");
   });
