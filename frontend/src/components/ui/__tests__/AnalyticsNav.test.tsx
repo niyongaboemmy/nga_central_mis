@@ -49,19 +49,19 @@ describe("Usage & Monitoring sidebar group", () => {
     const group = screen.getByRole("button", { name: /Usage & Monitoring/ });
     expect(group).toHaveAttribute("aria-expanded", "true");
     const list = screen.getByRole("list", { name: "Usage & Monitoring" });
-    expect(within(list).getByRole("button", { name: /Realtime/ })).toHaveAttribute("aria-current", "page");
-    expect(within(list).getByRole("button", { name: /Overview/ })).not.toHaveAttribute("aria-current");
+    expect(within(list).getByRole("link", { name: /Realtime/ })).toHaveAttribute("aria-current", "page");
+    expect(within(list).getByRole("link", { name: /Overview/ })).not.toHaveAttribute("aria-current");
     // Person-level and admin pages need more than view rights.
-    expect(within(list).queryByRole("button", { name: /Visitors/ })).toBeNull();
-    expect(within(list).queryByRole("button", { name: /Watchlist/ })).toBeNull();
-    expect(within(list).queryByRole("button", { name: /Settings/ })).toBeNull();
+    expect(within(list).queryByRole("link", { name: /Visitors/ })).toBeNull();
+    expect(within(list).queryByRole("link", { name: /Watchlist/ })).toBeNull();
+    expect(within(list).queryByRole("link", { name: /Settings/ })).toBeNull();
   });
 
   it("shows every page to a platform owner and toggles closed", async () => {
     caps = ["ANALYTICS_VIEW", "ANALYTICS_LIVE_VIEW", "ANALYTICS_USER_VIEW", "ANALYTICS_USER_CONTROL", "ANALYTICS_CONFIGURE"];
     renderSidebar("/analytics");
     const list = screen.getByRole("list", { name: "Usage & Monitoring" });
-    expect(within(list).getAllByRole("button")).toHaveLength(13);
+    expect(within(list).getAllByRole("link")).toHaveLength(13);
     await userEvent.click(screen.getByRole("button", { name: /Usage & Monitoring/ }));
     expect(screen.getByRole("button", { name: /Usage & Monitoring/ })).toHaveAttribute("aria-expanded", "false");
   });
@@ -72,7 +72,7 @@ describe("Audit log in the group", () => {
     legacyPerms = ["VIEW_ALL_LOGS_HISTORY"];
     renderSidebar("/analytics/audit-log");
     const list = screen.getByRole("list", { name: "Usage & Monitoring" });
-    const items = within(list).getAllByRole("button");
+    const items = within(list).getAllByRole("link");
     expect(items).toHaveLength(1);
     expect(items[0]).toHaveTextContent("Audit log");
     expect(items[0]).toHaveAttribute("aria-current", "page");
