@@ -55,6 +55,43 @@ export async function overview(callerCaps: string[]) {
     [fourMonthsAgo],
   );
 
+  // Money actually received per calendar month (UTC), last 6 months, same rule as
+  // revenueThisTerm (confirmed, not waived) so the dashboard tile and chart agree.
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (5 - i), 1));
+    return d.toISOString().slice(0, 7);
+  });
+  const collectedMonthly = months.map((month) => ({ month, amount: 0 }));
+  const [paidRows] = await pool.query<RowDataPacket[]>(
+    "SELECT DATE_FORMAT(reviewed_at, '%Y-%m') AS m, COALESCE(SUM(amount), 0) AS total FROM Payment WHERE status = 'CONFIRMED' AND is_waiver = 0 AND reviewed_at >= ? GROUP BY m",
+    [new Date(`${months[0]}-01T00:00:00Z`)],
+  );
+  for (const r of paidRows) {
+    const slot = collectedMonthly.find((c) => c.month === String(r.m));
+    if (slot) slot.amount = Number(r.total) || 0;
+  }
+
+  // Open invoices, computed by the database (the console's invoice list stops at 500 rows).
+  // Overdue = marked OVERDUE, or ISSUED and past its due date; ageing counts days past due.
+  const [[open]] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total,
+            SUM(CASE WHEN status = 'OVERDUE' OR (due_at IS NOT NULL AND due_at < ?) THEN 1 ELSE 0 END) AS overdue,
+            COALESCE(SUM(CASE WHEN status = 'OVERDUE' OR (due_at IS NOT NULL AND due_at < ?) THEN amount ELSE 0 END), 0) AS overdueTotal,
+            SUM(CASE WHEN status <> 'OVERDUE' AND (due_at IS NULL OR due_at >= ?) THEN 1 ELSE 0 END) AS notDue,
+            SUM(CASE WHEN (status = 'OVERDUE' OR due_at < ?) AND (due_at IS NULL OR DATEDIFF(?, due_at) <= 30) THEN 1 ELSE 0 END) AS d30,
+            SUM(CASE WHEN due_at IS NOT NULL AND DATEDIFF(?, due_at) BETWEEN 31 AND 60 THEN 1 ELSE 0 END) AS d60,
+            SUM(CASE WHEN due_at IS NOT NULL AND DATEDIFF(?, due_at) > 60 THEN 1 ELSE 0 END) AS d61
+       FROM Invoice WHERE status IN ('ISSUED','OVERDUE')`,
+    [now, now, now, now, now, now, now],
+  );
+  const billing = {
+    openInvoices: Number(open.n) || 0,
+    outstanding: Number(open.total) || 0,
+    overdueInvoices: Number(open.overdue) || 0,
+    overdueAmount: Number(open.overdueTotal) || 0,
+    ageing: { notDue: Number(open.notDue) || 0, d30: Number(open.d30) || 0, d60: Number(open.d60) || 0, d61: Number(open.d61) || 0 },
+  };
+
   const first = weekStart(new Date(now.getTime() - 11 * 7 * DAY_MS));
   const trend = Array.from({ length: 12 }, (_, i) => ({ week: ymd(new Date(first.getTime() + i * 7 * DAY_MS)), submitted: 0, activated: 0 }));
   const bucket = (d: any) => {
@@ -106,6 +143,10 @@ export async function overview(callerCaps: string[]) {
     tenants,
     expiringIn30Days: Number(expiring.n),
     revenueThisTerm: Number(revenue.total),
+    /** revenueThisTerm covers confirmed payments of the last N months */
+    revenueWindowMonths: 4,
+    collectedMonthly,
+    billing,
     currency: "RWF",
     trend,
     caps: callerCaps,

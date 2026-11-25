@@ -25,11 +25,17 @@ const SORTS: Record<Sort, (a: TenantListItem, b: TenantListItem, pkg: (c: string
 };
 
 /** List rows carry raw counts; the package gives the limits for the bars. */
+/**
+ * A school's usage against its limits. Uses the school's effective limits from the API
+ * (package + overrides, nothing for the primary school) and falls back to the package's.
+ */
 export const listMeters = (t: TenantListItem, pkg: PackageInfo | undefined): UsageMeter[] => {
-  const lim = (k: string) => {
+  const fromPkg = (k: string) => {
     const e = pkg?.entitlements.find((x) => x.key === k);
     return e ? e.value : null;
   };
+  const eff: Record<string, number | null> | null = t.limits ? { "limit.students": t.limits.students, "limit.staff": t.limits.staff, "limit.storage_gb": t.limits.storageGb } : null;
+  const lim = (k: string) => (eff ? eff[k] : fromPkg(k));
   const mk = (key: string, label: string, unit: string, used: number, limit: number | null): UsageMeter => ({ key, label, unit, used, limit, ratio: limit ? used / limit : null });
   const gb = lim("limit.storage_gb");
   return [

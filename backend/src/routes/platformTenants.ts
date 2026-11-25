@@ -9,7 +9,7 @@ import { APP_KEYS, PLATFORM_CAPS } from "../services/tenantMgmt/catalog";
 import { holds, platformActor, requirePlatform } from "../services/tenantMgmt/guards";
 import { resolveEntitlements } from "../services/tenantMgmt/entitlements";
 import { currentSubscriptionRow, dateOnly, serializeSubscription } from "../services/tenantMgmt/subscription";
-import { tenantUsage } from "../services/tenantMgmt/usage";
+import { liveUsage, tenantUsage } from "../services/tenantMgmt/usage";
 import {
   addOverride,
   allowedActions,
@@ -86,7 +86,7 @@ async function listItems(where = "", params: unknown[] = []) {
       ORDER BY t.is_primary DESC, t.tenant_id`,
     params,
   );
-  return rows.map((r) => ({
+  const items = rows.map((r) => ({
     tid: Number(r.tenant_id),
     slug: String(r.slug),
     name: String(r.display_name),
@@ -101,8 +101,38 @@ async function listItems(where = "", params: unknown[] = []) {
     graceUntil: iso(r.grace_until),
     lastActivityAt: r.last_active_day ? new Date(`${dateOnly(r.last_active_day)}T00:00:00Z`).toISOString() : null,
     createdAt: iso(r.created_at)!,
+    usageLive: false,
+    usageAt: null as string | null,
+    /** the school's effective limits (package + overrides; null = unlimited) */
+    limits: null as null | { students: number | null; staff: number | null; storageGb: number | null },
     _row: r,
   }));
+  // Current numbers from each school's own database (cached a minute), not the nightly
+  // snapshot that can be a day old or missing. A school whose database can't answer
+  // within 5 s keeps its snapshot values (usageLive false).
+  await Promise.all(
+    items.map(async (it) => {
+      if (it.status === "ARCHIVED") return;
+      try {
+        const ent = await resolveEntitlements(it.tid);
+        const lim = (k: string) => (ent.unrestricted ? null : (ent.limits[k] ?? null));
+        it.limits = { students: lim("limit.students"), staff: lim("limit.staff"), storageGb: lim("limit.storage_gb") };
+      } catch {
+        /* limits unknown: the console falls back to the package */
+      }
+      if (!it.isPrimary && !it._row.mis_db_name) return;
+      const live = await Promise.race([liveUsage(it.tid).catch(() => null), new Promise<null>((res) => setTimeout(() => res(null), 5000).unref?.())]);
+      if (!live) return;
+      it.students = live.students;
+      it.staff = live.staff;
+      it.storageMb = live.storageMb;
+      it.activeUsers7d = live.activeUsers7d;
+      it.lastActivityAt = live.lastActivityAt ?? it.lastActivityAt;
+      it.usageLive = true;
+      it.usageAt = live.at;
+    }),
+  );
+  return items;
 }
 
 const publicItem = ({ _row, ...item }: any) => item;

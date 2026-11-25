@@ -62,11 +62,113 @@ export async function measureStorageMb(tid: number): Promise<number> {
   return Math.round((docs + assets) / (1024 * 1024));
 }
 
-/** Distinct people who signed in during the last `days` days (AuthEvent). */
+/**
+ * Distinct people active during the last `days` days: anyone who used an app (an
+ * AnalyticsSession with activity in the window, bots excluded) or signed in (AuthEvent).
+ * Sign-ins alone undercount: a person who stays signed in for a week never signs in again.
+ * A tenant DB without the analytics tables falls back to sign-ins.
+ */
 export async function activeUsers(tid: number, days = 7, now = new Date()): Promise<number> {
   const since = new Date(now.getTime() - days * 86_400_000);
-  return scalar(tid, "SELECT COUNT(DISTINCT user_id) AS n FROM AuthEvent WHERE outcome = 'success' AND user_id IS NOT NULL AND occurred_at >= ?", [since]);
+  try {
+    const [rows] = await poolFor(tid).query<RowDataPacket[]>(
+      `SELECT COUNT(DISTINCT user_id) AS n FROM (
+         SELECT user_id FROM AnalyticsSession WHERE user_id IS NOT NULL AND is_bot = 0 AND last_activity_at >= ?
+         UNION
+         SELECT user_id FROM AuthEvent WHERE outcome = 'success' AND user_id IS NOT NULL AND occurred_at >= ?
+       ) x`,
+      [since, since],
+    );
+    return Number(rows[0]?.n ?? 0) || 0;
+  } catch {
+    return scalar(tid, "SELECT COUNT(DISTINCT user_id) AS n FROM AuthEvent WHERE outcome = 'success' AND user_id IS NOT NULL AND occurred_at >= ?", [since]);
+  }
 }
+
+/** Distinct active people per calendar day (UTC) for the last `days` days, same rule as activeUsers. */
+async function activePerDay(tid: number, days: number, now: Date): Promise<Map<string, number>> {
+  const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (days - 1) * 86_400_000);
+  const run = async (q: string, params: unknown[]) => {
+    const [rows] = await poolFor(tid).query<RowDataPacket[]>(q, params);
+    return new Map(rows.map((r) => [String(r.d), Number(r.n) || 0]));
+  };
+  try {
+    return await run(
+      `SELECT d, COUNT(DISTINCT user_id) AS n FROM (
+         SELECT DATE_FORMAT(started_at, '%Y-%m-%d') AS d, user_id FROM AnalyticsSession
+          WHERE user_id IS NOT NULL AND is_bot = 0 AND last_activity_at >= ?
+         UNION
+         SELECT DATE_FORMAT(last_activity_at, '%Y-%m-%d') AS d, user_id FROM AnalyticsSession
+          WHERE user_id IS NOT NULL AND is_bot = 0 AND last_activity_at >= ?
+         UNION
+         SELECT DATE_FORMAT(occurred_at, '%Y-%m-%d') AS d, user_id FROM AuthEvent
+          WHERE outcome = 'success' AND user_id IS NOT NULL AND occurred_at >= ?
+       ) x GROUP BY d`,
+      [since, since, since],
+    );
+  } catch {
+    try {
+      return await run(
+        `SELECT DATE_FORMAT(occurred_at, '%Y-%m-%d') AS d, COUNT(DISTINCT user_id) AS n
+           FROM AuthEvent WHERE outcome = 'success' AND user_id IS NOT NULL AND occurred_at >= ? GROUP BY d`,
+        [since],
+      );
+    } catch {
+      return new Map();
+    }
+  }
+}
+
+export interface LiveUsage {
+  students: number;
+  staff: number;
+  storageMb: number;
+  activeUsers7d: number;
+  /** latest app activity or sign-in of anyone in the school */
+  lastActivityAt: string | null;
+  at: string;
+}
+
+async function lastActivity(tid: number): Promise<string | null> {
+  const one = async (q: string) => {
+    try {
+      const [rows] = await poolFor(tid).query<RowDataPacket[]>(q);
+      const v = rows[0]?.t;
+      return v ? new Date(v) : null;
+    } catch {
+      return null;
+    }
+  };
+  const [a, b] = await Promise.all([
+    one("SELECT MAX(last_activity_at) AS t FROM AnalyticsSession WHERE user_id IS NOT NULL AND is_bot = 0"),
+    one("SELECT MAX(occurred_at) AS t FROM AuthEvent WHERE outcome = 'success' AND user_id IS NOT NULL"),
+  ]);
+  const best = [a, b].filter((d): d is Date => !!d && !Number.isNaN(d.getTime())).sort((x, y) => y.getTime() - x.getTime())[0];
+  return best ? best.toISOString() : null;
+}
+
+const LIVE_TTL_MS = 60_000;
+const liveCache = new Map<number, { at: number; value: Promise<LiveUsage> }>();
+
+/**
+ * Current usage of a school, read from its own database (cached for a minute). Lists and
+ * dashboards use this instead of the nightly TenantUsageDaily row, which can be up to a day
+ * old and is missing for a school the job has not reached yet.
+ */
+export function liveUsage(tid: number, now = new Date()): Promise<LiveUsage> {
+  const hit = liveCache.get(tid);
+  if (hit && Date.now() - hit.at < LIVE_TTL_MS) return hit.value;
+  const value = (async () => {
+    const [{ students, staff }, storageMb, active, last] = await Promise.all([liveCounts(tid), measureStorageMb(tid), activeUsers(tid, 7, now), lastActivity(tid)]);
+    return { students, staff, storageMb, activeUsers7d: active, lastActivityAt: last, at: now.toISOString() };
+  })();
+  liveCache.set(tid, { at: Date.now(), value });
+  value.catch(() => liveCache.delete(tid));
+  return value;
+}
+
+/** Drop the cached live usage (tests; after a big import). */
+export const forgetLiveUsage = (tid?: number) => (tid === undefined ? liveCache.clear() : liveCache.delete(tid));
 
 /** The latest TenantUsageDaily row of a tenant (or null). */
 export async function latestDaily(tid: number): Promise<RowDataPacket | null> {
@@ -159,30 +261,49 @@ export async function usageMeters(tid: number, ent?: Entitlements): Promise<Usag
 /** Meters at 90 % or more (banner warnings). */
 export const nearLimit = (meters: UsageMeter[]) => meters.filter((m) => m.ratio !== null && m.limit !== null && m.limit > 0 && m.ratio >= 0.9);
 
-/** `TenantUsage`: meters + the last 30 days of TenantUsageDaily. */
-export async function tenantUsage(tid: number, ent?: Entitlements): Promise<TenantUsage> {
+/**
+ * `TenantUsage`: meters + the last 30 days, one entry per calendar day (oldest first):
+ * people active that day (activePerDay), that day's AI requests and code runs from the
+ * usage counters (the full day, not the moment the nightly snapshot ran), and storage
+ * from the snapshot of that day when there is one (carried forward otherwise).
+ */
+export async function tenantUsage(tid: number, ent?: Entitlements, now = new Date()): Promise<TenantUsage> {
+  const DAYS = 30;
   const meters = await usageMeters(tid, ent);
-  let rows: RowDataPacket[] = [];
+  const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - (DAYS - 1) * 86_400_000);
+  const days = Array.from({ length: DAYS }, (_, i) => dayOf(new Date(first.getTime() + i * 86_400_000)));
+  const active = await activePerDay(tid, DAYS, now);
+  const counters = new Map<string, number>();
   try {
-    [rows] = await controlPool().query<RowDataPacket[]>(
-      "SELECT day, active_users, ai_requests, code_runs, storage_mb FROM TenantUsageDaily WHERE tenant_id = ? ORDER BY day DESC LIMIT 30",
-      [tid],
+    const [rows] = await controlPool().query<RowDataPacket[]>(
+      "SELECT ent_key, period, used FROM TenantUsageCounter WHERE tenant_id = ? AND ent_key IN ('limit.ai_requests_day','limit.code_runs_day') AND period >= ?",
+      [tid, days[0]],
     );
+    for (const r of rows) counters.set(`${r.ent_key}|${String(r.period)}`, Number(r.used) || 0);
   } catch {
-    rows = [];
+    /* no counters table: zeros */
   }
-  return {
-    meters,
-    daily: rows
-      .map((r) => ({
-        day: dateStr(r.day),
-        activeUsers: Number(r.active_users),
-        aiRequests: Number(r.ai_requests),
-        codeRuns: Number(r.code_runs),
-        storageMb: Number(r.storage_mb),
-      }))
-      .reverse(),
-  };
+  const storage = new Map<string, number>();
+  try {
+    const [rows] = await controlPool().query<RowDataPacket[]>("SELECT day, storage_mb FROM TenantUsageDaily WHERE tenant_id = ? AND day >= ?", [tid, days[0]]);
+    for (const r of rows) storage.set(dateStr(r.day), Number(r.storage_mb) || 0);
+  } catch {
+    /* no snapshots */
+  }
+  let lastStorage = Number((await latestDaily(tid))?.storage_mb ?? 0);
+  const firstKnown = days.find((d) => storage.has(d));
+  if (firstKnown) lastStorage = storage.get(firstKnown)!;
+  const daily = days.map((day) => {
+    if (storage.has(day)) lastStorage = storage.get(day)!;
+    return {
+      day,
+      activeUsers: active.get(day) ?? 0,
+      aiRequests: counters.get(`limit.ai_requests_day|${day}`) ?? 0,
+      codeRuns: counters.get(`limit.code_runs_day|${day}`) ?? 0,
+      storageMb: lastStorage,
+    };
+  });
+  return { meters, daily };
 }
 
 /** Is tenant `tid` known (and its DB name resolvable by poolFor)? */

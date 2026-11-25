@@ -363,7 +363,13 @@ export interface PlatformOverview {
   provisioningFailures: number;
   tenants: Record<TenantLifecycle, number>;
   expiringIn30Days: number;
+  /** confirmed, non-waived payments over the last `revenueWindowMonths` months */
   revenueThisTerm: number;
+  revenueWindowMonths?: number;
+  /** money received per calendar month (UTC), oldest first, same rule as revenueThisTerm */
+  collectedMonthly?: Array<{ month: string; amount: number }>;
+  /** open invoices, computed by the database (not limited by the invoice list) */
+  billing?: { openInvoices: number; outstanding: number; overdueInvoices: number; overdueAmount: number; ageing: { notDue: number; d30: number; d60: number; d61: number } };
   currency: string;
   /** last 12 weeks: submitted applications and activated schools */
   trend: Array<{ week: string; submitted: number; activated: number }>;
@@ -453,6 +459,11 @@ export interface TenantListItem {
   graceUntil: string | null;
   lastActivityAt: string | null;
   createdAt: string;
+  /** true when students/staff/storage/active come straight from the school's database; false = last night's snapshot */
+  usageLive?: boolean;
+  usageAt?: string | null;
+  /** effective limits: package + overrides; null = unlimited (absent on older APIs) */
+  limits?: { students: number | null; staff: number | null; storageGb: number | null } | null;
 }
 
 /** A school's administrator (GET /platform/tenants/:tid/admins). */

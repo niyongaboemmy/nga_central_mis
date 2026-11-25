@@ -160,7 +160,7 @@ export const StatTile: React.FC<{
         <p className="mt-0.5 text-sm font-medium text-gray-600 dark:text-gray-300">{label}</p>
         {hint && <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{hint}</p>}
       </div>
-      {spark && spark.length > 1 && <Sparkline values={spark} label={label} tone={alert ? "red" : tone} />}
+      {spark && spark.length > 1 && spark.some((v) => v > 0) && <Sparkline values={spark} label={label} tone={alert ? "red" : tone} />}
       {onClick && <ChevronRight className="absolute bottom-4 right-4 h-4 w-4 text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-gray-600" aria-hidden />}
     </Tag>
   );

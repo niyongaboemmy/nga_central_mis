@@ -24,11 +24,12 @@ import {
 } from "lucide-react";
 import TenantLogo from "../../brand/TenantLogo";
 import { STEP_ICONS, STEP_LABELS, statusLabel } from "../kit";
-import { TRACKER_STEPS, formatMoney, platformApi, type ApplicationStatus, type Invoice, type PackageInfo, type TenantListItem, type TrackerStep } from "../../../api/tenantMgmt";
+import { TRACKER_STEPS, formatMoney, platformApi, type ApplicationStatus, type PackageInfo, type TenantListItem, type TrackerStep } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
 import { Skeleton, cx, daysUntil, surface, usePlatform } from "./platformShared";
 import { STEP_STATUSES, nextAction } from "./OverviewPage";
 import TenancyHealthCard from "./TenancyHealthCard";
+import { listMeters } from "./SchoolsPage";
 import { BarList, DaysRing, IconTile, Panel, Ring, SegmentBar, StatTile, TONE, TrendChart, limitTone, monthLabel, type BarItem } from "../viz";
 
 /**
@@ -38,20 +39,14 @@ import { BarList, DaysRing, IconTile, Panel, Ring, SegmentBar, StatTile, TONE, T
 
 const age = (days: number) => (days <= 0 ? "today" : days === 1 ? "1 day" : `${days} days`);
 
-/** The most-used share of a school's package limits (students, staff, storage). */
+/** The most-used share of a school's limits (students, staff, storage), from listMeters. */
 function heaviestLimit(t: TenantListItem, pkg: PackageInfo | undefined): { label: string; ratio: number; used: string } | null {
-  if (!pkg) return null;
-  const lim = (key: string) => pkg.entitlements.find((e) => e.key === key)?.value ?? null;
-  const rows: Array<{ label: string; used: number; limit: number | null; fmt: (n: number) => string }> = [
-    { label: "Students", used: t.students, limit: lim("limit.students"), fmt: (n) => n.toLocaleString() },
-    { label: "Staff", used: t.staff, limit: lim("limit.staff"), fmt: (n) => n.toLocaleString() },
-    { label: "Storage", used: t.storageMb, limit: lim("limit.storage_gb") === null ? null : (lim("limit.storage_gb") as number) * 1024, fmt: (n) => `${(n / 1024).toFixed(n >= 10240 ? 0 : 1)} GB` },
-  ];
+  const gb = (mb: number) => `${(mb / 1024).toFixed(mb >= 10240 ? 0 : 1)} GB`;
   let best: { label: string; ratio: number; used: string } | null = null;
-  for (const r of rows) {
-    if (!r.limit) continue;
-    const ratio = r.used / r.limit;
-    if (!best || ratio > best.ratio) best = { label: r.label, ratio, used: `${r.fmt(r.used)} / ${r.fmt(r.limit)}` };
+  for (const m of listMeters(t, pkg)) {
+    if (!m.limit || m.ratio === null) continue;
+    const fmt = m.unit === "MB" ? gb : (n: number) => n.toLocaleString();
+    if (!best || m.ratio > best.ratio) best = { label: m.label, ratio: m.ratio, used: `${fmt(m.used)} / ${fmt(m.limit)}` };
   }
   return best;
 }
@@ -65,22 +60,21 @@ const DashboardPage: React.FC = () => {
   const canBilling = can("invoice", "confirm", "waive");
   const [schools, setSchools] = useState<TenantListItem[] | null>(null);
   const [packages, setPackages] = useState<PackageInfo[] | null>(null);
-  const [paid, setPaid] = useState<Invoice[] | null>(null);
 
   useEffect(() => {
     let live = true;
     if (canSchools) platformApi.tenants().then((r) => live && setSchools(r), () => live && setSchools([]));
     else setSchools([]);
     platformApi.packages().then((r) => live && setPackages(r), () => live && setPackages([]));
-    if (canBilling) platformApi.invoices({ status: "PAID" }).then((r) => live && setPaid(r), () => live && setPaid([]));
-    else setPaid([]);
     return () => {
       live = false;
     };
-  }, [canSchools, canBilling]);
+  }, [canSchools]);
 
   const derived = useMemo(() => {
-    const list = (schools ?? []).filter((t) => !t.isPrimary);
+    // Every school counts, the primary one (NGA) included: the headline "Live schools" number
+    // (overview.tenants) includes it, so the totals beside it must too.
+    const list = schools ?? [];
     const pkgOf = (code: string) => packages?.find((p) => p.code === code);
     const live = list.filter((t) => t.status === "ACTIVE" || t.status === "GRACE");
     const students = live.reduce((n, t) => n + t.students, 0);
@@ -103,23 +97,12 @@ const DashboardPage: React.FC = () => {
       .slice()
       .sort((a, b) => b.activeUsers7d - a.activeUsers7d)
       .slice(0, 6);
-    // collected per month, last 6 months
-    const months = Array.from({ length: 6 }, (_, i) => {
-      const d = new Date();
-      d.setUTCDate(1);
-      d.setUTCMonth(d.getUTCMonth() - (5 - i));
-      return d.toISOString().slice(0, 7);
-    });
-    const byMonth = new Map(months.map((k) => [k, 0]));
-    for (const inv of paid ?? []) {
-      const k = (inv.paidAt ?? inv.issuedAt ?? "").slice(0, 7);
-      if (byMonth.has(k)) byMonth.set(k, (byMonth.get(k) ?? 0) + (Number(inv.amount) || 0));
-    }
-    const revenue = months.map((k) => ({ month: `${k}-01`, collected: byMonth.get(k) ?? 0 }));
-    return { live, students, active7, mix, nearLimits, renewals, busiest, revenue };
-  }, [schools, packages, paid]);
+    const snapshotOnly = live.some((t) => t.usageLive === false);
+    return { live, students, active7, mix, nearLimits, renewals, busiest, snapshotOnly };
+  }, [schools, packages]);
 
   if (!overview) return null;
+  const tenants = overview.tenants;
   const a = overview.applications;
   const n = (s: ApplicationStatus) => a[s] ?? 0;
   const go = (allowed: boolean, to: string) => (allowed ? () => nav(to) : undefined);
@@ -127,30 +110,40 @@ const DashboardPage: React.FC = () => {
   const attention = overview.attention ?? [];
   const waiting = (["SUBMITTED", "UNDER_REVIEW", "APPROVED_AWAITING_PAYMENT", "PAYMENT_SUBMITTED", "PAYMENT_CONFIRMED", "PROVISIONING", "PROVISIONING_FAILED"] as ApplicationStatus[]).reduce((t, s) => t + n(s), 0);
   const drafts = overview.draftInvoices ?? 0;
-  const activatedWeekly = overview.trend.map((w) => w.activated);
+  const liveNow = (tenants.ACTIVE ?? 0) + (tenants.GRACE ?? 0);
+  // live schools at the end of each of the 12 weeks: today's count minus the schools that went live after that week
+  const activations = overview.trend.map((w) => w.activated);
+  const liveWeekly = activations.map((_, i) => Math.max(0, liveNow - activations.slice(i + 1).reduce((t, v) => t + v, 0)));
   const submittedWeekly = overview.trend.map((w) => w.submitted);
   const totals = overview.trend.reduce((t, w) => ({ submitted: t.submitted + w.submitted, activated: t.activated + w.activated }), { submitted: 0, activated: 0 });
   const loadingSchools = canSchools && schools === null;
   const money = (v: number) => formatMoney(v, overview.currency);
-  const tenants = overview.tenants;
+  const collected = (overview.collectedMonthly ?? []).map((c) => ({ month: `${c.month}-01`, collected: c.amount }));
+  const windowMonths = overview.revenueWindowMonths ?? 4;
+  const schoolsTotal = (["ACTIVE", "GRACE", "SUSPENDED", "PENDING"] as const).reduce((t, k) => t + (tenants[k] ?? 0), 0);
+  const archived = tenants.ARCHIVED ?? 0;
 
   return (
     <div className="space-y-5">
       {/* Headline numbers */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Headline numbers">
-        <StatTile icon={School} label="Live schools" value={(tenants.ACTIVE ?? 0) + (tenants.GRACE ?? 0)} hint={`${totals.activated} joined in 12 weeks`} spark={activatedWeekly} onClick={go(canSchools, "/platform/schools?status=ACTIVE")} />
+        <StatTile icon={School} label="Live schools" value={liveNow} hint={`active or in grace · ${totals.activated} joined in 12 weeks`} spark={liveWeekly} onClick={go(canSchools, "/platform/schools?status=ACTIVE")} />
         {loadingSchools ? (
           <Skeleton className="h-full min-h-[9.5rem] !rounded-2xl" />
         ) : (
-          <StatTile icon={GraduationCap} label="Students" value={derived.students} hint="across live schools" onClick={go(canSchools, "/platform/schools")} />
+          <StatTile icon={GraduationCap} label="Students" value={derived.students} hint={`active accounts · ${derived.live.length} live ${derived.live.length === 1 ? "school" : "schools"}`} onClick={go(canSchools, "/platform/schools")} />
         )}
         {loadingSchools ? (
           <Skeleton className="h-full min-h-[9.5rem] !rounded-2xl" />
         ) : (
-          <StatTile icon={Activity} label="Active this week" value={derived.active7} hint="people who signed in" onClick={go(canSchools, "/platform/schools")} />
+          <StatTile icon={Activity} label="Active this week" value={derived.active7} hint="used an app or signed in · last 7 days" onClick={go(canSchools, "/platform/schools?sort=activity")} />
         )}
-        <StatTile icon={CircleDollarSign} label="Revenue · this term" value={overview.revenueThisTerm} format={money} tone="emerald" spark={paid ? derived.revenue.map((r) => r.collected) : undefined} onClick={go(canBilling, "/platform/billing?pane=invoices&status=PAID")} />
+        <StatTile icon={CircleDollarSign} label="Collected" value={overview.revenueThisTerm} format={money} hint={`confirmed payments · last ${windowMonths} months`} tone="emerald" spark={collected.map((c) => c.collected)} onClick={go(canBilling, "/platform/billing?pane=invoices&status=PAID")} />
       </section>
+
+      {derived.snapshotOnly && (
+        <p className="-mt-2 text-xs text-gray-500 dark:text-gray-400">Some schools didn't answer in time: their numbers are from last night's count.</p>
+      )}
 
       {/* Needs you now + platform health */}
       <div className="grid gap-5 lg:grid-cols-3">
@@ -211,7 +204,7 @@ const DashboardPage: React.FC = () => {
           )}
         </Panel>
 
-        <Panel title="Schools" icon={Gauge} aside={`${Object.values(tenants).reduce((s, v) => s + (v ?? 0), 0)} in total`}>
+        <Panel title="Schools" icon={Gauge} aside={`${schoolsTotal} in total${archived ? ` · ${archived} archived` : ""}`}>
           <SegmentBar
             columns={2}
             label="Schools by status"
@@ -260,7 +253,7 @@ const DashboardPage: React.FC = () => {
 
       {/* Application KPIs */}
       <section aria-label="Applications" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile icon={FileStack} label="To review" value={n("SUBMITTED") + n("UNDER_REVIEW")} spark={submittedWeekly} onClick={go(canApps, "/platform/applications?status=SUBMITTED")} />
+        <StatTile icon={FileStack} label="To review" value={n("SUBMITTED") + n("UNDER_REVIEW")} hint="line: applications per week" spark={submittedWeekly} onClick={go(canApps, "/platform/applications?status=SUBMITTED")} />
         <StatTile
           icon={Hourglass}
           label="Awaiting pay"
@@ -400,12 +393,8 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {canBilling && (
-        <Panel title="Collected" icon={CircleDollarSign} aside="paid invoices · last 6 months">
-          {paid === null ? (
-            <Skeleton className="h-48" />
-          ) : (
-            <TrendChart data={derived.revenue} x="month" xFormat={monthLabel} yWidth={48} series={[{ key: "collected", label: "Collected" }]} format={(v) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))} height={180} label="Money collected from paid invoices per month over the last 6 months" />
-          )}
+        <Panel title="Collected" icon={CircleDollarSign} aside="confirmed payments per month · last 6 months">
+          <TrendChart data={collected} x="month" xFormat={monthLabel} yWidth={48} series={[{ key: "collected", label: "Collected" }]} format={(v) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))} height={180} label={`Money received from confirmed payments per month over the last 6 months: ${collected.map((c) => money(c.collected)).join(", ")}`} />
         </Panel>
       )}
 
