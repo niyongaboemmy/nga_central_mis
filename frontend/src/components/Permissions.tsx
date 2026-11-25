@@ -5,8 +5,7 @@ import {
   Users,
   Key,
   LayoutDashboard,
-  Plus,
-} from "lucide-react";
+  Plus, ShieldOff } from "lucide-react";
 import { usePermissions } from "../hooks/usePermissions";
 import { useToast } from "../contexts/ToastContext";
 import { getAllPermissions } from "../constants/permissions";
@@ -66,6 +65,8 @@ const Permissions: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissionsList, setPermissionsList] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
+  // A 403 on either list: that part of the page isn't shown (instead of a skeleton forever).
+  const [denied, setDenied] = useState<{ roles: boolean; perms: boolean }>({ roles: false, perms: false });
 
   // roleId -> permission ids currently assigned. Lets both list tabs and the
   // dashboard derive "N permissions" / "used by N roles" without re-fetching.
@@ -122,22 +123,36 @@ const Permissions: React.FC = () => {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [rolesData, permsData] = await Promise.all([
-        getRoles(),
-        getPermissions(),
-      ]);
-      const loadedRoles = rolesData || [];
+    // Separately: someone who may manage roles but not the permission list still gets roles.
+    const [rolesRes, permsRes] = await Promise.allSettled([getRoles(), getPermissions()]);
+    const forbidden = (r: PromiseSettledResult<unknown>) =>
+      r.status === "rejected" && (r.reason as { response?: { status?: number } })?.response?.status === 403;
+    setDenied({ roles: forbidden(rolesRes), perms: forbidden(permsRes) });
+    if (permsRes.status === "fulfilled") setPermissionsList(permsRes.value || []);
+    if (rolesRes.status === "fulfilled") {
+      const loadedRoles = rolesRes.value || [];
       setRoles(loadedRoles);
-      setPermissionsList(permsData || []);
       loadRoleAssignments(loadedRoles);
-    } catch (error) {
-      console.error("Failed to load roles/permissions:", error);
-      showToast("Failed to load roles and permissions", "error");
-    } finally {
-      setLoading(false);
+    } else {
+      setAssignmentsLoading(false);
     }
+    const failed = [rolesRes, permsRes].filter((r) => r.status === "rejected" && !forbidden(r));
+    if (failed.length) {
+      console.error("Failed to load roles/permissions:", failed);
+      showToast("Failed to load roles and permissions", "error");
+    }
+    setLoading(false);
   }, [loadRoleAssignments, showToast]);
+
+  const tabAllowed = (t: Tab) => (t === "roles" ? !denied.roles : t === "permissions" ? !denied.perms : !denied.roles && !denied.perms);
+  const noAccess = denied.roles && denied.perms;
+  useEffect(() => {
+    if (!tabAllowed(activeTab)) {
+      const next = (["roles", "permissions", "dashboard"] as Tab[]).find(tabAllowed);
+      if (next) setActiveTab(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [denied]);
 
   // Guard against React StrictMode's dev-only double effect invocation.
   useEffect(() => {
@@ -303,6 +318,10 @@ const Permissions: React.FC = () => {
 
   // ---- Role <-> Permission assignment ----
   const openAssignModal = async (role: Role) => {
+    if (denied.perms) {
+      showToast("Changing what a role can do needs the Manage permissions permission", "warning");
+      return;
+    }
     setSelectedRole(role);
     setAssigningRoleId(role.role_id);
     setLoadingAssignModal(true);
@@ -390,7 +409,7 @@ const Permissions: React.FC = () => {
                 Manage roles, permissions, and access control
               </p>
             </div>
-            {activeTab !== "dashboard" && (
+            {activeTab !== "dashboard" && !noAccess && tabAllowed(activeTab) && (
               <button
                 onClick={() =>
                   activeTab === "roles" ? openRoleModal() : openPermModal()
@@ -403,6 +422,23 @@ const Permissions: React.FC = () => {
             )}
           </motion.div>
 
+          {noAccess ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-gray-200 bg-white px-6 py-14 text-center dark:border-gray-700/40 dark:bg-gray-800/40" role="status">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-gray-500 dark:bg-gray-800/70 dark:text-gray-400">
+                <ShieldOff className="h-6 w-6" aria-hidden />
+              </span>
+              <p className="font-semibold text-gray-900 dark:text-white">You can't manage roles and permissions here</p>
+              <p className="max-w-md text-sm text-gray-500 dark:text-gray-400">
+                This needs the Manage roles and Manage permissions permissions. Your school's administrator can give them to you.
+              </p>
+            </div>
+          ) : (
+          <>
+          {denied.perms && (
+            <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">
+              You can see roles, but changing what a role can do needs the Manage permissions permission.
+            </p>
+          )}
           {/* Tabs */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -412,7 +448,7 @@ const Permissions: React.FC = () => {
             aria-label="Roles & permissions view"
             className="flex gap-1 mb-4 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-white/50 dark:border-slate-700/30 rounded-full p-1 w-fit"
           >
-            <button
+            {tabAllowed("roles") && (<button
               role="tab"
               aria-selected={activeTab === "roles"}
               onClick={() => setActiveTab("roles")}
@@ -424,8 +460,8 @@ const Permissions: React.FC = () => {
             >
               <Users className="w-4 h-4" />
               Roles
-            </button>
-            <button
+            </button>)}
+            {tabAllowed("permissions") && (<button
               role="tab"
               aria-selected={activeTab === "permissions"}
               onClick={() => setActiveTab("permissions")}
@@ -437,8 +473,8 @@ const Permissions: React.FC = () => {
             >
               <Key className="w-4 h-4" />
               Permissions
-            </button>
-            <button
+            </button>)}
+            {tabAllowed("dashboard") && (<button
               role="tab"
               aria-selected={activeTab === "dashboard"}
               onClick={() => setActiveTab("dashboard")}
@@ -450,7 +486,7 @@ const Permissions: React.FC = () => {
             >
               <LayoutDashboard className="w-4 h-4" />
               Dashboard
-            </button>
+            </button>)}
           </motion.div>
 
           {/* Tabs stay mounted permanently so switching never loses search
@@ -487,6 +523,8 @@ const Permissions: React.FC = () => {
               onSelectRole={openAssignModal}
             />
           </div>
+          </>
+          )}
         </div>
       </div>
 

@@ -28,6 +28,8 @@ import {
 } from "../../errors/CustomError";
 import { effectiveDepth, expandScope } from "./compile";
 import { coversNode, isPlatformActor, nodeTarget } from "./delegation";
+import { responseTenant } from "../../tenancy/claims";
+import { packageFilter } from "../tenantMgmt/tenantAdminRoles";
 import { getSnapshot } from "./snapshotCache";
 import { bumpAccessVersion, syncRuleGrants } from "./ruleEngine";
 import { insertRoleWithNextId, isRestrictedGrant, writeAudit } from "./registry";
@@ -113,11 +115,18 @@ async function validateCapabilities(
   const { actor, platform } = await actorForRoleEdit(actorId);
   const errors: string[] = [];
   const out: Array<{ perm_id: number; name: string; depth: Depth | null }> = [];
+  // A school's roles stay inside its package (never PLATFORM_*, never a feature it lacks).
+  const tenant = responseTenant();
+  const inPackage = await packageFilter(tenant.tid, tenant.isPrimary);
 
   for (const c of caps) {
     const p = byName.get(c.name);
     if (!p || p.status !== "ACTIVE") {
       errors.push(`Unknown capability ${c.name}`);
+      continue;
+    }
+    if (!inPackage(p)) {
+      errors.push(`${c.name} is not in this school's package`);
       continue;
     }
     let depth: Depth | null = null;

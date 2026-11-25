@@ -513,6 +513,14 @@ async function stepSuperAdmin(ctx: RunCtx): Promise<void> {
   });
 
   await syncDirectoryUser(userId, tenant.tid);
+  // The owner is the school's own administrator: SUPER_ADMIN and School Owner hold every
+  // permission the package allows (and nothing platform-wide).
+  try {
+    const eq = await (await import("./tenantAdminRoles")).equipTenantAdminRoles(tenant.tid);
+    await ctx.log(`school admin roles: ${eq.roles} roles hold ${eq.permissions} permissions`);
+  } catch (err) {
+    await ctx.log(`school admin roles not equipped: ${(err as Error)?.message ?? err}`);
+  }
   // The applicant is now that school's user: their onboarding token stops working.
   await controlPool().query(
     "UPDATE ApplicantAccount SET status = 'CONVERTED', tenant_id = ? WHERE account_id = ? AND NOT (status = 'CONVERTED' AND tenant_id <=> ?)",
