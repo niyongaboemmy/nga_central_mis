@@ -471,6 +471,20 @@ export interface TenantAdmin {
   createdAt: string | null;
 }
 
+/** A person's account in a school (platform search across schools). */
+export interface PersonElsewhere {
+  tid: number;
+  schoolName: string;
+  userId: number;
+  name: string;
+  email: string | null;
+  username: string;
+  phone: string | null;
+  userType: string | null;
+  roles: string[];
+  alreadyInTarget: boolean;
+}
+
 export interface TenantDetail {
   tenant: TenantListItem & { timezone: string; country: string | null; activatedAt: string | null; suspendedAt: string | null; statusReason: string | null };
   entitlements: EffectiveEntitlements;
@@ -590,6 +604,10 @@ export const platformApi = {
     unwrap<{ admin: TenantAdmin; tempPassword: string; emailed: boolean }>(api.post(`/platform/tenants/${tid}/admins/${userId}/reset-password`, { reason })),
   removeAdmin: (tid: number, userId: number, reason: string) =>
     unwrap<{ ok: true }>(api.delete(`/platform/tenants/${tid}/admins/${userId}`, { data: { reason } })),
+  people: (q: string, forTid?: number) => unwrap<PersonElsewhere[]>(api.get("/platform/people", { params: { q, forTid } })),
+  tenantRoles: (tid: number) => unwrap<Array<{ roleId: number; name: string; description: string | null }>>(api.get(`/platform/tenants/${tid}/roles`)),
+  assignPerson: (tid: number, body: { sourceTid: number; sourceUserId: number; roleIds: number[]; reason: string }) =>
+    unwrap<{ userId: number; username: string; roles: string[] }>(api.post(`/platform/tenants/${tid}/people`, body)),
   provisioning: (runId: number) => unwrap<ProvisioningRun>(api.get(`/platform/provisioning/${runId}`)),
   retryProvisioning: (runId: number) => unwrap<ProvisioningRun>(api.post(`/platform/provisioning/${runId}/retry`)),
   /** support sessions this tenant granted (§6.9) */

@@ -1123,6 +1123,31 @@ export const createUser = async (
   }
 };
 
+/** The same person's account in another school (exact e-mail or username). */
+export interface PersonElsewhere {
+  tid: number;
+  schoolName: string;
+  userId: number;
+  name: string;
+  email: string | null;
+  username: string;
+  phone: string | null;
+  userType: string | null;
+  roles: string[];
+  alreadyInTarget: boolean;
+}
+
+export const findUserElsewhere = async (identifier: string): Promise<PersonElsewhere[]> => {
+  const response = await api.get<BackendResponse<PersonElsewhere[]>>("/users/elsewhere", { params: { identifier } });
+  return response.data.data ?? [];
+};
+
+/** Add that person to this school with roles of this school (they keep their password). */
+export const importUserFromSchool = async (body: { identifier: string; sourceTid: number; roles: number[] }) => {
+  const response = await api.post<BackendResponse<{ userId: number; username: string; roles: string[] }>>("/users/elsewhere/import", body);
+  return response.data.data!;
+};
+
 export const bulkCreateUsers = async (
   file: File,
   roleId?: number,

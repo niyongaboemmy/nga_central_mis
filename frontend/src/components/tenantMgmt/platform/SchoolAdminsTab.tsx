@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Copy, Crown, KeyRound, Lock, Mail, Phone, RotateCcw, ShieldCheck, TriangleAlert, UserCog, UserMinus, UserPlus, Users } from "lucide-react";
+import { ArrowLeftRight, Check, Copy, Crown, KeyRound, Lock, Mail, Phone, RotateCcw, School, Search, ShieldCheck, TriangleAlert, UserCog, UserMinus, UserPlus, Users } from "lucide-react";
 import Modal from "../../ui/Modal";
 import { EmptyState } from "../kit";
-import { platformApi, type TenantAdmin, type TenantDetail } from "../../../api/tenantMgmt";
+import { platformApi, type PersonElsewhere, type TenantAdmin, type TenantDetail } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
 import { Btn, Card, Field, IconBtn, ReasonDialog, act, ago, cx, errorText, fmtDateTime, initials, inputCls, toast, usePlatform } from "./platformShared";
 
@@ -21,6 +21,7 @@ const SchoolAdminsTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
   const [admins, setAdmins] = useState<TenantAdmin[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   const [resetFor, setResetFor] = useState<TenantAdmin | null>(null);
   const [removeFor, setRemoveFor] = useState<TenantAdmin | null>(null);
   const [creds, setCreds] = useState<Credentials | null>(null);
@@ -55,9 +56,14 @@ const SchoolAdminsTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
           </p>
         </div>
         {manage && (
-          <Btn tone="primary" icon={UserPlus} onClick={() => setAdding(true)} disabled={admins === null}>
-            Add administrator
-          </Btn>
+          <div className="flex flex-wrap gap-2">
+            <Btn icon={ArrowLeftRight} onClick={() => setAssigning(true)}>
+              Add existing person
+            </Btn>
+            <Btn tone="primary" icon={UserPlus} onClick={() => setAdding(true)} disabled={admins === null}>
+              Add administrator
+            </Btn>
+          </div>
         )}
       </div>
 
@@ -115,6 +121,17 @@ const SchoolAdminsTab: React.FC<{ d: TenantDetail }> = ({ d }) => {
           setAdding(false);
           load();
           if (r.tempPassword) setCreds({ name, email: r.admin.email, username: r.admin.username, password: r.tempPassword, emailed: r.emailed });
+        }}
+      />
+
+      <AssignPersonDialog
+        open={assigning}
+        tid={t.tid}
+        schoolName={t.name}
+        onClose={() => setAssigning(false)}
+        onDone={() => {
+          setAssigning(false);
+          load();
         }}
       />
 
@@ -352,6 +369,210 @@ const AddAdminDialog: React.FC<{
           </Btn>
           <Btn type="submit" tone="primary" icon={UserPlus} disabled={!ok} busy={busy}>
             Add
+          </Btn>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// ---------------------------------------------------------------------------
+
+/** Someone of another school, given a role in this one (backend: crossSchool.ts). */
+const AssignPersonDialog: React.FC<{ open: boolean; tid: number; schoolName: string; onClose: () => void; onDone: () => void }> = ({
+  open,
+  tid,
+  schoolName,
+  onClose,
+  onDone,
+}) => {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<PersonElsewhere[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState<PersonElsewhere | null>(null);
+  const [roles, setRoles] = useState<Array<{ roleId: number; name: string; description: string | null }> | null>(null);
+  const [roleIds, setRoleIds] = useState<number[]>([]);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setQ("");
+    setResults(null);
+    setPicked(null);
+    setRoleIds([]);
+    setReason("");
+    setRoles(null);
+    platformApi.tenantRoles(tid).then(setRoles, (e) => {
+      setRoles([]);
+      toast(errorText(e), "error");
+    });
+  }, [open, tid]);
+
+  // Debounced search across every school.
+  useEffect(() => {
+    if (!open || picked) return;
+    const term = q.trim();
+    if (term.length < 2) {
+      setResults(null);
+      return;
+    }
+    setSearching(true);
+    const h = window.setTimeout(() => {
+      platformApi.people(term, tid).then(
+        (r) => {
+          setResults(r);
+          setSearching(false);
+        },
+        (e) => {
+          setSearching(false);
+          toast(errorText(e), "error");
+        },
+      );
+    }, 350);
+    return () => window.clearTimeout(h);
+  }, [q, open, picked, tid]);
+
+  const ok = !!picked && roleIds.length > 0 && reason.trim().length >= 3;
+
+  return (
+    <Modal
+      isOpen={open}
+      onClose={() => !busy && onClose()}
+      size="lg"
+      title={
+        <span className="flex items-center gap-2">
+          <ArrowLeftRight className="h-5 w-5" aria-hidden />
+          Add someone from another school
+        </span>
+      }
+    >
+      <form
+        className="space-y-4"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!ok || !picked) return;
+          setBusy(true);
+          const r = await act(() => platformApi.assignPerson(tid, { sourceTid: picked.tid, sourceUserId: picked.userId, roleIds, reason: reason.trim() }));
+          setBusy(false);
+          if (!r) return;
+          toast(`${picked.name} added to ${schoolName} as ${r.roles.join(", ")}`, "success");
+          onDone();
+        }}
+      >
+        {!picked ? (
+          <>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+              <input
+                autoFocus
+                aria-label="Search people in every school"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Name, e-mail, username or phone"
+                className={cx(inputCls, "pl-9")}
+              />
+            </div>
+            {searching ? (
+              <ul className="space-y-2" aria-busy="true">
+                {[0, 1].map((i) => (
+                  <li key={i} className="h-14 animate-pulse rounded-2xl bg-slate-100 dark:bg-gray-800" />
+                ))}
+              </ul>
+            ) : results === null ? (
+              <p className="text-sm text-slate-600 dark:text-gray-300">Search every school. The person keeps their password and signs in to both schools.</p>
+            ) : results.length === 0 ? (
+              <p className="text-sm text-slate-600 dark:text-gray-300">No one matches “{q.trim()}”.</p>
+            ) : (
+              <ul className="max-h-72 space-y-2 overflow-y-auto" aria-label="People found">
+                {results.map((p) => (
+                  <li key={`${p.tid}-${p.userId}`}>
+                    <button
+                      type="button"
+                      disabled={p.alreadyInTarget}
+                      onClick={() => setPicked(p)}
+                      className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 p-3 text-left transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:hover:bg-gray-800"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-200" aria-hidden>
+                        {initials(p.name) || "?"}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold text-slate-900 dark:text-white">{p.name}</span>
+                        <span className="flex flex-wrap gap-x-3 text-xs text-slate-600 dark:text-gray-300">
+                          <span className="inline-flex items-center gap-1">
+                            <School className="h-3 w-3" aria-hidden />
+                            {p.schoolName}
+                          </span>
+                          {p.email && <span className="truncate">{p.email}</span>}
+                          {p.roles.length > 0 && <span>{p.roles.join(", ")}</span>}
+                        </span>
+                      </span>
+                      {p.alreadyInTarget && <span className="shrink-0 text-xs font-semibold text-slate-600 dark:text-gray-300">Already here</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-brand-300 bg-brand-50 p-3 dark:border-brand-400/40 dark:bg-brand-500/10">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white" aria-hidden>
+                {initials(picked.name) || "?"}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold text-slate-900 dark:text-white">{picked.name}</span>
+                <span className="block truncate text-xs text-slate-600 dark:text-gray-300">
+                  {picked.schoolName} · {picked.email ?? `@${picked.username}`}
+                </span>
+              </span>
+              <Btn size="sm" onClick={() => setPicked(null)}>
+                Change
+              </Btn>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold text-slate-600 dark:text-gray-300">Role in {schoolName}</p>
+              {roles === null ? (
+                <div className="flex gap-2" aria-busy="true">
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className="h-8 w-24 animate-pulse rounded-full bg-slate-100 dark:bg-gray-800" />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Roles">
+                  {roles.map((r) => {
+                    const on = roleIds.includes(r.roleId);
+                    return (
+                      <button
+                        key={r.roleId}
+                        type="button"
+                        aria-pressed={on}
+                        title={r.description ?? undefined}
+                        onClick={() => setRoleIds(on ? roleIds.filter((x) => x !== r.roleId) : [...roleIds, r.roleId])}
+                        className={cx(
+                          "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
+                          on ? "border-brand-600 bg-brand-600 text-white" : "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800",
+                        )}
+                      >
+                        {r.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="mt-2 text-xs text-slate-600 dark:text-gray-300">Owners are added with “Add administrator”.</p>
+            </div>
+            <Field label="Reason">
+              {(id) => <textarea id={id} required rows={2} value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} placeholder="e.g. Teaches in both schools" />}
+            </Field>
+          </>
+        )}
+        <div className="flex justify-end gap-2">
+          <Btn onClick={onClose} disabled={busy}>
+            Cancel
+          </Btn>
+          <Btn type="submit" tone="primary" icon={UserPlus} disabled={!ok} busy={busy}>
+            Add to {schoolName}
           </Btn>
         </div>
       </form>

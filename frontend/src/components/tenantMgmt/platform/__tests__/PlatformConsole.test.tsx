@@ -27,6 +27,9 @@ const api = vi.hoisted(() => ({
   createAdmin: vi.fn(),
   resetAdminPassword: vi.fn(),
   removeAdmin: vi.fn(),
+  people: vi.fn(),
+  tenantRoles: vi.fn(),
+  assignPerson: vi.fn(),
 }));
 
 vi.mock("../../../../api/tenantMgmt", async (orig) => {
@@ -506,6 +509,31 @@ describe("school administrators", () => {
     );
     expect(await screen.findByText("Abc234defGhj")).toBeInTheDocument();
     expect(screen.getByText(/could not be sent/)).toBeInTheDocument();
+  });
+
+  it("adds someone from another school with a role of this school", async () => {
+    api.tenant.mockResolvedValue(tenantDetail({ status: "ACTIVE" }));
+    api.admins.mockResolvedValue([ADMIN()]);
+    api.tenantRoles.mockResolvedValue([
+      { roleId: 3, name: "TEACHER", description: null },
+      { roleId: 5, name: "ADMIN", description: null },
+    ]);
+    api.people.mockResolvedValue([
+      { tid: 1, schoolName: "NGA", userId: 41, name: "Grace Mutoni", email: "grace@two.test", username: "grace", phone: null, userType: "TEACHER", roles: ["TEACHER"], alreadyInTarget: false },
+    ]);
+    api.assignPerson.mockResolvedValue({ userId: 90, username: "grace", roles: ["TEACHER"] });
+    const user = userEvent.setup();
+    inProvider(<SchoolDetailPage />, "/platform/schools/:tid", "/platform/schools/5");
+    await user.click(await screen.findByRole("tab", { name: /Admins/ }));
+    await user.click(await screen.findByRole("button", { name: /Add existing person/ }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Search people in every school"), "grace");
+    await user.click(await within(dialog).findByRole("button", { name: /Grace Mutoni/ }, { timeout: 2000 }));
+    expect(api.people).toHaveBeenCalledWith("grace", 5);
+    await user.click(within(dialog).getByRole("button", { name: "TEACHER" }));
+    await user.type(within(dialog).getByLabelText("Reason"), "Teaches in both");
+    await user.click(within(dialog).getByRole("button", { name: /Add to Green Hills Academy/ }));
+    await waitFor(() => expect(api.assignPerson).toHaveBeenCalledWith(5, { sourceTid: 1, sourceUserId: 41, roleIds: [3], reason: "Teaches in both" }));
   });
 
   it("is read-only without the lifecycle capability", async () => {
