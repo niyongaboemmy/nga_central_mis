@@ -577,7 +577,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           size={96}
                         />
                       ) : (
-                        <UserAvatar name={displayName} avatar={avatar} size={96} ring />
+                        <UserAvatar name={displayName} avatar={avatar} size={96} ring fallback="person" />
                       )}
                     </div>
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white">

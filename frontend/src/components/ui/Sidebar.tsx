@@ -39,11 +39,11 @@ const writeList = (key: string, list: string[]) => {
 const RECENT_MAX = 4;
 
 const railBtn =
-  "relative grid h-10 w-10 place-items-center rounded-xl transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+  "relative grid h-10 w-10 place-items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
 const railIdle = "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/60 dark:hover:text-white";
 const railOn = "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300";
 const rowBase =
-  "flex min-w-0 flex-1 items-center gap-2.5 rounded-lg py-1.5 pl-2.5 pr-8 text-[13px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+  "flex min-w-0 flex-1 items-center gap-2.5 rounded-full py-1.5 pl-2.5 pr-8 text-[13px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
 const rowIdle = "text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/50 dark:hover:text-white";
 const rowOn = "bg-blue-50 font-medium text-blue-700 dark:bg-blue-500/15 dark:text-blue-300";
 const headingCls = "px-2.5 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500";
@@ -305,7 +305,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
             aria-label={isPinned ? `Unpin ${link.label}` : `Pin ${link.label}`}
             aria-pressed={isPinned}
             title={isPinned ? "Unpin" : "Pin to top"}
-            className={`absolute right-1 rounded-md p-1 transition focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 ${
+            className={`absolute right-1 rounded-full p-1 transition focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-blue-500 ${
               isPinned
                 ? "text-blue-600 opacity-0 group-hover/row:opacity-100 dark:text-blue-300"
                 : "text-gray-400 opacity-0 hover:text-gray-700 group-hover/row:opacity-100 dark:hover:text-gray-200"
@@ -343,7 +343,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
           onClick={() => setGroupOpen(key, !open)}
           aria-expanded={open}
           aria-controls={panelId}
-          className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+          className={`flex w-full items-center gap-2 rounded-full px-2.5 py-1.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
             currentGroupKey === key && !open ? "text-blue-600 dark:text-blue-300" : ""
           }`}
         >
@@ -390,13 +390,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
           onClick={() => (isCollapsed ? setOverlayOpen(false) : onToggle?.())}
           aria-label={isCollapsed ? "Close menu" : "Collapse menu"}
           title={isCollapsed ? "Close" : "Collapse menu"}
-          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800/60 dark:hover:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800/60 dark:hover:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         >
           {isCollapsed ? <X className="h-4 w-4" aria-hidden /> : <ChevronsLeft className="h-4 w-4" aria-hidden />}
         </button>
       </div>
       <div className="px-3 pb-2">
-        <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30 dark:border-gray-700/30 dark:bg-gray-900/50">
+        <label className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30 dark:border-gray-700/30 dark:bg-gray-900/50">
           <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
           <input
             ref={searchRef}
@@ -539,7 +539,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
             {...tipProps("Account")}
             className={`mt-1 rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${accountOpen ? "ring-2 ring-blue-500" : "hover:ring-2 hover:ring-gray-200 dark:hover:ring-gray-700"}`}
           >
-            <UserAvatar name={fullName} avatar={user?.avatar} size={34} decorative />
+            <UserAvatar name={fullName} avatar={user?.avatar} size={34} decorative fallback="person" />
           </button>
         </nav>
 
@@ -556,7 +556,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.12 }}
-            className="pointer-events-none fixed z-[70] flex -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white dark:bg-gray-700"
+            className="pointer-events-none fixed z-[70] flex -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white dark:bg-gray-700"
             style={{ top: tip.top, left: tip.left }}
           >
             {tip.label}
@@ -583,7 +583,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
             }}
           >
             <div className="flex items-center gap-3 px-2.5 pb-2.5 pt-2">
-              <UserAvatar name={fullName} avatar={user?.avatar} size={36} decorative />
+              <UserAvatar name={fullName} avatar={user?.avatar} size={36} decorative fallback="person" />
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{fullName}</div>
                 <div className="truncate text-xs text-gray-500 dark:text-gray-400">{roleLabel}</div>
@@ -592,7 +592,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle, onMenu
             <div className="mb-1 border-t border-gray-100 dark:border-gray-700/30" />
             {accountLinks.map((l) => {
               const Icon = l.icon;
-              const cls = `flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors focus:outline-none focus-visible:bg-gray-100 dark:focus-visible:bg-gray-800/60 ${
+              const cls = `flex w-full items-center gap-2.5 rounded-full px-2.5 py-2 text-left text-[13px] transition-colors focus:outline-none focus-visible:bg-gray-100 dark:focus-visible:bg-gray-800/60 ${
                 l.path && location.pathname === l.path ? rowOn : rowIdle
               }`;
               const body = (

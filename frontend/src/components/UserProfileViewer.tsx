@@ -41,26 +41,13 @@ import { useToast } from "../contexts/ToastContext";
 // Pieces
 // ---------------------------------------------------------------------------
 
-const initialsOf = (first?: string | null, last?: string | null, fallback = "?") => {
-  const a = (first ?? "").trim();
-  const b = (last ?? "").trim();
-  const letters = `${a.charAt(0)}${b.charAt(0)}`.trim();
-  return (letters || fallback.charAt(0)).toUpperCase();
-};
 
-// Blue is the product's primary, so the header is always blue. Only the depth
-// of the second stop varies per user — enough that the same person is
+// Blue is the product's primary, so the header is always blue. Only the shade
+// varies per user — enough that the same person is
 // recognisable at a glance across visits, without turning the panel into a
 // different-coloured surface each time you open it.
-const GRADIENTS = [
-  "from-blue-600 to-indigo-700",
-  "from-blue-500 to-blue-700",
-  "from-sky-600 to-blue-700",
-  "from-blue-600 to-blue-800",
-  "from-indigo-600 to-blue-700",
-  "from-sky-500 to-indigo-600",
-];
-const gradientFor = (id: number) => GRADIENTS[id % GRADIENTS.length];
+const SHADES = ["bg-blue-600", "bg-blue-700", "bg-blue-800"];
+const shadeFor = (id: number) => SHADES[id % SHADES.length];
 
 const CopyableRow = ({
   icon: Icon,
@@ -346,9 +333,7 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
         >
           {/* Identity header */}
           <header
-            className={`relative bg-gradient-to-br ${gradientFor(
-              summary.user_id,
-            )} px-5 pt-5 pb-6 text-white`}
+            className={`relative ${shadeFor(summary.user_id)} px-5 pt-5 pb-6 text-white`}
           >
             <button
               type="button"
@@ -360,18 +345,8 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
             </button>
 
             <div className="flex items-center gap-4 pr-10">
-              {detail?.avatar || summary.avatar ? (
-                <UserAvatar
-                  name={fullName}
-                  avatar={detail?.avatar ?? summary.avatar}
-                  size={64}
-                  ring
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-xl font-bold flex-shrink-0">
-                  {initialsOf(firstName, lastName, summary.username)}
-                </div>
-              )}
+              {/* No photo: a person icon, not initials (one person's own view). */}
+              <UserAvatar name={fullName} avatar={detail?.avatar ?? summary.avatar} size={64} ring fallback="person" />
               <div className="min-w-0">
                 <h2 className="text-xl font-bold leading-tight truncate">
                   {fullName}
@@ -503,7 +478,7 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
                           key={`ug-${g.grade_id}-${g.class_group_id}`}
                           className="flex items-center gap-3 p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/25 border border-blue-100/70 dark:border-blue-900/30"
                         >
-                          <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                          <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                           <div className="min-w-0">
                             <p className="text-sm text-gray-900 dark:text-white truncate">
                               Class teacher · {g.class_group_name ?? g.name}

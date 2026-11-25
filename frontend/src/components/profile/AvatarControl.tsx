@@ -74,7 +74,7 @@ const AvatarControl: React.FC<Props> = ({ name, avatar, onChange, userId, size =
         aria-label={avatar ? "Change profile picture" : "Add a profile picture"}
         title={avatar ? "Change profile picture" : "Add a profile picture"}
       >
-        <UserAvatar name={name} avatar={avatar} size={size} ring />
+        <UserAvatar name={name} avatar={avatar} size={size} ring fallback="person" />
         <span className="absolute inset-0 rounded-full bg-black/45 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-xs font-medium gap-1">
           <Camera className="w-5 h-5" />
           {avatar ? "Change" : "Add photo"}

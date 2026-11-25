@@ -170,7 +170,7 @@ const ProfilePictureEditor: React.FC<Props> = (props) => {
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium rounded-xl text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium rounded-full text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
           >
             Cancel
           </button>
@@ -178,7 +178,7 @@ const ProfilePictureEditor: React.FC<Props> = (props) => {
             type="button"
             onClick={save}
             disabled={saving || !file}
-            className="px-4 py-2 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+            className="px-4 py-2 text-sm font-semibold rounded-full bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
           >
             {saving ? ((progress ?? 0) < 1 ? "Uploading…" : "Processing…") : "Save picture"}
           </button>
