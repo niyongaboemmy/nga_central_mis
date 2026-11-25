@@ -58,6 +58,24 @@ import { authenticate, authorize, authenticateIdentityRead } from "../middleware
 
 const router = express.Router();
 
+// --- one person, several schools (services/tenantMgmt/crossSchool.ts) --------
+// Registered before the bare "/:id" route. Exact e-mail / username only.
+router.get("/elsewhere", authenticate, authorize("MANAGE_USERS"), (req: any, res: any, next: any) => {
+  (async () => {
+    const { findByIdentifier } = await import("../services/tenantMgmt/crossSchool");
+    const { responseTenant } = await import("../tenancy/claims");
+    res.json({ success: true, data: await findByIdentifier(req.query.identifier, responseTenant().tid) });
+  })().catch(next);
+});
+router.post("/elsewhere/import", authenticate, authorize("MANAGE_USERS"), (req: any, res: any, next: any) => {
+  (async () => {
+    const { importByIdentifier } = await import("../services/tenantMgmt/crossSchool");
+    const { responseTenant } = await import("../tenancy/claims");
+    const r = await importByIdentifier(req.body?.identifier, req.body?.sourceTid, req.body?.roles, responseTenant().tid, Number(req.user?.userId) || null, req.ip ?? null);
+    res.status(201).json({ success: true, message: "User added to this school", data: r });
+  })().catch(next);
+});
+
 // Configure multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),

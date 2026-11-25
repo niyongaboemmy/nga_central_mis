@@ -24,6 +24,7 @@ import {
 } from "../services/tenantMgmt/lifecycle";
 import { retryRun, runForTenant, serializeRun } from "../services/tenantMgmt/provisioning";
 import { listActiveSessions, openSession } from "../services/tenantMgmt/support";
+import { assignableRoles, copyPersonInto, searchEverySchool } from "../services/tenantMgmt/crossSchool";
 import { createTenantAdmin, listTenantAdmins, removeTenantAdmin, resetTenantAdminPassword } from "../services/tenantMgmt/tenantAdmins";
 
 /**
@@ -333,6 +334,44 @@ router.delete(
   "/tenants/:id/admins/:userId",
   ...LIFECYCLE,
   wrap(async (req, res) => ok(res, await removeTenantAdmin(idParam(req.params.id), idParam(req.params.userId), req.body?.reason, platformActor(req)))),
+);
+
+// --- one person, several schools (crossSchool.ts) ----------------------------
+
+router.get(
+  "/people",
+  ...VIEW,
+  wrap(async (req, res) => ok(res, await searchEverySchool(req.query.q, req.query.forTid ? idParam(req.query.forTid) : null))),
+);
+
+router.get(
+  "/tenants/:id/roles",
+  ...VIEW,
+  wrap(async (req, res) => ok(res, await assignableRoles(idParam(req.params.id)))),
+);
+
+router.post(
+  "/tenants/:id/people",
+  ...LIFECYCLE,
+  wrap(async (req, res) => {
+    const tid = idParam(req.params.id);
+    if (tid === 1) return res.status(409).json({ success: false, message: "People join the primary school from its own Users screen." });
+    const reason = String(req.body?.reason ?? "").trim();
+    if (reason.length < 3) throw new ValidationError("A reason is required");
+    ok(
+      res,
+      await copyPersonInto({
+        sourceTid: idParam(req.body?.sourceTid),
+        sourceUserId: idParam(req.body?.sourceUserId),
+        targetTid: tid,
+        roleIds: Array.isArray(req.body?.roleIds) ? req.body.roleIds : [],
+        actorUserId: platformActor(req).userId,
+        via: "platform",
+        reason,
+        ip: req.ip ?? null,
+      }),
+    );
+  }),
 );
 
 // --- provisioning -----------------------------------------------------------
