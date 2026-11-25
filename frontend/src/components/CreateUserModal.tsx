@@ -159,6 +159,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     return re.test(email);
   };
 
+  // Students (first role = Student) may be registered without an e-mail: the account
+  // is saved for school records but can't sign in until an e-mail is added.
+  const emailOptional =
+    roles.find((r) => r.role_id === selectedRoles[0])?.name?.toUpperCase() === "STUDENT";
+
   const validateField = (name: string, value: string): string => {
     switch (name) {
       case "username":
@@ -169,7 +174,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
           return "Username can only contain letters, numbers, and underscores";
         return "";
       case "email":
-        if (!value.trim()) return "Email is required";
+        if (!value.trim())
+          return emailOptional ? "" : "Email is required (only students may be added without one)";
         if (!validateEmail(value)) return "Please enter a valid email address";
         return "";
       case "phone_number":
@@ -209,6 +215,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
         ? prev.filter((id) => id !== roleId)
         : [...prev, roleId],
     );
+    // The e-mail rule depends on the first role; re-check it with the next render's roles.
+    setErrors((prev) => (prev.email && !formData.email.trim() ? { ...prev, email: "" } : prev));
   };
 
   const lookup = async (identifier: string, quiet = false) => {
@@ -286,7 +294,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
       await createUser(
         {
           username: formData.username,
-          email: formData.email,
+          email: formData.email.trim() || undefined,
           phone_number: formData.phone_number || undefined,
           status: "ACTIVE",
           roles: selectedRoles,
@@ -485,10 +493,16 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                         value={formData.email}
                         onChange={handleChange}
                         error={errors.email}
-                        required
+                        required={!emailOptional}
                         icon={Mail}
                         placeholder="Enter email"
                       />
+                      {emailOptional && !formData.email.trim() && !errors.email && (
+                        <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                          Optional for students. Without an email the account is
+                          saved but can't sign in until an email is added.
+                        </p>
+                      )}
                       {matches && matches.length > 0 && matchedFor.toLowerCase() === formData.email.trim().toLowerCase() && !matches[0].alreadyInTarget && (
                         <p className="mt-1.5 text-xs text-blue-700 dark:text-blue-200">
                           {matches[0].name} already has an account at {matches[0].schoolName}.{" "}

@@ -381,6 +381,7 @@ export const notifyEscalations = async (created: NewEscalation[]) => {
       );
       const emails = await emailOf(parents);
       for (const [, to] of emails) {
+        if (!to) continue;
         const mail = emailLayout(
           `${student} is missing mandatory office hours`,
           [

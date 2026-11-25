@@ -20,7 +20,8 @@ import { sql } from "drizzle-orm";
 export const User = mysqlTable("User", {
   user_id: bigint("user_id", { mode: "number" }).primaryKey().autoincrement(),
   username: varchar("username", { length: 100 }).notNull().unique(),
-  email: varchar("email", { length: 150 }).notNull().unique(),
+  // NULL = no e-mail (young students, migration 148): such accounts cannot sign in.
+  email: varchar("email", { length: 150 }).unique(),
   phone_number: varchar("phone_number", { length: 50 }),
   status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).default(
     "ACTIVE",

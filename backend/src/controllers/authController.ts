@@ -100,14 +100,17 @@ const withSignInTenant = async (
   await runWithTenant(tenant, fn);
 };
 
+export const NO_EMAIL_SIGN_IN_MESSAGE =
+  "This account has no e-mail address, so it can't sign in. Ask the school to add an e-mail to it.";
+
 /** Does this identifier + password open an ACTIVE account in the current tenant? */
 const passwordMatches = async (identifier: string, password: string): Promise<boolean> => {
   const [u] = await db
-    .select({ user_id: User.user_id, status: User.status })
+    .select({ user_id: User.user_id, status: User.status, email: User.email })
     .from(User)
     .where(validateEmail(identifier) ? eq(User.email, identifier) : eq(User.username, identifier))
     .limit(1);
-  if (!u || u.status !== "ACTIVE") return false;
+  if (!u || u.status !== "ACTIVE" || !u.email) return false;
   const [cred] = await db
     .select({ password_hash: AuthCredential.password_hash })
     .from(AuthCredential)
@@ -183,6 +186,14 @@ const loginInTenant = async (req: any, res: any, sanitizedInput: string, sanitiz
     logger.warn(`Login attempt for inactive user: ${sanitizedInput}`);
     trackAuth(req, { kind: "login", outcome: "failure", reason: "inactive", userId: user[0].user_id, usernameAttempted: sanitizedInput });
     throw new AuthenticationError("Account is not active");
+  }
+
+  // No e-mail (young students, migration 148): the account exists for school records
+  // only. It has no password, and the sign-in code below could not be sent anywhere.
+  if (!user[0].email) {
+    logger.warn(`Login attempt for an account without e-mail: ${sanitizedInput}`);
+    trackAuth(req, { kind: "login", outcome: "failure", reason: "no_email", userId: user[0].user_id, usernameAttempted: sanitizedInput });
+    throw new AuthenticationError(NO_EMAIL_SIGN_IN_MESSAGE);
   }
 
   // Find auth credentials

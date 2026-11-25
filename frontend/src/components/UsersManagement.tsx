@@ -483,7 +483,11 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
       const fullUser = await getUser(newUser.user_id);
       if (fullUser) {
         viewUserProfile(fullUser);
-        showToast("User created successfully", "success");
+        if ((newUser as { can_sign_in?: boolean }).can_sign_in === false) {
+          showToast("Student created without an email: they can't sign in until an email is added", "info");
+        } else {
+          showToast("User created successfully", "success");
+        }
       }
     } catch (error) {
       console.error("Failed to load new user profile", error);
