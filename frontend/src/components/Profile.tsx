@@ -29,6 +29,7 @@ import { requestAppsDialog } from "./apps/openAppsDialog";
 import AvatarControl, { AvatarControlHandle } from "./profile/AvatarControl";
 import ProfileCover from "./profile/ProfileCover";
 import ChangePasswordModal from "./ChangePasswordModal";
+import AttendanceGoogleCard from "./profile/AttendanceGoogleCard";
 
 type FormState = {
   first_name: string;
@@ -625,6 +626,8 @@ const Profile: React.FC = () => {
               One password for every NGA app. Sign-in is protected with a one-time code, and signing out here signs you out of every NGA app.
             </p>
           </Card>
+
+          <AttendanceGoogleCard email={account?.email} />
         </aside>
       </div>
 
