@@ -535,6 +535,9 @@ export interface AuditEntry {
 
 export const platformApi = {
   overview: () => unwrap<PlatformOverview>(api.get("/platform/overview")),
+  /** automatic strict tenancy per app: flag + last 8 days (services/tenancy/strictMode.ts) */
+  tenancyHealth: () =>
+    unwrap<Array<{ app: string; strict: boolean; since: string | null; days: Array<{ day: string; reported: boolean; fallbacks: number }> }>>(api.get("/platform/tenancy/health")),
   // applications
   applications: (params: { status?: string; package?: string; q?: string; mine?: boolean } = {}) =>
     unwrap<ApplicationListItem[]>(api.get("/platform/applications", { params })),

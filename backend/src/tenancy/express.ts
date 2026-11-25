@@ -23,6 +23,7 @@ import {
   tidFromClaims,
 } from "../vendor/nga-tenancy";
 import { legacyDefaultTid, tenancyMode } from "./context";
+import { countFallback } from "./fallbacks";
 import { getTenant } from "./registry";
 
 declare global {
@@ -131,6 +132,7 @@ export async function suspendedSessionRefusal(req: any, userId: number): Promise
 export async function tenantFromClaims(
   claims: any,
 ): Promise<{ tenant: TenantCtx; refusal: null } | { tenant: TenantCtx | null; refusal: TenantRefusal }> {
+  if (claims && claims.tid == null && claims.tenant_id == null) countFallback("legacy_tid", "token without tid");
   const tid = tidFromClaims(claims, legacyDefaultTid());
   if (!tid) return { tenant: null, refusal: TENANT_REQUIRED };
   const tenant = await getTenant(tid);

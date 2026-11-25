@@ -232,7 +232,8 @@ describe("a school's whole journey", () => {
     const routes: Route[] = [];
     collect((app as any)._router.stack, "", routes);
     const platform = [...new Map(
-      routes.filter((r) => r.path.startsWith("/platform/") && r.path !== "/platform/tenants/active").map((r) => [`${r.method} ${fill(r.path)}`, r]),
+      // Service-token routes (spokes, not people): a user token gets 401 there.
+      routes.filter((r) => r.path.startsWith("/platform/") && r.path !== "/platform/tenants/active" && r.path !== "/platform/tenancy/fallbacks").map((r) => [`${r.method} ${fill(r.path)}`, r]),
     ).values()];
     expect(platform.length).toBeGreaterThan(40);
     const opened: string[] = [];

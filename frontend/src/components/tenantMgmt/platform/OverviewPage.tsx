@@ -23,6 +23,7 @@ import { TRACKER_STEPS, formatMoney, type ApplicationStatus, type AttentionItem,
 import { useMotion } from "../../../design/motion";
 import { Card, cx, toast, usePlatform } from "./platformShared";
 import { useChartTheme } from "./chartTheme";
+import TenancyHealthCard from "./TenancyHealthCard";
 
 /** Which application statuses sit on each journey step (pipeline strip + filters). */
 export const STEP_STATUSES: Record<TrackerStep, ApplicationStatus[]> = {
@@ -314,6 +315,8 @@ const OverviewPage: React.FC = () => {
           </span>
         </div>
       </Card>
+
+      {can("view") && <TenancyHealthCard />}
     </div>
   );
 };

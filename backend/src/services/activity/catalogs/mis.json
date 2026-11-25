@@ -82,6 +82,7 @@
     { "key": "mis.safeguarding", "label": "Safeguarding", "module": "Platform", "patterns": ["/safeguarding"] },
     { "key": "mis.register_school", "label": "Register a school", "module": "Public", "patterns": ["/register-school", "/register"], "public": true },
     { "key": "mis.platform_console", "label": "Platform console", "module": "Platform", "patterns": ["/platform"] },
+    { "key": "mis.switch_school", "label": "Switch school", "module": "Account", "patterns": ["/switch-school"] },
     { "key": "mis.support_session", "label": "Support session", "module": "Public", "patterns": ["/support-session"], "public": true },
     { "key": "mis.subscription", "label": "Subscription", "module": "Platform", "patterns": ["/settings/subscription"] },
     { "key": "mis.support_access", "label": "Support access", "module": "Platform", "patterns": ["/settings/support"] },
