@@ -15,7 +15,7 @@ const Footer: React.FC<FooterProps> = ({ className = "" }) => {
         <div className="flex flex-col sm:flex-row items-center justify-between space-y-2 sm:space-y-0">
           {/* Copyright */}
           <div className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
-            © {currentYear} NGA Central MIS. All rights reserved.
+            © {currentYear} Amashuri. All rights reserved.
           </div>
 
           {/* Quick Links */}

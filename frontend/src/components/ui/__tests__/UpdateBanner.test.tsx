@@ -17,7 +17,7 @@ describe("UpdateBanner", () => {
     const script = boot("index-OLD111.js");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('<script type="module" src="/assets/index-NEW222.js"></script>') }));
     render(<UpdateBanner enabled />);
-    expect(await screen.findByText("A new version of NGA MIS is available.")).toBeInTheDocument();
+    expect(await screen.findByText("A new version of Amashuri is available.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
     script.remove();
   });

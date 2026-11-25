@@ -61,7 +61,7 @@ const UpdateBanner: React.FC<{ enabled?: boolean }> = ({ enabled = import.meta.e
       className="fixed inset-x-4 bottom-4 z-[1100] mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-blue-200 bg-white px-4 py-3 text-sm shadow-xl dark:border-blue-500/30 dark:bg-slate-800"
     >
       <RefreshCw className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />
-      <p className="flex-1 text-slate-800 dark:text-slate-100">A new version of NGA MIS is available.</p>
+      <p className="flex-1 text-slate-800 dark:text-slate-100">A new version of Amashuri is available.</p>
       <button
         type="button"
         onClick={() => window.location.reload()}

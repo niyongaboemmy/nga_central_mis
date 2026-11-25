@@ -18,7 +18,7 @@ import {
 } from "./desktopDownload";
 
 /**
- * /apps: get NGA Desktop, the one app for NGA MIS, Task Mentor, Tendo and
+ * /apps: get NGA Desktop, the one app for Amashuri, Task Mentor, Tendo and
  * Tupo on Windows and macOS (nga-desktop). The download fitting this
  * computer comes first; every download is counted by the API
  * (/desktop/download/:platform) and installed apps update themselves.
@@ -188,7 +188,7 @@ export const AppsInstaller: React.FC = () => {
               </div>
               <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">All NGA apps in one desktop app</h1>
               <p className="mt-3 text-base text-white/85">
-                NGA MIS, Task Mentor, Tendo and Tupo in one window, for Windows and macOS.
+                Amashuri, Task Mentor, Tendo and Tupo in one window, for Windows and macOS.
               </p>
               <ul className="mt-5 flex flex-wrap gap-2">
                 {FEATURES.map(({ icon: Icon, text }) => (
@@ -374,7 +374,7 @@ export const AppsInstallerPage: React.FC = () => {
           </button>
           <p className="text-sm font-semibold text-slate-900 dark:text-white">NGA Desktop</p>
           <a href="/home" className="rounded-xl px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-slate-100 dark:text-brand-200 dark:hover:bg-slate-800">
-            Open NGA MIS
+            Open Amashuri
           </a>
         </div>
       </header>

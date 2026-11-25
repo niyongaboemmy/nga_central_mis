@@ -33,7 +33,7 @@ const origin = (value: string | undefined, fallback: string) => (value || fallba
 export const NGA_APPS: NgaApp[] = [
   {
     key: "mis",
-    name: "NGA MIS",
+    name: "Amashuri",
     description: "Timetable, lessons, reminders, reports",
     origin: origin(env.VITE_APP_ORIGIN_MIS, "https://mis.amashuri.com"),
     startPath: "/home?source=pwa",
@@ -109,7 +109,7 @@ export const markStep = (progress: Progress, key: NgaApp["key"], status: StepSta
 export const installedCount = (progress: Progress, apps: NgaApp[] = NGA_APPS) => apps.filter((a) => isInstalled(progress[a.key])).length;
 
 /**
- * The status of the app this installer page belongs to (NGA MIS) follows the
+ * The status of the app this installer page belongs to (Amashuri) follows the
  * browser's live answer both ways: a saved "installed" from an earlier visit
  * must not outlive an uninstall (the install icon in the address bar and
  * beforeinstallprompt both mean "not installed here").

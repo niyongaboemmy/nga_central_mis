@@ -67,7 +67,7 @@ const WelcomePopup: React.FC<WelcomePopupProps> = ({ onClose }) => {
               transition={{ delay: 0.4 }}
               className="text-text-secondary-light dark:text-text-secondary-dark/70 mb-6"
             >
-              Welcome to the NGA Central MIS platform
+              Welcome to the Amashuri platform
             </motion.p>
 
             <motion.button

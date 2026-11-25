@@ -179,7 +179,7 @@ export default function MyActivity() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">My activity</h1>
         <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-          When and where your account was used across NGA MIS, Task Mentor, Tendo and Tupo, so you can spot anything that wasn't you. Nothing you type or
+          When and where your account was used across Amashuri, Task Mentor, Tendo and Tupo, so you can spot anything that wasn't you. Nothing you type or
           read is recorded.
         </p>
       </header>

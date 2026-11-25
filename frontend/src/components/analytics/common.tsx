@@ -14,7 +14,7 @@ import misCatalog from "../../activity/mis.catalog.json";
  */
 export const APPS: AppKey[] = ["mis", "tm", "tendo", "tupo"];
 export const APP_META: Record<AppKey, { label: string; light: string; dark: string }> = {
-  mis: { label: "NGA MIS", light: "#2a78d6", dark: "#3987e5" },
+  mis: { label: "Amashuri", light: "#2a78d6", dark: "#3987e5" },
   tm: { label: "Task Mentor", light: "#eb6834", dark: "#d95926" },
   tendo: { label: "Tendo", light: "#1baf7a", dark: "#199e70" },
   tupo: { label: "Tupo", light: "#eda100", dark: "#c98500" },

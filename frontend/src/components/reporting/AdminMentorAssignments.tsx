@@ -178,7 +178,7 @@ const AdminMentorAssignments: React.FC = () => {
         return;
       }
       MentorshipReportService.download(report, {
-        schoolName: "NGA MIS",
+        schoolName: "Amashuri",
         academicYearName: selectedYearName,
         generatedBy: "Admin",
       });

@@ -63,7 +63,7 @@ const CodePlaygroundPage: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(() => typeof document !== "undefined" && !!document.fullscreenElement);
 
   useEffect(() => {
-    document.title = "Code Playground · NGA MIS";
+    document.title = "Code Playground · Amashuri";
     const onChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);

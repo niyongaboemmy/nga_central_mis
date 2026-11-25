@@ -45,6 +45,7 @@ import {
   School,
 } from "lucide-react";
 import TenantLogo from "./brand/TenantLogo";
+import { AmashuriMark } from "./brand/AmashuriLogo";
 import { loadBranding, readLastSchool } from "../hooks/useTenantBranding";
 
 interface LoginProps {
@@ -495,7 +496,7 @@ const FeatureCarousel = () => {
       className="relative z-10 w-full group"
       role="region"
       aria-roledescription="carousel"
-      aria-label="NGA MIS feature highlights"
+      aria-label="Amashuri feature highlights"
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onMouseEnter={() => setPaused(true)}
@@ -623,8 +624,8 @@ const useLoginBrand = () => {
   const [brand, setBrand] = useState(() => {
     const last = readLastSchool();
     return last
-      ? { isPrimary: last.isPrimary, name: last.isPrimary ? "NGA MIS" : last.name, logoUrl: last.logoUrl }
-      : { isPrimary: true, name: "NGA MIS", logoUrl: null as string | null };
+      ? { isPrimary: last.isPrimary, name: last.isPrimary ? "Amashuri" : last.name, logoUrl: last.logoUrl }
+      : { isPrimary: true, name: "Amashuri", logoUrl: null as string | null };
   });
   useEffect(() => {
     let alive = true;
@@ -665,17 +666,11 @@ const LoginBrandPanel = () => {
       <div className="lg:hidden relative z-10 flex items-center justify-between gap-3 px-5 py-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center p-1.5 shrink-0">
-            <TenantLogo src={brand.logoUrl} name={brand.name} isPrimary={brand.isPrimary} className="w-full h-full" rounded="rounded-md" />
+            {brand.isPrimary ? <AmashuriMark size={24} title="Amashuri" /> : <TenantLogo src={brand.logoUrl} name={brand.name} isPrimary={false} className="w-full h-full" rounded="rounded-md" />}
           </div>
           <div>
             <p className="text-white font-bold leading-tight tracking-tight truncate max-w-[12rem]">
-              {brand.isPrimary ? (
-                <>
-                  NGA<span className="font-light text-blue-100"> MIS</span>
-                </>
-              ) : (
-                brand.name
-              )}
+              {brand.isPrimary ? "Amashuri" : brand.name}
             </p>
           </div>
         </div>
@@ -712,17 +707,11 @@ const LoginBrandPanel = () => {
                 whileHover={{ scale: 1.05, rotate: -3 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
-                <TenantLogo src={brand.logoUrl} name={brand.name} isPrimary={brand.isPrimary} className="w-full h-full" rounded="rounded-lg" />
+                {brand.isPrimary ? <AmashuriMark size={28} title="Amashuri" /> : <TenantLogo src={brand.logoUrl} name={brand.name} isPrimary={false} className="w-full h-full" rounded="rounded-lg" />}
               </motion.div>
               <div className="leading-tight">
                 <span className="text-white text-xl font-bold tracking-tight block truncate max-w-[18rem]">
-                  {brand.isPrimary ? (
-                    <>
-                      NGA<span className="font-light text-blue-100">MIS</span>
-                    </>
-                  ) : (
-                    brand.name
-                  )}
+                  {brand.isPrimary ? "Amashuri" : brand.name}
                 </span>
               </div>
             </div>
@@ -755,7 +744,7 @@ const LoginBrandPanel = () => {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
-            © {new Date().getFullYear()} NGA Central MIS. All rights reserved.
+            © {new Date().getFullYear()} Amashuri. All rights reserved.
           </motion.p>
         </div>
       </div>
@@ -1411,7 +1400,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.3 }}
                     >
-                      Welcome to NGA Central MIS
+                      Welcome to Amashuri
                     </motion.p>
                   </motion.div>
 
@@ -2216,7 +2205,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.3 }}
                     >
-                      Sign in to access NGA Central MIS
+                      Sign in to access Amashuri
                     </motion.p>
                   </motion.div>
 
@@ -2435,7 +2424,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </AnimatePresence>
 
           <div className="mt-6 flex items-center justify-center gap-4 text-xs text-gray-400 dark:text-gray-500">
-            <span>© {new Date().getFullYear()} NGA Central MIS</span>
+            <span>© {new Date().getFullYear()} Amashuri</span>
             <a
               href="/privacy/"
               className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors"

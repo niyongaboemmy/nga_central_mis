@@ -19,7 +19,7 @@ interface Props {
   schoolName?: string;
 }
 
-const MentorshipDashboardWidgets: React.FC<Props> = ({ schoolName = "NGA MIS" }) => {
+const MentorshipDashboardWidgets: React.FC<Props> = ({ schoolName = "Amashuri" }) => {
   const { selectedYearId, selectedYear } = useAcademicPeriod();
   const { user } = useUser();
   const { showToast } = useToast();

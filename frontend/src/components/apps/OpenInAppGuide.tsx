@@ -3,7 +3,7 @@ import { AppWindow, Check, Copy } from "lucide-react";
 import { openAppUrl } from "../../reminders/pwa";
 
 /**
- * NGA MIS is installed, but Chrome opens its links in the browser: the app's
+ * Amashuri is installed, but Chrome opens its links in the browser: the app's
  * "Open supported links" setting is off (Chrome 139+ turns it on by default
  * only for new installs). No web page can change a Chrome setting or open a
  * chrome:// page, so: one switch, explained -- or Chrome's own "Open in app"
@@ -26,10 +26,10 @@ export const OpenInAppGuide: React.FC<{ compact?: boolean }> = ({ compact = fals
       className={`rounded-2xl border border-brand-200 bg-brand-50 text-slate-800 dark:border-brand-600/40 dark:bg-brand-600/10 dark:text-slate-100 ${compact ? "p-3 text-sm" : "p-4 text-sm"}`}
     >
       <p className="flex items-center gap-2 font-semibold text-brand-800 dark:text-brand-100">
-        <AppWindow className="h-4 w-4 flex-shrink-0" /> Open NGA MIS in its app window
+        <AppWindow className="h-4 w-4 flex-shrink-0" /> Open Amashuri in its app window
       </p>
       <p className="mt-1 text-slate-600 dark:text-slate-300">
-        NGA MIS is installed, but Chrome is set to open its links in the browser. Switch it once:
+        Amashuri is installed, but Chrome is set to open its links in the browser. Switch it once:
       </p>
       <ol className="mt-2 list-decimal space-y-1 pl-5">
         <li>

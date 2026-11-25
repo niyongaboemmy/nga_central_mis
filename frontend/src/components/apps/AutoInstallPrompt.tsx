@@ -145,11 +145,11 @@ export const AutoInstallPrompt: React.FC = () => {
     {barOpen && !open && (
       <div
         role="region"
-        aria-label="Install NGA MIS"
+        aria-label="Install Amashuri"
         className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-sm items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 py-2 pl-3 pr-2 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95"
       >
         <Download className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden />
-        <p className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">Install NGA MIS for quicker access</p>
+        <p className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">Install Amashuri for quicker access</p>
         <button
           type="button"
           onClick={() => {
@@ -174,7 +174,7 @@ export const AutoInstallPrompt: React.FC = () => {
     <Modal
       isOpen={open}
       onClose={close}
-      title={pwa.installed && pwa.linksOpenInBrowser ? "Open NGA MIS as an app" : pwa.installed ? "NGA MIS is installed" : "Install NGA MIS as an app"}
+      title={pwa.installed && pwa.linksOpenInBrowser ? "Open Amashuri as an app" : pwa.installed ? "Amashuri is installed" : "Install Amashuri as an app"}
       size="md"
     >
       <div className="space-y-4">

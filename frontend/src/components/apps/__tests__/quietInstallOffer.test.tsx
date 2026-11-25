@@ -40,7 +40,7 @@ beforeEach(() => {
 describe("quiet install offer", () => {
   it("offers a small bar, not a blocking sheet, on an ordinary visit", async () => {
     renderPrompt();
-    expect(await screen.findByRole("region", { name: "Install NGA MIS" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Install Amashuri" })).toBeInTheDocument();
     expect(screen.queryByText("install steps")).toBeNull();
   });
 
@@ -48,13 +48,13 @@ describe("quiet install offer", () => {
     renderPrompt();
     await userEvent.click(await screen.findByRole("button", { name: "Install" }));
     expect(screen.getByText("install steps")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Install NGA MIS" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Install Amashuri" })).toBeNull();
   });
 
   it("'Not now' keeps it away for weeks, across browser sessions", async () => {
     renderPrompt();
     await userEvent.click(await screen.findByRole("button", { name: "Not now" }));
-    expect(screen.queryByRole("region", { name: "Install NGA MIS" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Install Amashuri" })).toBeNull();
     sessionStorage.clear(); // a new browser session
     expect(autoPromptSnoozed()).toBe(true);
     expect(autoPromptSnoozed(Date.now() + (AUTO_DISMISS_DAYS + 1) * 86_400_000)).toBe(false);
@@ -69,7 +69,7 @@ describe("quiet install offer", () => {
     state.token = null;
     renderPrompt();
     await new Promise((r) => setTimeout(r, 20));
-    expect(screen.queryByRole("region", { name: "Install NGA MIS" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Install Amashuri" })).toBeNull();
   });
 
   it("still opens the full sheet when the NGA installer asks, despite 'Not now'", async () => {

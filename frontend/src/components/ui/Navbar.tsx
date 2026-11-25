@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
-import TenantLogo from "../brand/TenantLogo";
-import { useTenantBranding } from "../../hooks/useTenantBranding";
+import { AmashuriMark } from "../brand/AmashuriLogo";
 import { useUser } from "../../contexts/UserContext";
 import SystemsMenu from "./SystemsMenu";
 import AcademicPeriodSelector from "./AcademicPeriodSelector";
@@ -45,13 +44,10 @@ const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const location = useLocation();
   const { user, logout } = useUser();
-  // The signed-in school's name and logo (MIS-S10).
-  const brand = useTenantBranding();
-  // Every school, NGA included, shows the logo uploaded in Tenants & Schools.
-  const brandMark = (size: string) => (
-    <TenantLogo src={brand.logoUrl} name={brand.isPrimary ? "NGA Central MIS" : brand.name} isPrimary={brand.isPrimary} className={size} />
-  );
-  const brandName = brand.isPrimary ? "NGA MIS" : brand.name;
+  // The product is Amashuri: its logo and name lead the top bar for every school.
+  // The school itself shows in the sidebar header and the school switcher.
+  const brandMark = (size: string) => <AmashuriMark size={size === "w-10 h-10" ? 40 : 36} title="Amashuri" />;
+  const brandName = "Amashuri";
   // My AI (own AI keys): staff hold AI_PERSONAL_PROVIDERS, students the _STUDENT variant.
   const access = useAccess();
   const { hasPermission } = usePermissions();

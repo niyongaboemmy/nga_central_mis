@@ -5,7 +5,7 @@ import { getPwaState, refreshInstallCheck, resetInstallCheckForTests } from "../
 import NavAppActions from "../NavAppActions";
 
 /**
- * "Is NGA MIS installed?" comes from the browser (getInstalledRelatedApps),
+ * "Is Amashuri installed?" comes from the browser (getInstalledRelatedApps),
  * live -- a remembered note goes stale when the app is uninstalled. The top
  * bar shows "Open app" only when that answer is yes, in a browser tab.
  */
@@ -74,7 +74,7 @@ describe("a leftover record: listed as installed, but Chrome offers to install i
     expect(getPwaState().canPrompt).toBe(true);
     expect(getInstallDiagnostics().leftoverRecord).toBe(true);
     renderAt();
-    expect(screen.queryByRole("link", { name: "Open the NGA MIS app" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open the Amashuri app" })).toBeNull();
     // Stays that way on the periodic re-check.
     expect(await refreshInstallCheck()).toBe("no");
   });
@@ -149,7 +149,7 @@ describe("'Open app' landing in a browser tab", () => {
       await refreshInstallCheck();
     });
     renderAt();
-    expect(screen.getByRole("link", { name: "Open the NGA MIS app" })).toHaveAttribute("href", `${window.location.origin}/home?source=pwa&nga_open=1`);
+    expect(screen.getByRole("link", { name: "Open the Amashuri app" })).toHaveAttribute("href", `${window.location.origin}/home?source=pwa&nga_open=1`);
   });
 });
 
@@ -196,7 +196,7 @@ describe("top-bar app controls", () => {
       await refreshInstallCheck();
     });
     renderAt();
-    const open = screen.getByRole("link", { name: "Open the NGA MIS app" });
+    const open = screen.getByRole("link", { name: "Open the Amashuri app" });
     expect(open).toHaveAttribute("href", `${window.location.origin}/home?source=pwa&nga_open=1`);
     expect(open).toHaveAttribute("target", "_blank");
     expect(open).toHaveAttribute("rel", "noopener"); // required for Chrome to open it in the app
@@ -209,13 +209,13 @@ describe("top-bar app controls", () => {
       await refreshInstallCheck();
     });
     renderAt();
-    expect(screen.queryByRole("link", { name: "Open the NGA MIS app" })).toBeNull();
-    expect(screen.getByRole("link", { name: /Install the NGA apps \(NGA MIS isn't installed/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open the Amashuri app" })).toBeNull();
+    expect(screen.getByRole("link", { name: /Install the NGA apps \(Amashuri isn't installed/ })).toBeInTheDocument();
   });
 
   it("unknown (browser can't say): never claims installed", () => {
     renderAt();
-    expect(screen.queryByRole("link", { name: "Open the NGA MIS app" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open the Amashuri app" })).toBeNull();
   });
 
   it("stays out of the way on the installer page itself", () => {

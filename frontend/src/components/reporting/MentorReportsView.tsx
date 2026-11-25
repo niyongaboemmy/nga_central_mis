@@ -124,7 +124,7 @@ const MentorReportsView: React.FC<Props> = ({ onBack }) => {
         return;
       }
       MentorshipReportService.download(data, {
-        schoolName: "NGA MIS",
+        schoolName: "Amashuri",
         academicYearName: selectedYear?.name ?? "",
         generatedBy: instructorName,
       });
