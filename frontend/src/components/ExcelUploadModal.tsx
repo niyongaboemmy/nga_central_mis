@@ -12,7 +12,8 @@ import {
   Check,
   AlertTriangle,
 } from "lucide-react";
-import { getRoles, bulkCreateUsers, Role } from "../api/users";
+import { getRoles, bulkCreateUsers, otherSchoolMatchesOf, Role, type OtherSchoolMatch } from "../api/users";
+import OtherSchoolReview from "./users/OtherSchoolReview";
 import { useToast } from "../contexts/ToastContext";
 import * as XLSX from "xlsx";
 import SelectField from "./ui/SelectField";
@@ -124,6 +125,13 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
     errors: string[];
   } | null>(null);
   const [step, setStep] = useState<UploadStep>("upload");
+  // Rows the server found in another school (nothing created yet) and the ones to add anyway.
+  const [otherMatches, setOtherMatches] = useState<OtherSchoolMatch[] | null>(null);
+  const [addRows, setAddRows] = useState<Set<number>>(new Set());
+  const clearOtherMatches = () => {
+    setOtherMatches(null);
+    setAddRows(new Set());
+  };
   const [dragActive, setDragActive] = useState(false);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -223,6 +231,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
     }
 
     setFile(selectedFile);
+    clearOtherMatches();
     setError(null);
 
     const reader = new FileReader();
@@ -280,7 +289,8 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
     try {
       const result = await bulkCreateUsers(
         file,
-        selectedRole ? Number(selectedRole) : undefined
+        selectedRole ? Number(selectedRole) : undefined,
+        otherMatches ? { addRows: [...addRows] } : undefined,
       );
       setUploadStatus(result);
       setStep("complete");
@@ -289,14 +299,31 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
         const noEmail = result.without_email
           ? ` (${result.without_email} without an e-mail: they can't sign in)`
           : "";
+        const skipped = result.skipped_other_school
+          ? `, ${result.skipped_other_school} skipped (already in another school)`
+          : "";
         showToast(
-          `${result.success} user${result.success === 1 ? "" : "s"} created${noEmail}${result.failed ? `, ${result.failed} failed` : ""}`,
+          `${result.success} user${result.success === 1 ? "" : "s"} created${skipped}${noEmail}${result.failed ? `, ${result.failed} failed` : ""}`,
           result.failed ? "warning" : "success",
         );
+      } else if (result.skipped_other_school) {
+        showToast(`No users were created: ${result.skipped_other_school} skipped (already in another school)`, "warning");
       } else {
         showToast("No users were created", "error");
       }
     } catch (err: any) {
+      const matches = otherSchoolMatchesOf(err);
+      if (matches) {
+        // Nothing was created: the admin decides who to add, then uploads again.
+        setOtherMatches(matches);
+        setAddRows(new Set());
+        setStep("preview");
+        showToast(
+          `${matches.length} ${matches.length === 1 ? "person is" : "people are"} already in another school. Choose who to add.`,
+          "warning",
+        );
+        return;
+      }
       const status: number | undefined = err.response?.status;
       const serverMessage: string | undefined = err.response?.data?.message;
       if (!err.response) {
@@ -391,6 +418,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
 
   const resetForm = () => {
     setFile(null);
+    clearOtherMatches();
     setRawRows([]);
     setError(null);
     setWarning(null);
@@ -652,6 +680,21 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                   exit={{ opacity: 0, y: -10 }}
                   className="space-y-4"
                 >
+                  {otherMatches && (
+                    <OtherSchoolReview
+                      matches={otherMatches}
+                      addRows={addRows}
+                      onToggle={(row) =>
+                        setAddRows((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(row)) next.delete(row);
+                          else next.add(row);
+                          return next;
+                        })
+                      }
+                    />
+                  )}
+
                   {/* File Info */}
                   <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-900 rounded-xl">
                     <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
@@ -669,6 +712,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                     <button
                       onClick={() => {
                         setFile(null);
+                        clearOtherMatches();
                         setRawRows([]);
                         setStep("upload");
                       }}
@@ -962,6 +1006,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                   <button
                     onClick={() => {
                       setFile(null);
+                      clearOtherMatches();
                       setRawRows([]);
                       setStep("upload");
                     }}
@@ -990,7 +1035,9 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                       ) : (
                         <>
                           <Upload className="w-4 h-4" />
-                          Upload {validCount} Valid
+                          {otherMatches
+                            ? `Upload, skip ${otherMatches.length - addRows.size}`
+                            : `Upload ${validCount} Valid`}
                         </>
                       )}
                     </button>

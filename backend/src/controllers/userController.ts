@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { queueDirectorySync, removeDirectoryUser } from "../tenancy/directory";
-import { tenantBlock } from "../tenancy/claims";
+import { responseTenant, tenantBlock } from "../tenancy/claims";
 import { avatarUrls, profileMedia, withAvatar } from "../services/avatar/urls";
 import { getPublicSystems } from "../utils/publicSystems";
 import crypto from "crypto";
@@ -73,6 +73,7 @@ import { disableCredentialsOf } from "../services/ai/personal/credentials";
 import { revokeUserTokens } from "../services/mcp/oauthStore";
 import { checkPeopleLimit } from "../services/tenantMgmt/featureGate";
 import { limitRefusal } from "../services/tenantMgmt/entitlements";
+import { otherSchoolMatches } from "../services/tenantMgmt/uploadOtherSchools";
 import { signOutEverywhereLocal } from "../services/activity/control";
 
 /** A disabled / suspended account loses every session at once: bump
@@ -1371,6 +1372,41 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
   const headCount = await checkPeopleLimit(validatedUserType);
   if (!headCount.ok) return res.status(403).json(limitRefusal(headCount));
 
+  // People of ANOTHER school in this file (2026-11-25: a staff file uploaded into
+  // the wrong school gave six teachers a second account there). Until the admin
+  // decides (other_schools=decided), nothing is created and the rows are named;
+  // then flagged rows are skipped unless listed in add_rows.
+  const otherSchools = await otherSchoolMatches(
+    (data as any[]).map((r, i) => ({
+      row: i + 2,
+      username: r?.username?.toString(),
+      email: r?.email?.toString(),
+      first_name: r?.first_name?.toString(),
+      last_name: r?.last_name?.toString(),
+    })),
+    responseTenant(),
+    Number(req.user?.userId),
+  );
+  if (otherSchools.length && req.body?.other_schools !== "decided") {
+    return res.status(409).json({
+      success: false,
+      code: "OTHER_SCHOOL_MATCHES",
+      message: `${otherSchools.length} ${otherSchools.length === 1 ? "person in this file is" : "people in this file are"} already in another school.`,
+      data: { matches: otherSchools, total_rows: data.length },
+    });
+  }
+  const addAnyway = new Set<number>(
+    (() => {
+      try {
+        const v = JSON.parse(String(req.body?.add_rows ?? "[]"));
+        return Array.isArray(v) ? v.map(Number).filter(Number.isInteger) : [];
+      } catch {
+        return [];
+      }
+    })(),
+  );
+  const skipRows = new Set(otherSchools.map((m) => m.row).filter((row) => !addAnyway.has(row)));
+
   // bcrypt (cost 12) is CPU work on libuv's thread pool: hashing every temporary password
   // up front, several at once, instead of one per row inside the loop, keeps a 30-row
   // file well inside the request timeout (it took ~12 s and the browser gave up at 10 s).
@@ -1385,6 +1421,7 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
   for (let i = 0; i < data.length; i++) {
     const row = data[i] as any;
     const rowNum = i + 2; // Excel row number (1-based, with header)
+    if (skipRows.has(rowNum)) continue; // already in another school, not chosen
 
     try {
       // Validate required fields
@@ -1555,7 +1592,7 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
       `Bulk created ${successCount} users via Excel upload`,
       "User",
       undefined,
-      { successCount, failedCount, withoutEmail, totalRows: data.length, roleId: role_id },
+      { successCount, failedCount, withoutEmail, skippedOtherSchool: skipRows.size, addedFromOtherSchool: otherSchools.length - skipRows.size, totalRows: data.length, roleId: role_id },
       req.user.userId,
     );
   }
@@ -1563,8 +1600,9 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
   successResponse(
     res,
     `Bulk upload complete: ${successCount} created, ${failedCount} failed` +
+      (skipRows.size ? `, ${skipRows.size} skipped (already in another school)` : "") +
       (withoutEmail ? ` (${withoutEmail} without an e-mail: they can't sign in)` : ""),
-    { success: successCount, failed: failedCount, without_email: withoutEmail, errors: errors.slice(0, 10) },
+    { success: successCount, failed: failedCount, skipped_other_school: skipRows.size, without_email: withoutEmail, errors: errors.slice(0, 10) },
   );
 });
 
