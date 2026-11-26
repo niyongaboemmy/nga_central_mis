@@ -106,12 +106,44 @@ describe("students without an e-mail", () => {
 
     await user.click(upload);
     expect(await screen.findByText(/1 without an email: they can't\s+sign in/)).toBeInTheDocument();
-    expect(api.bulkCreateUsers).toHaveBeenCalledWith(expect.any(File), 5);
+    expect(api.bulkCreateUsers).toHaveBeenCalledWith(expect.any(File), 5, undefined);
   });
 
   it("are errors under any other role", async () => {
     await open(/TEACHER/);
     expect(await screen.findByRole("button", { name: /Upload 1 Valid/ }, { timeout: 4000 })).toBeInTheDocument();
     expect(screen.getByText(/Only students may be uploaded without an email/)).toBeInTheDocument();
+  });
+});
+
+describe("people already in another school", () => {
+  it("names them, skips them by default, and uploads again with only the ticked rows", async () => {
+    api.bulkCreateUsers
+      .mockRejectedValueOnce({
+        response: {
+          status: 409,
+          data: {
+            code: "OTHER_SCHOOL_MATCHES",
+            data: {
+              matches: [
+                { row: 2, name: "Ada Lovelace", email: "ada@example.test", username: "ada", schools: [{ tid: 1, school: "School One", by: ["email"] }] },
+                { row: 3, name: "Bob Stone", email: "bob@example.test", username: "bob", schools: [{ tid: 1, school: "School One", by: ["name"] }] },
+              ],
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({ success: 1, failed: 0, skipped_other_school: 1, errors: [] });
+    await uploadWith(undefined);
+    expect(await screen.findByText(/2 people are already in another school/)).toBeInTheDocument();
+    expect(screen.getAllByText("Skipped")).toHaveLength(2);
+    expect(screen.getByText(/same e-mail/)).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("checkbox", { name: "Add Bob Stone anyway" }));
+    expect(screen.getByText("Will be added")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Upload, skip 1/ }));
+    await waitFor(() => expect(api.bulkCreateUsers).toHaveBeenCalledTimes(2));
+    expect(api.bulkCreateUsers).toHaveBeenLastCalledWith(expect.any(File), 4, { addRows: [3] });
   });
 });

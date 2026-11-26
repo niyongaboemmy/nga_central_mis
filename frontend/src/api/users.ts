@@ -1148,14 +1148,35 @@ export const importUserFromSchool = async (body: { identifier: string; sourceTid
   return response.data.data!;
 };
 
+/** A row of an upload that is already a person of another school (server: uploadOtherSchools.ts). */
+export interface OtherSchoolMatch {
+  row: number;
+  name: string;
+  email: string | null;
+  username: string | null;
+  schools: Array<{ tid: number; school: string; by: Array<"email" | "username" | "name"> }>;
+}
+
+/** The server named rows already in another school; nothing was created yet. */
+export const otherSchoolMatchesOf = (error: any): OtherSchoolMatch[] | null =>
+  error?.response?.status === 409 && error?.response?.data?.code === "OTHER_SCHOOL_MATCHES"
+    ? (error.response.data.data?.matches as OtherSchoolMatch[]) ?? []
+    : null;
+
 export const bulkCreateUsers = async (
   file: File,
   roleId?: number,
-): Promise<{ success: number; failed: number; without_email?: number; errors: string[] }> => {
+  /** After an OTHER_SCHOOL_MATCHES answer: the flagged rows to add anyway (all others are skipped). */
+  otherSchools?: { addRows: number[] },
+): Promise<{ success: number; failed: number; without_email?: number; skipped_other_school?: number; errors: string[] }> => {
   const formData = new FormData();
   formData.append("file", file);
   if (roleId) {
     formData.append("role_id", roleId.toString());
+  }
+  if (otherSchools) {
+    formData.append("other_schools", "decided");
+    formData.append("add_rows", JSON.stringify(otherSchools.addRows));
   }
 
   try {
@@ -1164,6 +1185,7 @@ export const bulkCreateUsers = async (
         success: number;
         failed: number;
         without_email?: number;
+        skipped_other_school?: number;
         errors: string[];
       }>
     >("/users/bulk", formData, {
