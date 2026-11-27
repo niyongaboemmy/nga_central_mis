@@ -25,6 +25,7 @@ const SupportSessionLanding = lazy(() => import("./components/tenantMgmt/platfor
 import { isRegistrationSite, misHref, useRegistrationSiteHead } from "./utils/registrationSite";
 const LandingPage = lazy(() => import("./components/landing/LandingPage"));
 const DevelopersPage = lazy(() => import("./components/developers/DevelopersPage"));
+const StaffDocsPage = lazy(() => import("./components/docs/StaffDocsPage"));
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
@@ -1255,6 +1256,37 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <StaffCover />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            {/* Staff documentation: one folder of guides per app (src/docs/README.md). */}
+            <Route
+              path="/docs"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={null}><StaffDocsPage /></Suspense>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/docs/:module"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={null}><StaffDocsPage /></Suspense>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/docs/:module/:guide"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={null}><StaffDocsPage /></Suspense>
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }
