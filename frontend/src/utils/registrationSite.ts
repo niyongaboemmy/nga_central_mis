@@ -4,7 +4,7 @@
  * The same build is served on two hosts:
  *  - VITE_REGISTRATION_SITE_URL (https://amashuri.com): a school starts here.
  *    "/" is the landing page, /register the registration wizard, /onboarding the
- *    applicant tracker; everything else is sent to the MIS app.
+ *    applicant tracker, /developers the integration guide; everything else is sent to the MIS app.
  *  - VITE_MIS_APP_URL (https://mis.amashuri.com): the MIS itself.
  *
  * Unset (local dev, tests): there is one host and everything stays relative.
@@ -33,7 +33,7 @@ export function isRegistrationSite(host: string = window.location.host): boolean
 }
 
 /** Paths the registration site serves itself. */
-export const REGISTRATION_SITE_PATHS = ["/", "/register", "/onboarding"];
+export const REGISTRATION_SITE_PATHS = ["/", "/register", "/onboarding", "/developers"];
 
 /** Where "Register your school" goes: the registration site when it is another host. */
 export function registerSchoolHref(): string {

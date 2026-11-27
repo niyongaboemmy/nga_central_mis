@@ -287,6 +287,7 @@ const Footer: React.FC = () => (
       <nav className="flex flex-wrap items-center gap-x-5 gap-y-2" aria-label="Footer">
         <a href="/privacy/" className="hover:text-[var(--lp-text)] hover:underline">Privacy</a>
         <a href="/terms/" className="hover:text-[var(--lp-text)] hover:underline">Terms</a>
+        <Link to="/developers" className="hover:text-[var(--lp-text)] hover:underline">Developers</Link>
         <a href={misHref("/login")} className="hover:text-[var(--lp-text)] hover:underline">Sign in</a>
         <span>© {new Date().getFullYear()} Amashuri</span>
       </nav>

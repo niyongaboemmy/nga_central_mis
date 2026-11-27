@@ -24,6 +24,7 @@ const SupportAccessPage = lazy(() => import("./components/tenantMgmt/account/Sup
 const SupportSessionLanding = lazy(() => import("./components/tenantMgmt/platform/SupportSessionLanding"));
 import { isRegistrationSite, misHref, useRegistrationSiteHead } from "./utils/registrationSite";
 const LandingPage = lazy(() => import("./components/landing/LandingPage"));
+const DevelopersPage = lazy(() => import("./components/developers/DevelopersPage"));
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
@@ -314,6 +315,7 @@ const RegistrationSiteRoutes: React.FC = () => {
       <Route path="/" element={<Suspense fallback={null}><LandingPage /></Suspense>} />
       <Route path="/register" element={<Suspense fallback={null}><RegisterSchoolPage /></Suspense>} />
       <Route path="/register-school" element={<Navigate to="/register" replace />} />
+      <Route path="/developers" element={<Suspense fallback={null}><DevelopersPage /></Suspense>} />
       <Route
         path="/onboarding"
         element={<Suspense fallback={null}><OnboardingTracker /></Suspense>}
@@ -490,6 +492,8 @@ function App() {
             {/* Install every NGA app from one place. Public on purpose: a new
                 device can be set up before anyone signs in (docs/APP_LAUNCH.md). */}
             <Route path="/apps" element={<AppsInstallerPage />} />
+            {/* Integration guide for partner developers: SSO, sync, reminders. Public. */}
+            <Route path="/developers" element={<Suspense fallback={null}><DevelopersPage /></Suspense>} />
             {/* NGA desktop app: sign in through the browser, Postman-style (public, unwrapped). */}
             <Route path="/desktop/signin" element={<DesktopBrowserSignIn />} />
             <Route path="/desktop/complete" element={<DesktopSignInComplete />} />

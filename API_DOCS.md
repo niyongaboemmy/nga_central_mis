@@ -194,6 +194,8 @@ Request password reset.
 These endpoints are used for cross-domain authentication (OAuth2-style).
 
 > [!TIP]
+> **Developers page**: partner developers should start at `/developers` (https://amashuri.com/developers), which covers SSO, single sign-out, data sync, learning events and reminders with samples.
+>
 > **Integration Guide**: For a complete step-by-step tutorial on implementing SSO in your application (including backend code examples), please refer to the **[Client SSO Integration Guide](./SSO_CLIENT_INTEGRATION.md)**.
 
 ### GET /sso/authorize

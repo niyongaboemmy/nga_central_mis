@@ -1,5 +1,10 @@
 # NGA Central MIS: SSO Integration Guide
 
+> **Developers page:** this guide is published, with copy-ready samples in cURL, Node.js, Python and PHP, at
+> `/developers` (https://amashuri.com/developers, https://mis.amashuri.com/developers). The page is rendered from
+> `frontend/src/components/developers/content.ts`. When you change this file, `docs/SINGLE_SIGN_OUT.md`,
+> `docs/REMINDER_HUB.md` (Source API) or `packages/tenancy/CONTRACT.md`, update `content.ts` in the same change.
+
 This guide explains how to integrate your application with the NGA Central MIS Single Sign-On (SSO) system using the standard OAuth2 Authorization Code Flow. This allows users to sign in to your application using their NGA Central MIS credentials.
 
 ## Overview
@@ -33,7 +38,7 @@ Add these variables to your project's `.env` files.
 
 ```ini
 # The URL for the user login interface
-VITE_MIS_LOGIN_URL=https://nga.ac.rw/mis/login
+VITE_MIS_LOGIN_URL=https://mis.amashuri.com/login
 # Your unique application identifier
 VITE_SSO_CLIENT_ID=your_client_id
 ```
@@ -161,7 +166,7 @@ Authorization: Bearer <your_jwt_token>
 
 | Error                                | Possible Cause         | Solution                                                                                                               |
 | :----------------------------------- | :--------------------- | :--------------------------------------------------------------------------------------------------------------------- |
-| **404 Not Found** on Redirect        | Wrong Login URL        | Ensure you use `https://nga.ac.rw/mis/login`, NOT the API URL.                                                         |
+| **404 Not Found** on Redirect        | Wrong Login URL        | Ensure you use `https://mis.amashuri.com/login`, NOT the API URL.                                                         |
 | **Invalid Authorization Code**       | Code reused or expired | Codes are one-time use and expire after **5 minutes**. Ensure your frontend sends it only once (use `useRef` in React strict mode). |
 | **JsonWebTokenError**                | Stale local token      | Clear `localStorage` of old tokens. Ensure your app uses the fresh cookie/token from the SSO exchange.                 |
 | **401 Unauthorized** during exchange | Bad Secret             | Check `SSO_CLIENT_SECRET` matches the one in MIS Admin.                                                                |
