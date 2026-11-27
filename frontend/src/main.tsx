@@ -3,6 +3,8 @@ import ReactDOM from "react-dom/client";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import "./index.css";
 import App from "./App";
+// The document letterhead reads the signed-in school's header and footer from here.
+import "./services/letterheadSource";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { UserProvider } from "./contexts/UserContext";
 import { initPwa } from "./reminders/pwa";

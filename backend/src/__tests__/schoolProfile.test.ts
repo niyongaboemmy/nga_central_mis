@@ -83,3 +83,25 @@ describe("subject module weight", () => {
     expect((row as any).module_weight).toBeNull();
   });
 });
+
+describe("document letterhead footer (migration 150)", () => {
+  it("saves footer text line by line, refuses more than four lines, and returns it", async () => {
+    const save = await request(app)
+      .put("/schools/profile")
+      .set("Authorization", `Bearer ${signToken(admin)}`)
+      .send({ documents_footer_text: "  Tel: +250 700 000 000  \n\n  www.school.example \n" });
+    expect(save.status).toBe(200);
+    expect(save.body.data.documents_footer_text).toBe("Tel: +250 700 000 000\nwww.school.example");
+    expect(save.body.data).toHaveProperty("documents_footer_url");
+
+    const tooMany = await request(app)
+      .put("/schools/profile")
+      .set("Authorization", `Bearer ${signToken(admin)}`)
+      .send({ documents_footer_text: "1\n2\n3\n4\n5" });
+    expect(tooMany.status).toBe(400);
+
+    const read = await request(app).get("/schools/profile").set("Authorization", `Bearer ${signToken(teacher)}`);
+    expect(read.body.data.documents_footer_text).toBe("Tel: +250 700 000 000\nwww.school.example");
+    await db.update(School).set({ documents_footer_text: before.documents_footer_text ?? null } as any).where(eq(School.school_id, schoolId));
+  });
+});

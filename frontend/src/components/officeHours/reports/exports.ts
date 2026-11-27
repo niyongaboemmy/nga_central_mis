@@ -45,10 +45,14 @@ export const exportXlsx = async (tables: ExportTable[], fileTitle: string) => {
 export const exportPdf = async (tables: ExportTable[], fileTitle: string, scopeLine: string) => {
   const { default: jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
+  const { letterheadFrame, loadLetterhead, stampLetterhead } = await import("../../../utils/documentLetterhead");
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-  let y = 40;
+  // The school's letterhead: content starts under the header and stops above the footer.
+  const lh = await loadLetterhead();
+  const frame = letterheadFrame(doc, lh);
+  let y = Math.max(40, frame.top + 14);
   doc.setFontSize(16);
-  doc.text("NGA · Office hours", 40, y);
+  doc.text("Office hours", 40, y);
   doc.setFontSize(10);
   doc.text(`${fileTitle} · ${scopeLine} · generated ${new Date().toLocaleString("en-GB")}`, 40, (y += 16));
   for (const t of tables) {
@@ -65,14 +69,16 @@ export const exportPdf = async (tables: ExportTable[], fileTitle: string, scopeL
       body: t.rows.map((r) => r.map((v) => (v === null || v === undefined ? "" : String(v)))),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [29, 78, 216] },
-      margin: { left: 40, right: 40 },
+      margin: { left: 40, right: 40, top: frame.top, bottom: frame.bottom },
     });
     y = (doc as any).lastAutoTable.finalY;
-    if (y > 480) {
+    // Room for the next table's title and a few rows, or it starts on a new page.
+    if (y > frame.pageBottom - 90) {
       doc.addPage();
-      y = 20;
+      y = frame.top - 10;
     }
   }
+  stampLetterhead(doc, lh, { note: `Office hours · ${fileTitle}` });
   doc.save(`${slug(fileTitle)}.pdf`);
 };
 

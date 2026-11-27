@@ -14,6 +14,7 @@ import {
   ShadingType,
 } from "docx";
 import { LessonPlan } from "../api/lessonPlan";
+import { Letterhead, currentLetterhead, letterheadFrame, loadLetterhead, stampLetterhead } from "../utils/documentLetterhead";
 
 const ACCENT: [number, number, number] = [37, 99, 235]; // blue-600
 const TAN: [number, number, number] = [219, 196, 162]; // matches SchemeReportService branding
@@ -54,32 +55,36 @@ const fileBaseName = (plan: LessonPlan) =>
 // PDF
 // ─────────────────────────────────────────────────────────────────────────
 
-const buildPDF = (plan: LessonPlan): jsPDF => {
+// `lh` is the school's letterhead (header and footer on every page); downloadPDF loads it.
+const buildPDF = (plan: LessonPlan, lh: Letterhead = currentLetterhead()): jsPDF => {
   const doc = new jsPDF("p", "mm", "a4");
   const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
+  const frame = letterheadFrame(doc, lh, { sideMm: margin });
+  // The title band sits under the school's header (at the very top when there is none).
+  const dy = lh.header || lh.schoolName ? frame.top : 0;
+  const pageTop = Math.max(20, frame.top + 4);
 
   let y = 0;
 
   // ── Header band ──────────────────────────────────────────────────────
   doc.setFillColor(...ACCENT);
-  doc.rect(0, 0, pageWidth, 32, "F");
+  doc.rect(0, dy, pageWidth, 32, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.text(
     `LESSON PLAN  •  WEEK ${plan.week || "N/A"}  •  ${getTotalDuration(plan)} MINS`,
     margin,
-    12,
+    12 + dy,
   );
   doc.setFontSize(18);
-  doc.text(plan.module_name || plan.session_code || "Lesson Plan", margin, 22);
+  doc.text(plan.module_name || plan.session_code || "Lesson Plan", margin, 22 + dy);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(formatDate(plan.lesson_date), margin, 28);
+  doc.text(formatDate(plan.lesson_date), margin, 28 + dy);
 
-  y = 40;
+  y = 40 + dy;
 
   // ── Overview grid ────────────────────────────────────────────────────
   autoTable(doc, {
@@ -126,7 +131,7 @@ const buildPDF = (plan: LessonPlan): jsPDF => {
       2: { cellWidth: 32 },
       3: { cellWidth: "auto" as const },
     },
-    margin: { left: margin, right: margin },
+    margin: { left: margin, right: margin, top: pageTop, bottom: frame.bottom },
   });
   y = (doc as any).lastAutoTable.finalY + 6;
 
@@ -151,9 +156,9 @@ const buildPDF = (plan: LessonPlan): jsPDF => {
   }
 
   const ensureSpace = (needed: number) => {
-    if (y + needed > pageHeight - 20) {
+    if (y + needed > frame.pageBottom) {
       doc.addPage();
-      y = 20;
+      y = pageTop;
     }
   };
 
@@ -185,7 +190,7 @@ const buildPDF = (plan: LessonPlan): jsPDF => {
       styles: { fontSize: 8.5, cellPadding: 2.5, lineColor: [180, 180, 180] as any, lineWidth: 0.1 },
       headStyles: { fillColor: TAN as any, textColor: BLACK as any, fontStyle: "bold" as const },
       columnStyles: { 0: { cellWidth: 18 }, 2: { cellWidth: 22 }, 3: { cellWidth: 45 } },
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, top: pageTop, bottom: frame.bottom },
     });
     y = (doc as any).lastAutoTable.finalY + 8;
 
@@ -210,7 +215,7 @@ const buildPDF = (plan: LessonPlan): jsPDF => {
         styles: { fontSize: 8.5, cellPadding: 2.5, lineColor: [180, 180, 180] as any, lineWidth: 0.1 },
         headStyles: { fillColor: [235, 235, 235] as any, textColor: BLACK as any, fontStyle: "bold" as const },
         columnStyles: { 0: { cellWidth: 15 } },
-        margin: { left: margin, right: margin },
+        margin: { left: margin, right: margin, top: pageTop, bottom: frame.bottom },
       });
       y = (doc as any).lastAutoTable.finalY + 8;
     }
@@ -233,7 +238,7 @@ const buildPDF = (plan: LessonPlan): jsPDF => {
       styles: { fontSize: 8.5, cellPadding: 2.5, lineColor: [180, 180, 180] as any, lineWidth: 0.1 },
       headStyles: { fillColor: TAN as any, textColor: BLACK as any, fontStyle: "bold" as const },
       columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 18 } },
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, top: pageTop, bottom: frame.bottom },
     });
     y = (doc as any).lastAutoTable.finalY + 8;
   }
@@ -249,7 +254,7 @@ const buildPDF = (plan: LessonPlan): jsPDF => {
       styles: { fontSize: 8.5, cellPadding: 2.5, lineColor: [180, 180, 180] as any, lineWidth: 0.1 },
       headStyles: { fillColor: TAN as any, textColor: BLACK as any, fontStyle: "bold" as const },
       columnStyles: { 0: { cellWidth: 40 } },
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, top: pageTop, bottom: frame.bottom },
     });
     y = (doc as any).lastAutoTable.finalY + 8;
   }
@@ -314,22 +319,14 @@ const buildPDF = (plan: LessonPlan): jsPDF => {
     y += 8;
   }
 
-  // ── Footer page numbers ──────────────────────────────────────────────
-  const pageCount = doc.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...GRAY);
-    doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: "right" });
-    doc.text("Amashuri — Lesson Plan", margin, pageHeight - 8);
-  }
+  // ── The school's header and footer, and the page numbers, on every page ──
+  stampLetterhead(doc, lh, { sideMm: margin, note: "Lesson plan" });
 
   return doc;
 };
 
-const downloadPDF = (plan: LessonPlan) => {
-  const doc = buildPDF(plan);
+const downloadPDF = async (plan: LessonPlan) => {
+  const doc = buildPDF(plan, await loadLetterhead());
   doc.save(`${fileBaseName(plan)}.pdf`);
 };
 

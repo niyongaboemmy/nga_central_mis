@@ -4,10 +4,10 @@
  * Same stack as services/pdfExport.ts (Puppeteer printing an HTML page), no new
  * dependency. Rendered on demand, never stored.
  */
-import puppeteer from "puppeteer";
 import { sql } from "drizzle-orm";
 import { primaryDb } from "../../db";
 import { LOGO_DATA_URI } from "../pdfAssets";
+import { Letterhead, letterheadOf, renderPdf } from "../documents/letterhead";
 import type { SerializedInvoice } from "./billing";
 
 export interface InvoicePdfInput {
@@ -22,21 +22,28 @@ const money = (n: number, currency: string) => `${new Intl.NumberFormat("en-RW")
 const day = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Kigali" }) : "—";
 
-/** The primary tenant's school (the platform operator) as the issuer. */
-async function issuer(): Promise<{ name: string; address: string | null; email: string | null; phone: string | null }> {
+type Issuer = { name: string; address: string | null; email: string | null; phone: string | null };
+
+/**
+ * The primary tenant's school (the platform operator) as the issuer, with ITS letterhead:
+ * an invoice is the operator's document, whichever school it is billed to.
+ */
+async function issuer(): Promise<{ from: Issuer; letterhead: Letterhead | null }> {
   try {
-    const rows = (await primaryDb().execute(
-      sql`SELECT name, address, contact_email, contact_phone FROM School WHERE status = 'ACTIVE' ORDER BY school_id LIMIT 1`,
-    )) as any;
+    const rows = (await primaryDb().execute(sql`SELECT * FROM School WHERE status = 'ACTIVE' ORDER BY school_id LIMIT 1`)) as any;
     const r = rows[0]?.[0];
-    if (r) return { name: String(r.name), address: r.address ?? null, email: r.contact_email ?? null, phone: r.contact_phone ?? null };
+    if (r)
+      return {
+        from: { name: String(r.name), address: r.address ?? null, email: r.contact_email ?? null, phone: r.contact_phone ?? null },
+        letterhead: await letterheadOf(r, "primary").catch(() => null),
+      };
   } catch {
     /* no School table: generic issuer */
   }
-  return { name: "NGA Central MIS", address: null, email: null, phone: null };
+  return { from: { name: "Amashuri", address: null, email: null, phone: null }, letterhead: null };
 }
 
-export function buildInvoiceHtml(input: InvoicePdfInput, from: Awaited<ReturnType<typeof issuer>>): string {
+export function buildInvoiceHtml(input: InvoicePdfInput, from: Issuer, logo: string = LOGO_DATA_URI): string {
   const inv = input.invoice;
   const stamp = inv.status === "PAID" ? "PAID" : inv.status === "VOID" ? "VOID" : inv.status === "DRAFT" ? "DRAFT" : null;
   const stampColor = inv.status === "PAID" ? "#047857" : inv.status === "VOID" ? "#b91c1c" : "#64748b";
@@ -72,7 +79,7 @@ export function buildInvoiceHtml(input: InvoicePdfInput, from: Awaited<ReturnTyp
   ${stamp ? `<div class="stamp">${stamp}</div>` : ""}
   <div class="top">
     <div class="brand">
-      <img src="${LOGO_DATA_URI}" alt="" />
+      <img src="${logo}" alt="" />
       <div class="name">${esc(from.name)}</div>
       <div class="meta">${[from.address, from.email, from.phone].filter(Boolean).map(esc).join("<br/>")}</div>
     </div>
@@ -112,23 +119,20 @@ export function buildInvoiceHtml(input: InvoicePdfInput, from: Awaited<ReturnTyp
          ${input.instructions.map((i) => `<div class="item"><b>${esc(i.label)}</b><br/>${esc(i.details)}</div>`).join("")}</div>`
       : ""
   }
-  <div class="foot">${esc(from.name)} · ${esc(inv.number ?? "")}</div>
 </body></html>`;
 }
 
 export async function renderInvoicePdf(input: InvoicePdfInput): Promise<Buffer> {
-  const html = buildInvoiceHtml(input, await issuer());
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  const { from, letterhead } = await issuer();
+  const html = buildInvoiceHtml(input, from, letterhead?.header?.dataUri ?? LOGO_DATA_URI);
+  // The invoice has its own masthead (issuer block + INVOICE), so only the letterhead's
+  // footer and the page numbers are added around it.
+  return renderPdf(html, {
+    sideMm: 16,
+    header: false,
+    minTopMm: 16,
+    minBottomMm: 16,
+    note: [from.name, input.invoice.number].filter(Boolean).join(" · "),
+    letterhead: letterhead ?? { schoolName: from.name, header: null, footer: null, footerLines: [] },
   });
-  try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "load" });
-    const pdf = await page.pdf({ format: "a4", printBackground: true, margin: { top: "16mm", bottom: "16mm", left: "16mm", right: "16mm" } });
-    return Buffer.from(pdf);
-  } finally {
-    await browser.close();
-  }
 }

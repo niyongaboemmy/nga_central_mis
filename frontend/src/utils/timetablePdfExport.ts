@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { letterheadFrame, loadLetterhead, stampLetterhead } from "./documentLetterhead";
 import type { CalendarSlot, CalendarActivity } from "../api/calendar";
 import {
   DAYS,
@@ -44,7 +45,7 @@ const rowWeight = (row: ScheduleRow): number => {
   return 0.8;
 };
 
-export function exportTimetablePdf(
+export async function exportTimetablePdf(
   slots: CalendarSlot[],
   activities: CalendarActivity[],
   ctx: TimetablePdfContext,
@@ -78,26 +79,32 @@ export function exportTimetablePdf(
   const timeColWidth = 24;
   const dayColWidth = (gridWidth - timeColWidth) / DAYS.length;
 
+  // The school's letterhead: the title band sits under its header (at the very top when
+  // there is none) and the grid stops above its footer.
+  const lh = await loadLetterhead();
+  const frame = letterheadFrame(doc, lh, { sideMm: margin });
+  const dy = lh.header || lh.schoolName ? frame.top : 0;
+
   // ── Header block ──────────────────────────────────────────────────────
   doc.setFillColor(37, 99, 235);
-  doc.rect(0, 0, pageWidth, 22, "F");
+  doc.rect(0, dy, pageWidth, 22, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text(ctx.classGroupName || "Class Timetable", gridLeft, 12);
+  doc.text(ctx.classGroupName || "Class Timetable", gridLeft, 12 + dy);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   const subtitleParts = [ctx.yearName, ctx.termName].filter(Boolean);
-  doc.text(subtitleParts.join(" • ") || "Weekly Timetable", gridLeft, 18.5);
+  doc.text(subtitleParts.join(" • ") || "Weekly Timetable", gridLeft, 18.5 + dy);
   doc.setFontSize(8.5);
-  doc.text(`Generated ${new Date().toLocaleString()}`, pageWidth - margin, 18.5, {
+  doc.text(`Generated ${new Date().toLocaleString()}`, pageWidth - margin, 18.5 + dy, {
     align: "right",
   });
 
   const headerRowHeight = 8;
   const legendHeight = 12;
-  const gridTop = 28;
-  const availableHeight = pageHeight - gridTop - legendHeight - margin - headerRowHeight;
+  const gridTop = 28 + dy;
+  const availableHeight = pageHeight - gridTop - legendHeight - Math.max(margin, frame.bottom) - headerRowHeight;
 
   const totalWeight = scheduleRows.reduce((sum, r) => sum + rowWeight(r), 0);
   const rowHeights = scheduleRows.map(
@@ -282,5 +289,6 @@ export function exportTimetablePdf(
     .replace(/\s+/g, "_")
     .replace(/[^\w-]/g, "")
     .toLowerCase();
+  stampLetterhead(doc, lh, { sideMm: margin, note: "Class timetable", pageNumbers: false });
   doc.save(`${fileBase || "timetable"}.pdf`);
 }

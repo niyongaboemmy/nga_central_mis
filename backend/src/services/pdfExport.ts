@@ -1,8 +1,7 @@
-import puppeteer from "puppeteer";
 import katex from "katex";
 import fs from "fs";
 import path from "path";
-import { LOGO_DATA_URI } from "./pdfAssets";
+import { renderPdf } from "./documents/letterhead";
 
 // KaTeX's CSS references its font files via relative `url(fonts/...)` paths, which won't
 // resolve for a page loaded via page.setContent() (no real origin/base URL to resolve
@@ -57,44 +56,6 @@ const ACCENT = "#1d4ed8"; // brand blue
 const ACCENT_SOFT = "#eef2ff";
 const RULE = "#e2e6ee";
 const FONT = `"Segoe UI", Arial, Helvetica, sans-serif`;
-
-// Puppeteer renders headerTemplate/footerTemplate in a constrained frame sized to the
-// page's margins — no access to the page's own <style>, external stylesheets, or custom
-// fonts, and flexbox inside it is unreliable (items collapse/stack instead of sitting on
-// one row, observed directly rather than assumed). A two-cell table is the pattern that
-// actually behaves predictably in this frame, so that's what both templates use. This is
-// the real letterhead: it repeats on every page, which is what makes the export read as
-// an institutional document rather than a one-off printout.
-const buildHeaderTemplate = (docTitle: string) => `
-  <table style="width: 100%; font-family: ${FONT}; border-collapse: collapse; margin: 0 14mm; border-bottom: 1px solid ${RULE};">
-    <tr>
-      <td style="text-align: left; vertical-align: middle; padding-bottom: 6px; white-space: nowrap;">
-        <img src="${LOGO_DATA_URI}" style="height: 14px; width: auto; vertical-align: middle; margin-right: 6px;" /><span style="font-size: 9px; font-weight: 700; letter-spacing: 0.06em; color: ${ACCENT}; text-transform: uppercase; vertical-align: middle;">NGA Central MIS</span>
-      </td>
-      <td style="text-align: right; vertical-align: middle; padding-bottom: 6px;">
-        <span style="font-size: 8.5px; color: ${FAINT};">${escapeHtml(docTitle)}</span>
-      </td>
-    </tr>
-  </table>
-`;
-
-// Left cell carries the "who this document is from/for" attribution (teacher name, plus
-// subject/class when it's a single, unambiguous author) — repeated on every page so a
-// printed or reshuffled page is still traceable back to its source without the cover page
-// in hand. Right cell keeps the date (secondary here — the header already carries the
-// brand) and page count.
-const buildFooterTemplate = (footerLeft: string) => `
-  <table style="width: 100%; font-family: ${FONT}; border-collapse: collapse; margin: 0 14mm; border-top: 1px solid ${RULE};">
-    <tr>
-      <td style="text-align: left; vertical-align: middle; padding-top: 5px;">
-        <span style="font-size: 8.5px; color: ${MUTED};">${footerLeft}</span>
-      </td>
-      <td style="text-align: right; vertical-align: middle; padding-top: 5px; white-space: nowrap;">
-        <span style="font-size: 8px; color: ${FAINT};">${today()} &nbsp;·&nbsp; Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
-      </td>
-    </tr>
-  </table>
-`;
 
 // Shared print-optimized content styling — deliberately not the editor's own on-screen
 // CSS: generous margins, print-safe colors, no interactive chrome.
@@ -188,28 +149,12 @@ const CONTENT_CSS = `
   .content strong { color: ${INK}; }
 `;
 
-async function printHtmlToPdf(html: string, docTitle: string, footerLeft: string): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-  try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "load" });
-    const pdf = await page.pdf({
-      format: "a4",
-      printBackground: true,
-      margin: { top: "22mm", bottom: "16mm", left: "14mm", right: "14mm" },
-      displayHeaderFooter: true,
-      headerTemplate: buildHeaderTemplate(docTitle),
-      footerTemplate: buildFooterTemplate(footerLeft),
-    });
-    return Buffer.from(pdf);
-  } finally {
-    await browser.close();
-  }
-}
+// The school's letterhead (documents logo on top, its footer below) repeats on every page --
+// that is what makes the export read as the school's own document. The header's right side
+// carries the document title; the footer's small line says who it is from (teacher · subject)
+// so a loose printed page can still be traced, next to "Page N of M".
+const printHtmlToPdf = (html: string, docTitle: string, footerLeft: string): Promise<Buffer> =>
+  renderPdf(html, { sideMm: 14, title: docTitle, note: `${footerLeft} · ${today()}`, minTopMm: 22, minBottomMm: 16 });
 
 export interface LessonNotePdfData {
   title: string;
@@ -245,6 +190,6 @@ const buildPrintHtml = (data: LessonNotePdfData): string => `
 </html>`;
 
 export async function renderLessonNotePdf(data: LessonNotePdfData): Promise<Buffer> {
-  const footerLeft = `${escapeHtml(data.teacherName)} · ${escapeHtml(data.subjectName)}`;
+  const footerLeft = `${data.teacherName} · ${data.subjectName}`;
   return printHtmlToPdf(buildPrintHtml(data), data.title, footerLeft);
 }

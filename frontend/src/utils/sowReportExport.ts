@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { letterheadFrame, loadLetterhead, stampLetterhead } from "./documentLetterhead";
 import * as XLSX from "xlsx";
 import { TeacherWithSchemes } from "../api/schemeOfWork";
 
@@ -68,28 +69,34 @@ const buildDetailRows = (teachers: TeacherWithSchemes[]) =>
     ]),
   );
 
-export function exportSowReportPdf(
+export async function exportSowReportPdf(
   teachers: TeacherWithSchemes[],
   ctx: SowReportContext,
 ) {
   const stats = computeStats(teachers);
   const doc = new jsPDF({ orientation: "landscape" });
+  // The school's letterhead: content starts under the header and stops above the footer.
+  const lh = await loadLetterhead();
+  const frame = letterheadFrame(doc, lh);
+  const dy = frame.shift(10);
+  const margin = { top: frame.top, bottom: frame.bottom };
 
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text("Teachers' Scheme of Work — Progress Report", 14, 16);
+  doc.text("Teachers' Scheme of Work — Progress Report", 14, 16 + dy);
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.text(
     `${ctx.programName} • ${ctx.gradeName} • ${ctx.roleLabel} • ${ctx.yearName} / ${ctx.termName}`,
     14,
-    23,
+    23 + dy,
   );
-  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28 + dy);
 
   autoTable(doc, {
-    startY: 34,
+    startY: 34 + dy,
+    margin,
     head: [["Metric", "Value"]],
     body: [
       ["Total Teachers", String(stats.totalTeachers)],
@@ -109,6 +116,7 @@ export function exportSowReportPdf(
 
   autoTable(doc, {
     startY: afterSummaryY,
+    margin,
     head: [
       [
         "Teacher",
@@ -128,6 +136,7 @@ export function exportSowReportPdf(
     columnStyles: { 0: { fontStyle: "bold" } },
   });
 
+  stampLetterhead(doc, lh, { note: "Scheme of Work progress report" });
   doc.save(
     `sow-report-${ctx.programName}-${ctx.gradeName}-${ctx.termName}`
       .replace(/\s+/g, "_")

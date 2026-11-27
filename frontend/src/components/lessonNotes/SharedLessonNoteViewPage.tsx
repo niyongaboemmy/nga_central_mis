@@ -53,6 +53,7 @@ import { SubjectTile } from "./library/NoteCard";
 import { fullWhen, shortWhen } from "./library/noteVisuals";
 import { hydrateInlineChecks } from "../elearning/interactive/hydrate";
 import CourseLinkBanner from "./elearning/CourseLinkBanner";
+import { PrintLetterhead } from "../ui/PrintLetterhead";
 
 /** Rail (272) + gap (32) + side padding (48) + a page that still reads like one (~600). */
 const RAIL_MIN_ROW_WIDTH = 952;
@@ -794,6 +795,8 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
 
         {/* The paper */}
         <div ref={stageRef} className="flex-1 min-w-0 flex flex-col items-center">
+          {/* The school's header and footer on every printed sheet of the note */}
+          <PrintLetterhead note={[note.subject_name, note.teacher_name].filter(Boolean).join(" · ")} sideMm={16} />
           <div
             ref={sheetRef}
             className={`note-reader-sheet ${bookMode ? "note-reader-sheet--book" : "note-reader-sheet--scroll"}`}
