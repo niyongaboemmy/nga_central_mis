@@ -5,7 +5,7 @@ import { School } from "../db/schema";
 import { PRIMARY_TENANT_ID, TenantCtx, isTenantUsable, runWithTenant } from "../vendor/nga-tenancy";
 import { findTenant, primaryTenant, responseTenant } from "../tenancy";
 import { publicApiBase } from "../services/avatar/urls";
-import { isServableLogo } from "../controllers/schoolController";
+import { isServableLogo, schoolLogoUrl } from "../controllers/schoolController";
 
 /**
  * GET /tenant/branding?slug=<slug>|tid=<tid>  (public, MIS-S10)
@@ -52,13 +52,9 @@ export async function brandingFor(tenant: TenantCtx) {
     const logos: Record<LogoSlot, string | null> = { primary: null, partner: null, documents: null };
     if (school) {
       // ?v= changes with every upload (School.updated_at), so a new logo shows at once.
-      const params = new URLSearchParams();
-      if (tenant.tid !== PRIMARY_TENANT_ID) params.set("tenant", tenant.slug);
       const v = school.updated_at ? new Date(school.updated_at as any).getTime() : NaN;
-      if (Number.isFinite(v)) params.set("v", String(v));
-      const q = params.toString() ? `?${params}` : "";
       for (const [slot, col] of SLOTS) {
-        if (isServableLogo(school[col])) logos[slot] = `${publicApiBase()}/schools/${school.school_id}/logo/${slot}${q}`;
+        if (isServableLogo(school[col])) logos[slot] = schoolLogoUrl(publicApiBase(), school.school_id, slot, tenant, Number.isFinite(v) ? v : null);
       }
     }
     const primaryColor = await readPrimaryColor();

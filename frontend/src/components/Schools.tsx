@@ -76,7 +76,9 @@ const brandSchoolId = (schools: School[]): number | null =>
 
 const logoUrl = (school: School, slot: SchoolLogoSlot = "primary") => {
   const col = slot === "primary" ? school.logo : slot === "partner" ? school.partner_logo : school.documents_logo;
-  return col ? getSchoolLogoUrl(school.school_id, slot, school.logo_version) : null;
+  if (!col) return null;
+  // The server's address names the school; the image endpoint needs that (ids repeat across schools).
+  return school.logo_urls?.[slot] ?? getSchoolLogoUrl(school.school_id, slot, school.logo_version);
 };
 
 const SchoolCard = ({
