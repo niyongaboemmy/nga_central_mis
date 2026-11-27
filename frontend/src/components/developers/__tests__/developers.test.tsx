@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { ToastProvider } from "../../../contexts/ToastContext";
 import DevelopersPage from "../DevelopersPage";
 import { ALL_SECTIONS, GROUPS } from "../content";
-import { DEFAULT_VALUES, fillSample } from "../parts";
+import { DEFAULT_VALUES, SERVER_LANGS, fillSample } from "../parts";
 import type { Endpoint, Sample } from "../types";
 
 // The theme switch needs the signed-in user context; the guide itself does not.
@@ -44,6 +44,12 @@ describe("developers guide content", () => {
       expect(e.path.startsWith("/"), e.path).toBe(true);
       expect(e.path.startsWith("/api"), e.path).toBe(false);
       expect(e.samples.some((s) => s.lang === "curl"), e.path).toBe(true);
+    }
+  });
+
+  it("gives every endpoint a sample in each language the reader can choose", () => {
+    for (const e of endpoints) {
+      for (const lang of SERVER_LANGS) expect(e.samples.some((s) => s.lang === lang), `${e.method} ${e.path}: ${lang}`).toBe(true);
     }
   });
 

@@ -186,6 +186,20 @@ export const GROUPS: Group[] = [
                   lang: "python",
                   code: `import os, requests\n\nres = requests.get(\n    "{{BASE}}/platform/tenants/active",\n    auth=("{{CLIENT_ID}}", os.environ["CLIENT_SECRET"]),\n    headers={"X-NGA-Tenant": "{{TENANT}}"},\n    timeout=15,\n)\nusable = [t for t in res.json()["tenants"] if t["status"] in ("ACTIVE", "GRACE")]`,
                 },
+                {
+                  lang: "php",
+                  code: `<?php
+$ch = curl_init("{{BASE}}/platform/tenants/active");
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT => 30,
+    CURLOPT_USERPWD => "{{CLIENT_ID}}:" . getenv("CLIENT_SECRET"),
+    CURLOPT_HTTPHEADER => ["X-NGA-Tenant: {{TENANT}}"],
+]);
+$tenants = json_decode(curl_exec($ch), true)["tenants"];
+$usable = array_filter($tenants, fn($t) => in_array($t["status"], ["ACTIVE", "GRACE"]));
+curl_close($ch);`,
+                },
               ],
               response: {
                 status: 200,
@@ -424,6 +438,24 @@ export const GROUPS: Group[] = [
                   lang: "python",
                   code: `def still_signed_in(token: str) -> bool:\n    try:\n        res = requests.get(\n            "{{BASE}}/auth/verify",\n            headers={"Authorization": f"Bearer {token}"},\n            timeout=8,\n        )\n    except requests.RequestException:\n        return True  # network problem: not a sign-out\n    return res.status_code != 401`,
                 },
+                {
+                  lang: "php",
+                  code: `<?php
+function stillSignedIn(string $token): bool {
+    $ch = curl_init("{{BASE}}/auth/verify");
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 8,
+        CURLOPT_HTTPHEADER => ["Authorization: Bearer " . $token],
+    ]);
+    curl_exec($ch);
+    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    // Only a 401 means the session ended. 0 (network) or 5xx: keep the session.
+    return $status !== 401;
+}`,
+                },
               ],
               response: {
                 status: 200,
@@ -469,6 +501,41 @@ export const GROUPS: Group[] = [
                 {
                   lang: "node",
                   code: `const query = new URLSearchParams({\n  client_id: "{{CLIENT_ID}}",\n  redirect_uri: "{{REDIRECT_URI}}",\n  state,\n});\nconst res = await fetch("{{BASE}}/sso/authorize?" + query, {\n  headers: { Authorization: "Bearer " + token },\n});\nconst { data } = await res.json();\n\nconst target = new URL("{{REDIRECT_URI}}");\ntarget.searchParams.set("code", data.code);\ntarget.searchParams.set("state", data.state);`,
+                },
+                {
+                  lang: "python",
+                  code: `from urllib.parse import urlencode
+
+res = requests.get(
+    "{{BASE}}/sso/authorize",
+    params={
+        "client_id": "{{CLIENT_ID}}",
+        "redirect_uri": "{{REDIRECT_URI}}",
+        "state": state,
+    },
+    headers={"Authorization": f"Bearer {token}"},
+    timeout=15,
+)
+data = res.json()["data"]
+target = "{{REDIRECT_URI}}?" + urlencode({"code": data["code"], "state": data["state"]})`,
+                },
+                {
+                  lang: "php",
+                  code: `<?php
+$query = http_build_query([
+    "client_id" => "{{CLIENT_ID}}",
+    "redirect_uri" => "{{REDIRECT_URI}}",
+    "state" => $state,
+]);
+$ch = curl_init("{{BASE}}/sso/authorize?" . $query);
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => ["Authorization: Bearer " . $token],
+]);
+$data = json_decode(curl_exec($ch), true)["data"];
+curl_close($ch);
+
+$target = "{{REDIRECT_URI}}?" . http_build_query(["code" => $data["code"], "state" => $data["state"]]);`,
                 },
               ],
               response: { status: 200, body: `{\n  "success": true,\n  "message": "Authorization code generated",\n  "data": {\n    "code": "1.9c41d0...e7.sA1b2C3d4",\n    "state": "9f2c1e7a"\n  }\n}` },
@@ -561,6 +628,35 @@ export const GROUPS: Group[] = [
               {
                 lang: "python",
                 code: `import os, jwt\nfrom flask import Flask, request\n\nISSUER = "{{BASE}}"\nEVENT = "http://schemas.openid.net/event/backchannel-logout"\nkeys = jwt.PyJWKClient(ISSUER + "/.well-known/jwks.json", cache_keys=True, lifespan=3600)\nseen = set()  # use a shared store with several servers\n\napp = Flask(__name__)\n\n@app.post("/sso/backchannel-logout")\ndef backchannel_logout():\n    headers = {"Cache-Control": "no-store"}\n    try:\n        token = request.form["logout_token"]\n        payload = jwt.decode(\n            token,\n            keys.get_signing_key_from_jwt(token).key,\n            algorithms=["RS256"],\n            issuer=ISSUER,\n            audience=os.environ["SSO_CLIENT_ID"],\n            options={"require": ["exp", "iat", "sub", "jti"]},\n        )\n        if EVENT not in payload.get("events", {}) or "nonce" in payload:\n            raise ValueError("not a logout token")\n        if payload["jti"] in seen:\n            raise ValueError("replayed")\n        seen.add(payload["jti"])\n\n        end_sessions(tid=payload.get("tid", 1), amashuri_user_id=payload["sub"])\n        return "", 200, headers\n    except Exception:\n        return "", 400, headers`,
+              },
+              {
+                lang: "php",
+                code: `<?php
+// composer require firebase/php-jwt
+use Firebase\\JWT\\JWK;
+use Firebase\\JWT\\JWT;
+
+const ISSUER = "{{BASE}}";
+const EVENT = "http://schemas.openid.net/event/backchannel-logout";
+
+header("Cache-Control: no-store");
+try {
+    // Cache this answer for an hour; fetch it again on an unknown key id.
+    $jwks = json_decode(file_get_contents(ISSUER . "/.well-known/jwks.json"), true);
+    $claims = (array) JWT::decode($_POST["logout_token"] ?? "", JWK::parseKeySet($jwks, "RS256"));
+
+    if (($claims["iss"] ?? "") !== ISSUER) throw new Exception("issuer");
+    if (($claims["aud"] ?? "") !== getenv("SSO_CLIENT_ID")) throw new Exception("audience");
+    if (empty($claims["sub"]) || empty($claims["jti"])) throw new Exception("missing claims");
+    if (!isset(((array) ($claims["events"] ?? []))[EVENT])) throw new Exception("not a logout token");
+    if (array_key_exists("nonce", $claims)) throw new Exception("nonce not allowed");
+    if (!rememberJti($claims["jti"], $claims["exp"])) throw new Exception("replayed"); // false when seen before
+
+    endSessions((int) ($claims["tid"] ?? 1), (string) $claims["sub"]);
+    http_response_code(200);
+} catch (Throwable $e) {
+    http_response_code(400);
+}`,
               },
             ],
           },
@@ -662,6 +758,24 @@ export const GROUPS: Group[] = [
                   lang: "python",
                   code: `ref = requests.get("{{BASE}}/integrations/sync/reference", headers=headers, timeout=60).json()["data"]\n\nreplace_all("subjects", ref["subjects"])\nreplace_all("class_groups", ref["classGroups"])`,
                 },
+                {
+                  lang: "php",
+                  code: `<?php
+$ch = curl_init("{{BASE}}/integrations/sync/reference");
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT => 30,
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer " . getenv("AMASHURI_TOKEN"),
+        "X-NGA-Tenant: {{TENANT}}",
+    ],
+]);
+$ref = json_decode(curl_exec($ch), true)["data"];
+
+replaceAll("subjects", $ref["subjects"]);
+replaceAll("class_groups", $ref["classGroups"]);
+curl_close($ch);`,
+                },
               ],
               response: {
                 status: 200,
@@ -742,6 +856,27 @@ export const GROUPS: Group[] = [
                   lang: "python",
                   code: `data = requests.get(\n    "{{BASE}}/integrations/sync/academics",\n    params={"since": last_run_at.isoformat()},\n    headers=headers,\n    timeout=120,\n).json()["data"]\n\nif not data["truncation"]["complete"]:\n    print("Partial lists:", data["truncation"]["truncated"])\nupsert_notes(data["lessonNotes"])`,
                 },
+                {
+                  lang: "php",
+                  code: `<?php
+$since = urlencode($lastRunAt->format(DATE_ATOM));
+$ch = curl_init("{{BASE}}/integrations/sync/academics?since=" . $since);
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT => 120,
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer " . getenv("AMASHURI_TOKEN"),
+        "X-NGA-Tenant: {{TENANT}}",
+    ],
+]);
+$data = json_decode(curl_exec($ch), true)["data"];
+curl_close($ch);
+
+if (!$data["truncation"]["complete"]) {
+    error_log("Partial lists: " . implode(", ", $data["truncation"]["truncated"]));
+}
+upsertNotes($data["lessonNotes"]);`,
+                },
               ],
               response: {
                 status: 200,
@@ -763,6 +898,39 @@ export const GROUPS: Group[] = [
                 {
                   lang: "node",
                   code: `const res = await fetch("{{BASE}}/integrations/sync/courses", { headers });\nconst { data: courses } = await res.json();\n\nfor (const course of courses) {\n  for (const item of course.items) {\n    await linkItem(item.ref_id, item.item_id, item.return_url);\n  }\n}`,
+                },
+                {
+                  lang: "python",
+                  code: `courses = requests.get(
+    "{{BASE}}/integrations/sync/courses",
+    headers=headers,
+    timeout=60,
+).json()["data"]
+
+for course in courses:
+    for item in course["items"]:
+        link_item(item["ref_id"], item["item_id"], item["return_url"])`,
+                },
+                {
+                  lang: "php",
+                  code: `<?php
+$ch = curl_init("{{BASE}}/integrations/sync/courses");
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT => 30,
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer " . getenv("AMASHURI_TOKEN"),
+        "X-NGA-Tenant: {{TENANT}}",
+    ],
+]);
+$courses = json_decode(curl_exec($ch), true)["data"];
+
+foreach ($courses as $course) {
+    foreach ($course["items"] as $item) {
+        linkItem($item["ref_id"], $item["item_id"], $item["return_url"]);
+    }
+}
+curl_close($ch);`,
                 },
               ],
               response: {
@@ -815,6 +983,33 @@ export const GROUPS: Group[] = [
                 {
                   lang: "python",
                   code: `res = requests.post(\n    "{{BASE}}/integrations/learning-events",\n    headers=headers,\n    json={\n        "events": [\n            {\n                "actor_user_id": 1503,\n                "verb": "SCORED",\n                "object_type": "TASKMENTOR_QUIZ",\n                "object_id": 812,\n                "result": {"score_pct": 78},\n                "idempotency_key": "quiz-812-user-1503-attempt-1",\n            }\n        ]\n    },\n    timeout=30,\n)\nrefused = [r for r in res.json()["data"]["results"] if r["status"] == "rejected"]`,
+                },
+                {
+                  lang: "php",
+                  code: `<?php
+$ch = curl_init("{{BASE}}/integrations/learning-events");
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT => 30,
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer " . getenv("AMASHURI_TOKEN"),
+        "X-NGA-Tenant: {{TENANT}}",
+        "Content-Type: application/json",
+    ],
+    CURLOPT_POSTFIELDS => json_encode(["events" => [[
+        "actor_user_id" => 1503,
+        "verb" => "SCORED",
+        "object_type" => "TASKMENTOR_QUIZ",
+        "object_id" => 812,
+        "result" => ["score_pct" => 78],
+        "idempotency_key" => "quiz-812-user-1503-attempt-1",
+    ]]]),
+]);
+$data = json_decode(curl_exec($ch), true)["data"];
+curl_close($ch);
+
+$refused = array_filter($data["results"], fn($r) => $r["status"] === "rejected");`,
                 },
               ],
               response: {
@@ -901,6 +1096,68 @@ export const GROUPS: Group[] = [
                   lang: "curl",
                   code: `curl -X PUT {{BASE}}/reminders/sources \\\n  -H "Authorization: Bearer $AMASHURI_TOKEN" \\\n  -H "X-NGA-Tenant: {{TENANT}}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "source_app": "taskmentor",\n    "source_type": "meeting",\n    "external_id": "meeting-77",\n    "title": "Parents meeting",\n    "starts_at": "2026-12-05T07:00:00Z",\n    "audience_user_ids": [1203, 1204]\n  }'`,
                 },
+                {
+                  lang: "node",
+                  code: `const res = await fetch("{{BASE}}/reminders/sources", {
+  method: "PUT",
+  headers: {
+    Authorization: "Bearer " + process.env.AMASHURI_TOKEN,
+    "X-NGA-Tenant": "{{TENANT}}",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    source_app: "taskmentor",
+    source_type: "meeting",
+    external_id: "meeting-77",
+    title: "Parents meeting",
+    starts_at: "2026-12-05T07:00:00Z",
+    audience_user_ids: [1203, 1204],
+  }),
+});
+const { data } = await res.json();
+console.log(data.created ? "created" : data.changed ? "updated" : "unchanged");`,
+                },
+                {
+                  lang: "python",
+                  code: `res = requests.put(
+    "{{BASE}}/reminders/sources",
+    headers=headers,
+    json={
+        "source_app": "taskmentor",
+        "source_type": "meeting",
+        "external_id": "meeting-77",
+        "title": "Parents meeting",
+        "starts_at": "2026-12-05T07:00:00Z",
+        "audience_user_ids": [1203, 1204],
+    },
+    timeout=30,
+)
+saved = res.json()["data"]  # source_id, created, changed, noticed`,
+                },
+                {
+                  lang: "php",
+                  code: `<?php
+$ch = curl_init("{{BASE}}/reminders/sources");
+curl_setopt_array($ch, [
+    CURLOPT_CUSTOMREQUEST => "PUT",
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer " . getenv("AMASHURI_TOKEN"),
+        "X-NGA-Tenant: {{TENANT}}",
+        "Content-Type: application/json",
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+        "source_app" => "taskmentor",
+        "source_type" => "meeting",
+        "external_id" => "meeting-77",
+        "title" => "Parents meeting",
+        "starts_at" => "2026-12-05T07:00:00Z",
+        "audience_user_ids" => [1203, 1204],
+    ]),
+]);
+$saved = json_decode(curl_exec($ch), true)["data"]; // source_id, created, changed, noticed
+curl_close($ch);`,
+                },
               ],
               response: { status: 200, body: `{\n  "success": true,\n  "message": "Reminder source saved",\n  "data": { "source_id": 941, "created": true, "changed": true, "noticed": 0 }\n}` },
             },
@@ -927,6 +1184,32 @@ export const GROUPS: Group[] = [
                 {
                   lang: "node",
                   code: `await fetch("{{BASE}}/reminders/sources/taskmentor/quiz_close/quiz-812-close", {\n  method: "DELETE",\n  headers,\n});`,
+                },
+                {
+                  lang: "python",
+                  code: `res = requests.delete(
+    "{{BASE}}/reminders/sources/taskmentor/quiz_close/quiz-812-close",
+    headers=headers,
+    timeout=30,
+)
+if res.status_code == 404:
+    pass  # already cancelled, or never sent`,
+                },
+                {
+                  lang: "php",
+                  code: `<?php
+$ch = curl_init("{{BASE}}/reminders/sources/taskmentor/quiz_close/quiz-812-close");
+curl_setopt_array($ch, [
+    CURLOPT_CUSTOMREQUEST => "DELETE",
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer " . getenv("AMASHURI_TOKEN"),
+        "X-NGA-Tenant: {{TENANT}}",
+    ],
+]);
+curl_exec($ch);
+$status = curl_getinfo($ch, CURLINFO_HTTP_CODE); // 404: already cancelled, or never sent
+curl_close($ch);`,
                 },
               ],
               errors: [{ status: 404, meaning: "No item has that app, type and ID." }],

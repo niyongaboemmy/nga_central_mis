@@ -139,7 +139,7 @@ const HLJS: Record<Lang, string> = {
 
 /** Syntax colours for the samples. The panel is dark in both themes. */
 export const CODE_STYLES = `
-.devdocs-code { color: #e5e7eb; }
+.devdocs-code { color: #e5e7eb; font-variant-ligatures: none; }
 .devdocs-code .hljs-keyword, .devdocs-code .hljs-literal, .devdocs-code .hljs-type, .devdocs-code .hljs-meta { color: #60a5fa; }
 .devdocs-code .hljs-string, .devdocs-code .hljs-regexp { color: #6ee7b7; }
 .devdocs-code .hljs-number, .devdocs-code .hljs-symbol { color: #fcd34d; }
