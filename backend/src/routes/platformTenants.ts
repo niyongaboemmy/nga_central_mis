@@ -5,7 +5,8 @@ import { controlPool } from "../db/platform";
 import { primaryDb } from "../db";
 import { sql } from "drizzle-orm";
 import { NotFoundError, ValidationError } from "../errors/CustomError";
-import { APP_KEYS, PLATFORM_CAPS } from "../services/tenantMgmt/catalog";
+import { PLATFORM_CAPS } from "../services/tenantMgmt/catalog";
+import { moduleSchools, resolveSchoolIds, schoolModules } from "../services/tenantMgmt/modules";
 import { holds, platformActor, requirePlatform } from "../services/tenantMgmt/guards";
 import { resolveEntitlements } from "../services/tenantMgmt/entitlements";
 import { currentSubscriptionRow, dateOnly, serializeSubscription } from "../services/tenantMgmt/subscription";
@@ -20,6 +21,7 @@ import {
   reactivateTenant,
   removeOverride,
   setTenantApp,
+  setModuleForSchools,
   suspendTenant,
   tenantRow,
   updateTenantDetails,
@@ -137,17 +139,6 @@ async function listItems(where = "", params: unknown[] = []) {
 
 const publicItem = ({ _row, ...item }: any) => item;
 
-async function systemsById(): Promise<Map<number, { name: string; clientId: string | null }>> {
-  const out = new Map<number, { name: string; clientId: string | null }>();
-  try {
-    const rows = (await primaryDb().execute(sql`SELECT system_id, name, client_id FROM \`System\``)) as any;
-    for (const r of rows[0] as RowDataPacket[]) out.set(Number(r.system_id), { name: String(r.name), clientId: r.client_id ?? null });
-  } catch {
-    /* no System table */
-  }
-  return out;
-}
-
 /** The school's primary logo URL (same as GET /tenant/branding), or null. Cosmetic: never throws. */
 async function logoUrlOf(tid: number): Promise<string | null> {
   try {
@@ -165,28 +156,17 @@ export async function tenantDetail(tid: number, can: (cap: string) => boolean) {
   const ent = await resolveEntitlements(tid);
 
   const [ovr] = await controlPool().query<RowDataPacket[]>("SELECT * FROM TenantEntitlementOverride WHERE tenant_id = ? ORDER BY id DESC", [tid]);
-  const [ts] = await controlPool().query<RowDataPacket[]>("SELECT * FROM TenantSystem WHERE tenant_id = ? ORDER BY system_id", [tid]);
   const [audit] = await controlPool().query<RowDataPacket[]>("SELECT * FROM PlatformAudit WHERE target_tid = ? ORDER BY at DESC, audit_id DESC LIMIT 50", [tid]);
   const names = await staffNames([...ovr.map((o) => Number(o.granted_by)), ...audit.map((a) => Number(a.actor_user_id))]);
-  const systems = await systemsById();
-
   let invoices: any[] = [];
   try {
     invoices = await (await import("../services/tenantMgmt/billing")).invoicesForTenant(tid, "platform");
   } catch {
     invoices = [];
   }
-  let apps = ts.map((s) => ({
-    systemId: Number(s.system_id),
-    name: systems.get(Number(s.system_id))?.name ?? `System ${s.system_id}`,
-    clientId: systems.get(Number(s.system_id))?.clientId ?? null,
-    status: s.status as "ACTIVE" | "DISABLED",
-    source: s.source as "PACKAGE" | "OVERRIDE",
-  }));
-  // The primary tenant is implicitly assigned every System.
-  if (item.isPrimary && apps.length === 0) {
-    apps = Array.from(systems.entries()).map(([id, s]) => ({ systemId: id, name: s.name, clientId: s.clientId, status: "ACTIVE" as const, source: "PACKAGE" as const }));
-  }
+  // Every module, on or off: a module added after the school was created has no
+  // TenantSystem row yet and must still be listed, or it could never be switched on.
+  const apps = await schoolModules(tid, ent);
 
   return {
     tenant: {
@@ -209,7 +189,7 @@ export async function tenantDetail(tid: number, can: (cap: string) => boolean) {
       expiresAt: iso(o.expires_at),
       grantedBy: o.granted_by ? names.get(Number(o.granted_by)) ?? null : null,
     })),
-    apps: apps.map((a) => ({ ...a, key: appKeyOf(a.clientId) })),
+    apps,
     usage: await tenantUsage(tid, ent),
     subscription: serializeSubscription(await currentSubscriptionRow(tid)),
     invoices,
@@ -225,10 +205,6 @@ export async function tenantDetail(tid: number, can: (cap: string) => boolean) {
     allowedActions: allowedActions(r, can),
   };
 }
-
-/** The APP entitlement key ("app.taskmentor") of a System, by its SSO client id. */
-const appKeyOf = (clientId: string | null): string | null =>
-  clientId ? Object.entries(APP_KEYS).find(([, v]) => v.client === clientId)?.[0] ?? null : null;
 
 const detailFor = (req: any, tid: number) => tenantDetail(tid, (cap) => holds(req, cap));
 
@@ -396,6 +372,29 @@ router.put(
     const tid = idParam(req.params.id);
     await setTenantApp(tid, idParam(req.params.systemId), req.body?.status, platformActor(req));
     ok(res, await detailFor(req, tid));
+  }),
+);
+
+// --- modules: which schools have one ---------------------------------------
+// The same switch as PUT /tenants/:id/apps/:systemId, seen from the module: used
+// by Modules -> a module -> Schools, and to give a new module to several schools.
+
+router.get(
+  "/modules/:systemId/schools",
+  ...VIEW,
+  wrap(async (req, res) => {
+    ok(res, await moduleSchools(idParam(req.params.systemId)));
+  }),
+);
+
+router.put(
+  "/modules/:systemId/schools",
+  ...ENTITLEMENTS,
+  wrap(async (req, res) => {
+    const systemId = idParam(req.params.systemId);
+    const tids = await resolveSchoolIds(req.body?.tids);
+    await setModuleForSchools(systemId, tids, req.body?.status, platformActor(req));
+    ok(res, await moduleSchools(systemId));
   }),
 );
 

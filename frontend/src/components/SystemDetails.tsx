@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
+  Building2,
   ArrowLeft,
   Copy,
   Check,
@@ -17,6 +18,7 @@ import {
   Globe,
 } from "lucide-react";
 import { getSystemById, System } from "../api/systems";
+import ModuleSchoolsPanel from "./tenantMgmt/platform/ModuleSchoolsPanel";
 import { useToast } from "../contexts/ToastContext";
 import { useUser } from "../contexts/UserContext";
 
@@ -376,6 +378,27 @@ const SystemDetails = () => {
             </div>
           )}
         </div>
+      </motion.div>
+
+      {/* Schools: which schools have this module, and the switch for each */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="bg-white dark:bg-gray-900/60 rounded-3xl p-6 md:p-8 border border-gray-100 dark:border-slate-700/30"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+            <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Schools</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Choose which schools can open this module. To include it in a subscription, turn it on for a package under Platform → Packages.
+            </p>
+          </div>
+        </div>
+        <ModuleSchoolsPanel systemId={system.system_id} moduleName={system.name} />
       </motion.div>
     </div>
   );

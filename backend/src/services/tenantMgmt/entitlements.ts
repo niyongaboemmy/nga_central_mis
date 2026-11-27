@@ -10,7 +10,7 @@
 import { RowDataPacket } from "mysql2/promise";
 import { controlPool, isControlPlaneMissing } from "../../db/platform";
 import { currentTenantOrNull } from "../../vendor/nga-tenancy";
-import { APP_KEYS, FEATURES, LIMITS, featureOfCapability, isPlatformCap } from "./catalog";
+import { APP_KEYS, FEATURES, LIMITS, featureOfCapability, isAppKey, isPlatformCap } from "./catalog";
 
 export interface Entitlements {
   tid: number;
@@ -84,7 +84,7 @@ async function load(tid: number): Promise<Entitlements> {
     const key = String(o.ent_key);
     const on = Number(o.enabled) === 1;
     if (key in LIMITS) limits[key] = o.value_int === null ? null : Number(o.value_int);
-    else if (key in APP_KEYS) on ? apps.add(key) : apps.delete(key);
+    else if (isAppKey(key)) on ? apps.add(key) : apps.delete(key);
     else on ? features.add(key) : features.delete(key);
   }
   return { tid, pkg, unrestricted: false, apps: [...apps].sort(), features: [...features].sort(), limits };

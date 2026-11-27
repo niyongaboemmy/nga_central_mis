@@ -55,8 +55,25 @@ export const LIMITS: Record<string, { label: string; unit: string; consumable: "
 
 export const PACKAGE_CODES = ["starter", "gold", "premium", "max"] as const;
 
+/**
+ * A module the platform added on the Modules screen (a System row that is not one
+ * of the built-in apps: Ganzaa, an assets app, ...) can be part of a package too.
+ * Its APP entitlement key is "module.<system_id>"; the package editor lists every
+ * such module beside the built-in apps, and deriveTenantSystems() switches it on
+ * for the schools whose package (or an override) includes it.
+ */
+const MODULE_KEY = /^module\.([1-9]\d{0,9})$/;
+export const moduleKey = (systemId: number): string => `module.${systemId}`;
+export const moduleIdOfKey = (key: string): number | null => {
+  const m = MODULE_KEY.exec(key);
+  return m ? Number(m[1]) : null;
+};
+export const isModuleKey = (key: string): boolean => MODULE_KEY.test(key);
+/** An APP entitlement key: a built-in app or a module. */
+export const isAppKey = (key: string): boolean => key in APP_KEYS || isModuleKey(key);
+
 export function kindOfKey(key: string): EntKind | null {
-  if (key in APP_KEYS) return "APP";
+  if (key in APP_KEYS || isModuleKey(key)) return "APP";
   if (key in FEATURES) return "FEATURE";
   if (key in LIMITS) return "LIMIT";
   return null;

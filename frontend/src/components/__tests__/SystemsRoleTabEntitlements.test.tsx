@@ -10,6 +10,8 @@ vi.mock("../../api/schools", () => ({ getSchools: vi.fn().mockResolvedValue([{ s
 vi.mock("../../api/users", () => ({ getRoles: vi.fn().mockResolvedValue([{ role_id: 3, name: "Teacher" }]) }));
 vi.mock("../../contexts/ToastContext", () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 vi.mock("../../contexts/UserContext", () => ({ useUser: () => ({ user: null }) }));
+// The Schools tab (the default one) has its own tests: ModuleSchoolsPanel.test.tsx.
+vi.mock("../tenantMgmt/platform/ModuleSchoolsPanel", () => ({ default: () => null }));
 
 const sys = (client_id: string) => ({ system_id: 2, name: "Task Mentor", client_id, icon_url: "", home_url: "", status: "ACTIVE" as const });
 const status = (ent: object) => ({ status: "ACTIVE", graceUntil: null, daysLeft: null, warnings: [], entitlements: { pkg: "starter", limits: {}, features: [], ...ent } });

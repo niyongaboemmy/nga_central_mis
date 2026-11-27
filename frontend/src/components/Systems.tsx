@@ -8,7 +8,6 @@ import {
   Edit,
   Trash2,
   Shield,
-  School as SchoolIcon,
   // Check,
   Layers,
   ChevronRight,
@@ -27,13 +26,13 @@ import {
   createSystem,
   updateSystem,
   deleteSystem,
-  assignSystemToSchool,
   assignSystemToRoleInSchool,
   System,
 } from "../api/systems";
 import { getSchools, School } from "../api/schools";
 import { getRoles, Role } from "../api/users";
 import SelectField from "./ui/SelectField";
+import ModuleSchoolsPanel from "./tenantMgmt/platform/ModuleSchoolsPanel";
 import { CLIENT_APP_KEYS, isSystemEntitled, useTenantStatus } from "./tenantMgmt/account/usePackage";
 import { LockedCard } from "./tenantMgmt/account/LockedFeature";
 
@@ -42,7 +41,7 @@ const SystemCard = ({
   system,
   onView,
   onEdit,
-  // onAssign,
+  onAssign,
   onDelete,
 }: {
   system: System;
@@ -112,6 +111,17 @@ const SystemCard = ({
         <button
           onClick={(e) => {
             e.stopPropagation();
+            onAssign(system);
+          }}
+          title="Schools that have this module"
+          aria-label={`Schools that have ${system.name}`}
+          className="px-3 py-2 bg-gray-50 dark:bg-slate-700/50 text-gray-600 dark:text-gray-400 text-sm font-semibold rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+        >
+          <Building className="w-4 h-4" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
             onEdit(system);
           }}
           className="px-3 py-2 bg-gray-50 dark:bg-slate-700/50 text-gray-600 dark:text-gray-400 text-sm font-semibold rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
@@ -155,9 +165,12 @@ const SystemModal = ({
   });
   const [loading, setLoading] = useState(false);
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
+  // Which schools get a new module: this school, every school, or none yet.
+  const [scope, setScope] = useState<"primary" | "all" | "none">("primary");
   const { showToast } = useToast();
 
   useEffect(() => {
+    setScope("primary");
     if (system) {
       setFormData(system);
       setCreatedSecret(null);
@@ -185,7 +198,10 @@ const SystemModal = ({
         onSuccess();
         onClose();
       } else {
-        const response: any = await createSystem(formData);
+        const response: any = await createSystem({
+          ...formData,
+          ...(scope === "all" ? { tenant_ids: "all" } : scope === "none" ? { tenant_ids: [] } : {}),
+        } as Partial<System>);
         // If the backend returned a client_secret, display it
         if (response?.data?.client_secret) {
           setCreatedSecret(response.data.client_secret);
@@ -414,6 +430,26 @@ const SystemModal = ({
             </p>
           </div>
         )}
+        {!system && !createdSecret && (
+          <div>
+            <label htmlFor="module-schools" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+              Which schools get this module
+            </label>
+            <SelectField
+              id="module-schools"
+              value={scope}
+              onChange={(e) => setScope(e.target.value as "primary" | "all" | "none")}
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl text-gray-900 dark:text-white"
+            >
+              <option value="primary">This school only</option>
+              <option value="all">Every school</option>
+              <option value="none">No school yet</option>
+            </SelectField>
+            <p className="mt-1.5 ml-1 text-xs text-gray-500 dark:text-gray-400">
+              You can change this per school afterwards: open the module and use Schools, or include it in a package.
+            </p>
+          </div>
+        )}
         <div className="flex justify-end gap-3 pt-4">
           <button
             type="button"
@@ -449,8 +485,6 @@ const AssignModal = ({
   const [schools, setSchools] = useState<School[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
 
-  const [selectedSchoolId, setSelectedSchoolId] = useState<number | "">("");
-
   // For role assignment
   const [roleAssignSchoolId, setRoleAssignSchoolId] = useState<number | "">("");
   const [selectedRoleId, setSelectedRoleId] = useState<number | "">("");
@@ -473,23 +507,6 @@ const AssignModal = ({
 
     const rolesData = await getRoles();
     if (rolesData) setRoles(rolesData);
-  };
-
-  const handleAssignSchool = async () => {
-    if (!selectedSchoolId) return;
-    setLoading(true);
-    try {
-      await assignSystemToSchool(Number(selectedSchoolId), system.system_id);
-      showToast("System assigned to school successfully", "success");
-      onClose();
-    } catch (error: any) {
-      showToast(
-        error.response?.data?.message || "Failed to assign system",
-        "error",
-      );
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleAssignRole = async () => {
@@ -526,7 +543,7 @@ const AssignModal = ({
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Assign Access
+              Who can open it
             </h2>
             <p className="text-gray-500 dark:text-gray-400 text-sm font-normal">
               Control visibility for{" "}
@@ -549,7 +566,7 @@ const AssignModal = ({
           }`}
         >
           <Building className="w-4 h-4" />
-          To Tenant
+          Schools
         </button>
         <button
           onClick={() => setActiveTab("role")}
@@ -566,55 +583,7 @@ const AssignModal = ({
 
       <div className="min-h-[220px]">
         {activeTab === "school" ? (
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-6"
-          >
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
-              <div className="flex gap-3">
-                <div className="mt-0.5">
-                  <SchoolIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-blue-900 dark:text-blue-200 text-sm">
-                    Tenant-wide Access
-                  </h4>
-                  <p className="text-blue-700 dark:text-blue-300/70 text-sm mt-1">
-                    This will enable the module for the entire school ecosystem.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ml-1">
-                Select Tenant
-              </label>
-              <div className="relative">
-                <SelectField
-                  value={selectedSchoolId}
-                  onChange={(e) => setSelectedSchoolId(Number(e.target.value))}
-                  className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white appearance-none transition-all"
-                >
-                  <option value="">Choose a school...</option>
-                  {schools.map((school) => (
-                    <option key={school.school_id} value={school.school_id}>
-                      {school.name}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-            </div>
-
-            <button
-              onClick={handleAssignSchool}
-              disabled={loading || !selectedSchoolId}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:shadow-none"
-            >
-              {loading ? "Processing..." : "Grant Access"}
-            </button>
-          </motion.div>
+          <ModuleSchoolsPanel systemId={system.system_id} moduleName={system.name} />
         ) : !roleEntitled ? (
           <LockedCard feature={CLIENT_APP_KEYS[system.client_id ?? ""] ?? ""} label={system.name} />
         ) : (

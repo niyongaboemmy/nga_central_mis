@@ -33,7 +33,7 @@ import { getTenant, invalidateTenants } from "../../tenancy/registry";
 import { platformAudit } from "../../tenancy/audit";
 import { misDbNameFor } from "../../tenancy/dbNames";
 import logger from "../../utils/logger";
-import { APP_KEYS, PLATFORM_CAPS, kindOfKey } from "./catalog";
+import { APP_KEYS, PLATFORM_CAPS, isAppKey, kindOfKey } from "./catalog";
 import { assertTransition, canTransition } from "./stateMachine";
 import { getPlatformSetting } from "./settings";
 import { publishTenantChanged, packageRow, reactivateTenantRow, setTenantPackage } from "./subscription";
@@ -414,7 +414,7 @@ export async function addOverride(
     "INSERT INTO TenantEntitlementOverride (tenant_id, ent_key, value_int, enabled, reason, expires_at, granted_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
     [tid, key, value, enabled ? 1 : 0, why, expires, actor.userId],
   );
-  await publishTenantChanged(tid, { packageChanged: key in APP_KEYS });
+  await publishTenantChanged(tid, { packageChanged: isAppKey(key) });
   await platformAudit({ action: "tenant.override.add", actorUserId: actor.userId, ip: actor.ip ?? null, targetTid: tid, payload: { id: res.insertId, key, value, enabled, reason: why, expiresAt: expires } });
   return Number(res.insertId);
 }
@@ -424,24 +424,57 @@ export async function removeOverride(tid: number, overrideId: number, actor: Pla
   if (!rows[0]) throw new NotFoundError("Override not found");
   refuseArchived(await tenantRow(tid), "changed");
   await controlPool().query("DELETE FROM TenantEntitlementOverride WHERE id = ?", [overrideId]);
-  await publishTenantChanged(tid, { packageChanged: String(rows[0].ent_key) in APP_KEYS });
+  await publishTenantChanged(tid, { packageChanged: isAppKey(String(rows[0].ent_key)) });
   await platformAudit({ action: "tenant.override.remove", actorUserId: actor.userId, ip: actor.ip ?? null, targetTid: tid, payload: { id: overrideId, key: rows[0].ent_key } });
 }
 
 /** An operator's TenantSystem OVERRIDE row (never touched by package derivation). */
+/**
+ * Switch a module on or off for one school, by hand (source OVERRIDE: it stays as
+ * set whatever the package says, until the platform changes it again).
+ *
+ * The primary school is managed the same way as any other: since Systems are
+ * assigned per school (tenancy/systems.ts) it no longer "has every app".
+ */
 export async function setTenantApp(tid: number, systemId: number, status: unknown, actor: PlatformActorInfo) {
   if (status !== "ACTIVE" && status !== "DISABLED") throw new ValidationError("status must be ACTIVE or DISABLED.");
   if (!Number.isInteger(systemId) || systemId <= 0) throw new ValidationError("Choose an app.");
   const t = await tenantRow(tid);
-  refusePrimary(t, "given app overrides (it has every app)");
   // Archive switched every app off; turning one back on would undo it.
   refuseArchived(t, "given apps");
+  const { moduleById } = await import("./modules");
+  const module = await moduleById(systemId);
   await controlPool().query(
     "INSERT INTO TenantSystem (tenant_id, system_id, status, source) VALUES (?, ?, ?, 'OVERRIDE') ON DUPLICATE KEY UPDATE status = VALUES(status), source = 'OVERRIDE'",
     [tid, systemId, status],
   );
   await publishTenantChanged(tid);
-  await platformAudit({ action: "tenant.app", actorUserId: actor.userId, ip: actor.ip ?? null, targetTid: tid, payload: { systemId, status } });
+  await platformAudit({ action: "tenant.app", actorUserId: actor.userId, ip: actor.ip ?? null, targetTid: tid, payload: { systemId, name: module.name, status } });
+}
+
+/**
+ * Switch a module on or off for several schools at once (Modules -> a module's
+ * schools, and "which schools" when a module is created). Archived schools are
+ * skipped. Returns the tenant ids changed.
+ */
+export async function setModuleForSchools(systemId: number, tids: number[], status: unknown, actor: PlatformActorInfo): Promise<number[]> {
+  if (status !== "ACTIVE" && status !== "DISABLED") throw new ValidationError("status must be ACTIVE or DISABLED.");
+  const { moduleById } = await import("./modules");
+  const module = await moduleById(systemId);
+  if (!tids.length) return [];
+  const [rows] = await controlPool().query<RowDataPacket[]>("SELECT tenant_id FROM Tenant WHERE tenant_id IN (?) AND status <> 'ARCHIVED'", [tids]);
+  const done: number[] = [];
+  for (const r of rows) {
+    const tid = Number(r.tenant_id);
+    await controlPool().query(
+      "INSERT INTO TenantSystem (tenant_id, system_id, status, source) VALUES (?, ?, ?, 'OVERRIDE') ON DUPLICATE KEY UPDATE status = VALUES(status), source = 'OVERRIDE'",
+      [tid, systemId, status],
+    );
+    await publishTenantChanged(tid);
+    done.push(tid);
+  }
+  await platformAudit({ action: "module.schools", actorUserId: actor.userId, ip: actor.ip ?? null, payload: { systemId, name: module.name, status, tids: done } });
+  return done;
 }
 
 // ---------------------------------------------------------------------------

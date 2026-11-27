@@ -5,6 +5,7 @@ import { controlPool, isControlPlaneMissing } from "../db/platform";
 import { TokenBucket } from "../middleware/rateLimit";
 import { requireApplicant, signOnboardingToken } from "../services/tenantMgmt/guards";
 import { APP_KEYS, FEATURES, LIMITS, kindOfKey } from "../services/tenantMgmt/catalog";
+import { moduleLabels } from "../services/tenantMgmt/modules";
 import { checkSlug } from "../services/tenantMgmt/slug";
 import { checkUpload, PLATFORM_UPLOAD_MAX_BYTES, streamPlatformFile } from "../services/tenantMgmt/files";
 import { RWANDA_ADMIN_DIVISIONS } from "../services/tenantMgmt/adminDivisions";
@@ -94,6 +95,7 @@ export async function publicPackages() {
       "SELECT package_code, ent_key, kind, value_int FROM PackageEntitlement WHERE package_code IN (?) ORDER BY ent_key",
       [pkgs.map((p) => p.code)],
     );
+    const modules = await moduleLabels();
     return pkgs.map((p) => ({
       code: String(p.code),
       name: String(p.name),
@@ -112,7 +114,7 @@ export async function publicPackages() {
           key: String(e.ent_key),
           kind: (kindOfKey(String(e.ent_key)) ?? e.kind) as string,
           value: e.value_int === null ? null : Number(e.value_int),
-          label: entLabel(String(e.ent_key)),
+          label: modules.get(String(e.ent_key)) ?? entLabel(String(e.ent_key)),
         })),
     }));
   } catch (err) {

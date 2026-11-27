@@ -54,6 +54,8 @@ export interface Entitlement {
   /** LIMIT value; null = unlimited (or "enabled" for APP / FEATURE) */
   value: number | null;
   label: string;
+  /** a module added on the Modules screen (package editor rows) */
+  module?: boolean;
 }
 
 export interface PackageInfo {
@@ -506,11 +508,51 @@ export interface PersonElsewhere {
   alreadyInTarget: boolean;
 }
 
+/** A module (built-in app or one added on the Modules screen) and its state for one school. */
+export interface SchoolModule {
+  systemId: number;
+  name: string;
+  description?: string | null;
+  clientId: string | null;
+  iconUrl?: string | null;
+  /** built-in app key ("app.tupo"); null for a module the platform added */
+  key?: string | null;
+  /** the key a package uses to include it ("app.tupo" or "module.7") */
+  entitlementKey?: string;
+  status: "ACTIVE" | "DISABLED";
+  /** PACKAGE: from the school's package. OVERRIDE: set by hand. NONE: never switched on. */
+  source: "PACKAGE" | "OVERRIDE" | "NONE";
+  inPackage?: boolean;
+  /** a built-in app the package does not include: the switch alone would not open it */
+  needsPackage?: boolean;
+  moduleStatus?: "ACTIVE" | "DISABLED";
+}
+
+/** One school in a module's list (Modules -> a module -> Schools). */
+export interface ModuleSchool {
+  tid: number;
+  name: string;
+  slug: string;
+  isPrimary: boolean;
+  lifecycle: string;
+  pkg: string;
+  status: "ACTIVE" | "DISABLED";
+  source: "PACKAGE" | "OVERRIDE" | "NONE";
+  inPackage: boolean;
+  needsPackage: boolean;
+}
+
+export interface ModuleSchools {
+  module: { systemId: number; name: string; clientId: string | null; key: string | null; entitlementKey: string; moduleStatus: "ACTIVE" | "DISABLED" };
+  schools: ModuleSchool[];
+}
+
 export interface TenantDetail {
   tenant: TenantListItem & { legalName?: string | null; logoUrl?: string | null; timezone: string; country: string | null; activatedAt: string | null; suspendedAt: string | null; statusReason: string | null };
   entitlements: EffectiveEntitlements;
   overrides: Array<{ id: number; key: string; value: number | null; enabled: boolean; reason: string; expiresAt: string | null; grantedBy: string | null }>;
-  apps: Array<{ systemId: number; name: string; clientId: string | null; status: "ACTIVE" | "DISABLED"; source: "PACKAGE" | "OVERRIDE"; /** entitlement key ("app.tupo"), null when unmapped */ key?: string | null }>;
+  /** Every module, on or off for this school (a module the school was never given has source NONE). */
+  apps: SchoolModule[];
   usage: TenantUsage;
   subscription: Subscription | null;
   invoices: Invoice[];
@@ -632,6 +674,10 @@ export const platformApi = {
   removeOverride: (tid: number, overrideId: number) => unwrap<TenantDetail>(api.delete(`/platform/tenants/${tid}/overrides/${overrideId}`)),
   setTenantApp: (tid: number, systemId: number, status: "ACTIVE" | "DISABLED") =>
     unwrap<TenantDetail>(api.put(`/platform/tenants/${tid}/apps/${systemId}`, { status })),
+  /** Which schools have a module, and switching it for some or all of them. */
+  moduleSchools: (systemId: number) => unwrap<ModuleSchools>(api.get(`/platform/modules/${systemId}/schools`)),
+  setModuleSchools: (systemId: number, tids: number[] | "all", status: "ACTIVE" | "DISABLED") =>
+    unwrap<ModuleSchools>(api.put(`/platform/modules/${systemId}/schools`, { tids, status })),
   admins: (tid: number) => unwrap<TenantAdmin[]>(api.get(`/platform/tenants/${tid}/admins`)),
   createAdmin: (tid: number, body: { firstName: string; lastName: string; email: string; phone?: string; kind: TenantAdmin["kind"]; reason: string }) =>
     unwrap<{ admin: TenantAdmin; created: boolean; tempPassword: string | null; emailed: boolean }>(api.post(`/platform/tenants/${tid}/admins`, body)),

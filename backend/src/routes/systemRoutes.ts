@@ -8,6 +8,7 @@ import {
   removeSystemFromSchool,
   assignSystemToRoleInSchool,
   getSchoolSystems,
+  getSchoolModules,
   deleteSystem,
   getSchoolRoleAssignments,
   removeSystemFromRoleInSchool,
@@ -126,6 +127,12 @@ router.get(
   getSchoolSystems,
 );
 
+router.get(
+  "/school/:schoolId/modules",
+  authenticate,
+  authorize([Permissions.MANAGE_SCHOOLS, Permissions.MANAGE_SYSTEMS, Permissions.ASSIGN_SCHOOL_SYSTEMS]),
+  getSchoolModules,
+);
 router.get(
   "/school/:schoolId/roles",
   authenticate,

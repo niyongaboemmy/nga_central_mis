@@ -2,10 +2,10 @@
  * TenantSystem derivation from APP entitlements (plan §3.1, fix plan 2.6) -- OWNED
  * BY WORK PACKAGE A. Signature is the seam provisioning and package changes call.
  *
- * Only Systems that ARE an app of the catalogue (APP_KEYS[...].client: Task
- * Mentor, Tendo, Tupo) are derived; any other SSO client a school has is the
- * operator's business (OVERRIDE) and left alone. System rows are global and
- * live in the primary tenant's database.
+ * Derived: the built-in apps (APP_KEYS[...].client: Task Mentor, Tendo, Tupo) and
+ * any module a package or override names ("module.<system_id>", catalog.ts). A
+ * module the platform switched on or off by hand is an OVERRIDE row and is left
+ * alone. System rows are global and live in the primary tenant's database.
  */
 import { inArray } from "drizzle-orm";
 import { RowDataPacket } from "mysql2/promise";
@@ -15,6 +15,7 @@ import { controlPool, isControlPlaneMissing } from "../../db/platform";
 import { APP_KEY_BY_CLIENT, assignSystem } from "../../tenancy/systems";
 import { clearSnapshotCache } from "../access/snapshotCache";
 import { invalidateEntitlements, resolveEntitlements } from "./entitlements";
+import { builtInKeyOf, entitledModuleIds, listModules } from "./modules";
 
 export { APP_KEY_BY_CLIENT };
 
@@ -39,7 +40,14 @@ export async function deriveTenantSystems(tid: number): Promise<{ assigned: numb
   const entitled = new Set(
     systems.filter((s) => ent.apps.includes(APP_KEY_BY_CLIENT[String(s.client_id)])).map((s) => s.system_id),
   );
-  const appSystems = new Set(systems.map((s) => s.system_id));
+  // Modules the platform added ("module.<id>" entitlements): a package or an
+  // override that names one switches it on, exactly like a built-in app. A key
+  // whose module was deleted names nothing.
+  const moduleIds = new Set((await listModules()).filter((m) => !builtInKeyOf(m.clientId)).map((m) => m.systemId));
+  for (const id of entitledModuleIds(ent)) if (moduleIds.has(id)) entitled.add(id);
+  // Every System a PACKAGE row can belong to. A module switched on by hand is an
+  // OVERRIDE row and is never touched here, so only package-given rows turn off.
+  const appSystems = new Set([...systems.map((s) => s.system_id), ...moduleIds]);
 
   let rows: RowDataPacket[];
   try {

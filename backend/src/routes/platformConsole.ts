@@ -239,7 +239,7 @@ router.put("/payment-instructions", guard(C.invoice), asyncHandler(async (req: a
 
 router.get("/packages", guard(CATALOG_READ), asyncHandler(async (_req, res) => ok(res, await packagesAdmin.listPackages())));
 
-router.get("/entitlement-catalog", guard(CATALOG_READ), asyncHandler(async (_req, res) => ok(res, packagesAdmin.entitlementCatalog())));
+router.get("/entitlement-catalog", guard(CATALOG_READ), asyncHandler(async (_req, res) => ok(res, await packagesAdmin.entitlementCatalog())));
 
 router.put("/packages/:code", guard(C.packages), asyncHandler(async (req: any, res) => {
   ok(res, await packagesAdmin.updatePackage(String(req.params.code), req.body ?? {}, userId(req)));

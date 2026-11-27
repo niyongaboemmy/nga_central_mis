@@ -4,6 +4,11 @@ import { responseTenant } from "../tenancy/claims";
 import { assignSystem, filterAssignedSystems, systemRefusal } from "../tenancy/systems";
 import { PRIMARY_TENANT_ID } from "../vendor/nga-tenancy";
 import { parseScopes, writeSystemScopes } from "../tenancy/systemScopes";
+import { controlPool, isControlPlaneMissing } from "../db/platform";
+import { invalidateModules, resolveSchoolIds, schoolModules } from "../services/tenantMgmt/modules";
+import { moduleKey } from "../services/tenantMgmt/catalog";
+import { setModuleForSchools, setTenantApp } from "../services/tenantMgmt/lifecycle";
+import { onEntitlementsChanged } from "../services/tenantMgmt/entitlementsChanged";
 
 // System rows are global (the primary tenant's DB); only the primary tenant
 // manages them ([MIS-A17]). Everything else in this file is tenant data.
@@ -83,15 +88,25 @@ export const createSystem = async (req: Request, res: Response) => {
     const [created] = await db.select({ id: System.system_id }).from(System).where(eq(System.name, name)).limit(1);
     // Service scopes ([MIS-A11]); omitted = legacy (every scope).
     if (req.body.scopes !== undefined && created) await writeSystemScopes(created.id, parseScopes(req.body.scopes));
-    // Systems are assigned per school, the primary included (tenancy/systems.ts):
-    // a System made on the primary console is NGA's unless told otherwise.
-    if (created && req.body.assign_primary !== false) {
+    invalidateModules();
+    // Systems are assigned per school, the primary included (tenancy/systems.ts).
+    // `tenant_ids` says which schools get the new module: a list of school ids, or
+    // "all". Without it the module is the primary school's only (the behaviour
+    // before the form asked), unless assign_primary is false.
+    if (created && req.body.tenant_ids !== undefined) {
+      try {
+        const tids = await resolveSchoolIds(req.body.tenant_ids);
+        await setModuleForSchools(created.id, tids, "ACTIVE", { userId: (req as any).user?.userId ?? null, ip: req.ip ?? null });
+      } catch (error) {
+        console.error("Error assigning the new system to schools:", error);
+      }
+    } else if (created && req.body.assign_primary !== false) {
       await assignSystem(PRIMARY_TENANT_ID, created.id).catch((error) => console.error("Error assigning system to tenant 1:", error));
     }
 
     res.status(201).json({
       message: "System created successfully",
-      data: { client_id, client_secret }, // Return credentials if created
+      data: { client_id, client_secret, system_id: created?.id ?? null }, // Return credentials if created
     });
   } catch (error) {
     console.error("Error creating system:", error);
@@ -203,6 +218,7 @@ export const updateSystem = async (req: Request, res: Response) => {
       .where(eq(System.system_id, Number(id)));
     if (req.body.scopes !== undefined) await writeSystemScopes(Number(id), parseScopes(req.body.scopes));
 
+    invalidateModules();
     res.status(200).json({
       message: "System updated successfully",
       // A hashed secret (scripts/hash-sso-client-secrets.ts) is not the
@@ -234,40 +250,32 @@ export const deleteSystem = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "System not found" });
     }
 
-    // System.system_id is referenced by SchoolSystemAssignment and
-    // RoleSystemFragment with ON DELETE NO ACTION, so a module that's
-    // assigned to any school or role would otherwise fail the DELETE with
-    // an opaque FK constraint error. Check first and report clearly.
-    const [schoolAssignments, roleAssignments] = await Promise.all([
-      db
-        .select({ school_id: SchoolSystemAssignment.school_id })
-        .from(SchoolSystemAssignment)
-        .where(eq(SchoolSystemAssignment.system_id, systemId)),
-      db
-        .select({ fragment_id: RoleSystemFragment.fragment_id })
-        .from(RoleSystemFragment)
-        .where(eq(RoleSystemFragment.system_id, systemId)),
-    ]);
-
-    if (schoolAssignments.length > 0 || roleAssignments.length > 0) {
+    // Role assignments are the schools' own data: ask for them to be removed first.
+    // SchoolSystemAssignment rows are leftovers of the pre-tenancy assignment
+    // screen (nothing reads them any more), so they go with the module.
+    const roleAssignments = await db
+      .select({ fragment_id: RoleSystemFragment.fragment_id })
+      .from(RoleSystemFragment)
+      .where(eq(RoleSystemFragment.system_id, systemId));
+    if (roleAssignments.length > 0) {
       return res.status(409).json({
-        message:
-          "Cannot delete this module: it is still assigned to " +
-          [
-            schoolAssignments.length > 0
-              ? `${schoolAssignments.length} school(s)`
-              : null,
-            roleAssignments.length > 0
-              ? `${roleAssignments.length} role(s)`
-              : null,
-          ]
-            .filter(Boolean)
-            .join(" and ") +
-          ". Remove those assignments first.",
+        message: `Cannot delete this module: it is still assigned to ${roleAssignments.length} role(s). Remove those assignments first.`,
       });
     }
+    await db.delete(SchoolSystemAssignment).where(eq(SchoolSystemAssignment.system_id, systemId));
 
     await db.delete(System).where(eq(System.system_id, systemId));
+    invalidateModules();
+    // The module is gone for every school: drop its switches and take it out of
+    // the packages and overrides that named it.
+    try {
+      await controlPool().query("DELETE FROM TenantSystem WHERE system_id = ?", [systemId]);
+      await controlPool().query("DELETE FROM PackageEntitlement WHERE ent_key = ?", [moduleKey(systemId)]);
+      await controlPool().query("DELETE FROM TenantEntitlementOverride WHERE ent_key = ?", [moduleKey(systemId)]);
+      await onEntitlementsChanged();
+    } catch (error) {
+      if (!isControlPlaneMissing(error)) console.error("Error cleaning up a deleted system's assignments:", error);
+    }
 
     res.status(200).json({ message: "System deleted successfully" });
   } catch (error: any) {
@@ -284,61 +292,45 @@ export const deleteSystem = async (req: Request, res: Response) => {
 
 // --- Assignments ---
 
-// Assign System to School
-export const assignSystemToSchool = async (req: Request, res: Response) => {
-  try {
-    const { school_id, system_id } = req.body;
-
-    const existingAssignment = await db
-      .select()
-      .from(SchoolSystemAssignment)
-      .where(
-        and(
-          eq(SchoolSystemAssignment.school_id, school_id),
-          eq(SchoolSystemAssignment.system_id, system_id),
-        ),
-      );
-
-    if (existingAssignment.length > 0) {
-      return res
-        .status(400)
-        .json({ message: "System already assigned to this school" });
-    }
-
-    await db.insert(SchoolSystemAssignment).values({
-      school_id,
-      system_id,
+/**
+ * Switch a module on or off for the school the request runs in (School profile ->
+ * Configure -> System Assignments). This is the same switch as the platform
+ * console's school -> Plan & apps: a TenantSystem row. Only the platform may flip
+ * it; a school sees what it has and asks for the rest through its subscription.
+ *
+ * (Before multi-tenancy these wrote SchoolSystemAssignment, which nothing reads
+ * any more: the switches looked right and changed nothing.)
+ */
+const setModuleForThisSchool = async (req: Request, res: Response, status: "ACTIVE" | "DISABLED") => {
+  const tenant = responseTenant();
+  if (!tenant.isPrimary) {
+    return res.status(403).json({
+      success: false,
+      code: "PLATFORM_ONLY",
+      message: "Modules are switched on for your school by Amashuri. See Subscription, or contact support.",
     });
-
-    res.status(201).json({ message: "System assigned to school successfully" });
-  } catch (error) {
-    console.error("Error assigning system to school:", error);
-    res.status(500).json({ message: "Internal server error" });
   }
-};
-
-// Remove System from School
-export const removeSystemFromSchool = async (req: Request, res: Response) => {
+  const systemId = Number(req.body?.system_id);
+  if (!Number.isInteger(systemId) || systemId <= 0) return res.status(400).json({ message: "Choose a module." });
   try {
-    const { school_id, system_id } = req.body; // or params, depending on route choice. Using body for consistency.
-
-    await db
-      .delete(SchoolSystemAssignment)
-      .where(
-        and(
-          eq(SchoolSystemAssignment.school_id, school_id),
-          eq(SchoolSystemAssignment.system_id, system_id),
-        ),
-      );
-
-    res
-      .status(200)
-      .json({ message: "System removed from school successfully" });
-  } catch (error) {
-    console.error("Error removing system from school:", error);
-    res.status(500).json({ message: "Internal server error" });
+    await setTenantApp(tenant.tid, systemId, status, { userId: (req as any).user?.userId ?? null, ip: req.ip ?? null });
+    return res.status(status === "ACTIVE" ? 201 : 200).json({
+      message: status === "ACTIVE" ? "Module switched on for this school" : "Module switched off for this school",
+    });
+  } catch (error: any) {
+    if (isControlPlaneMissing(error)) {
+      // A single-school install with no control plane: the school has every module.
+      return res.status(200).json({ message: "This school has every module." });
+    }
+    if (error?.statusCode) return res.status(error.statusCode).json({ success: false, code: error.code, message: error.message });
+    console.error("Error switching a module for this school:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const assignSystemToSchool = (req: Request, res: Response) => setModuleForThisSchool(req, res, "ACTIVE");
+
+export const removeSystemFromSchool = (req: Request, res: Response) => setModuleForThisSchool(req, res, "DISABLED");
 
 // Assign System to Role in School context
 export const assignSystemToRoleInSchool = async (
@@ -408,21 +400,44 @@ export const assignSystemToRoleInSchool = async (
   }
 };
 
-export const getSchoolSystems = async (req: Request, res: Response) => {
+/**
+ * The modules that are on for the school the request runs in: assigned
+ * (TenantSystem) and, for a built-in app, in its package. Never the secrets.
+ */
+export const getSchoolSystems = async (_req: Request, res: Response) => {
   try {
-    const { schoolId } = req.params;
-    const result = await db
-      .select({
-        system: System,
-      })
-      .from(SchoolSystemAssignment)
-      .innerJoin(System, eq(SchoolSystemAssignment.system_id, System.system_id))
-      .where(eq(SchoolSystemAssignment.school_id, Number(schoolId)));
-
-    const systems = result.map((r) => r.system);
-    res.json(systems);
+    const systems = await primaryDb().select().from(System).where(eq(System.status, "ACTIVE"));
+    const mine = await filterAssignedSystems(systems);
+    res.json(mine.map(({ client_secret: _s, ...rest }) => rest));
   } catch (error) {
     console.error("Error fetching school systems:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+/**
+ * Every module with its state for this school (on / off, from the package or set
+ * by hand, and whether the school may change it): the rows of System Assignments.
+ */
+export const getSchoolModules = async (_req: Request, res: Response) => {
+  try {
+    const tenant = responseTenant();
+    const modules = (await schoolModules(tenant.tid)).filter((m) => m.moduleStatus === "ACTIVE");
+    res.json({
+      canManage: tenant.isPrimary,
+      modules: modules.map((m) => ({
+        system_id: m.systemId,
+        name: m.name,
+        description: m.description,
+        icon_url: m.iconUrl,
+        on: m.status === "ACTIVE" && !m.needsPackage,
+        source: m.source,
+        inPackage: m.inPackage,
+        needsPackage: m.needsPackage,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching school modules:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

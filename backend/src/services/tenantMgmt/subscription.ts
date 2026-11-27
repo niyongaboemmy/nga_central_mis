@@ -21,6 +21,7 @@ import { NotFoundError } from "../../errors/CustomError";
 import { invalidateEntitlements } from "./entitlements";
 import { assertTransition } from "./stateMachine";
 import { APP_KEYS, FEATURES, LIMITS } from "./catalog";
+import { moduleLabels } from "./modules";
 
 export type Cycle = "TERM" | "YEAR";
 export const CYCLE_MONTHS: Record<Cycle, number> = { TERM: 4, YEAR: 12 };
@@ -94,6 +95,7 @@ export async function loadPackages(filter: { publicOnly?: boolean; code?: string
   const [ents] = codes.length
     ? await controlPool().query<RowDataPacket[]>("SELECT * FROM PackageEntitlement WHERE package_code IN (?) ORDER BY kind, ent_key", [codes])
     : [[] as RowDataPacket[]];
+  const modules = await moduleLabels();
   return pkgs.map((p) => ({
     code: String(p.code),
     name: String(p.name),
@@ -108,7 +110,7 @@ export async function loadPackages(filter: { publicOnly?: boolean; code?: string
     currency: String(p.currency ?? "RWF"),
     entitlements: (ents as RowDataPacket[])
       .filter((e) => e.package_code === p.code)
-      .map((e) => ({ key: String(e.ent_key), kind: e.kind, value: e.value_int === null ? null : Number(e.value_int), label: entLabel(String(e.ent_key)) })),
+      .map((e) => ({ key: String(e.ent_key), kind: e.kind, value: e.value_int === null ? null : Number(e.value_int), label: modules.get(String(e.ent_key)) ?? entLabel(String(e.ent_key)) })),
   }));
 }
 export type PackageInfo = Awaited<ReturnType<typeof loadPackages>>[number];

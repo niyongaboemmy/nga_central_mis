@@ -42,8 +42,9 @@ import {
   SchoolTextField,
 } from "../api/schools";
 import {
-  getSystems,
   getSchoolSystems,
+  getSchoolModules,
+  type SchoolModuleState,
   getSchoolRoleAssignments,
   assignSystemToSchool,
   removeSystemFromSchool,
@@ -202,7 +203,9 @@ const SchoolConfigurationModal = ({
   school: School;
 }) => {
   const [activeTab, setActiveTab] = useState<"systems" | "roles">("systems");
-  const [allSystems, setAllSystems] = useState<System[]>([]);
+  // Every module with its real state for this school (the same switch as the platform console).
+  const [modules, setModules] = useState<SchoolModuleState[]>([]);
+  const [canManage, setCanManage] = useState(false);
   const [schoolSystems, setSchoolSystems] = useState<System[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [roleAssignments, setRoleAssignments] = useState<RoleAssignment[]>([]);
@@ -228,15 +231,16 @@ const SchoolConfigurationModal = ({
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [systemsData, schoolSystemsData, rolesData, assignmentsData] =
+      const [modulesData, schoolSystemsData, rolesData, assignmentsData] =
         await Promise.all([
-          getSystems(),
+          getSchoolModules(school.school_id),
           getSchoolSystems(school.school_id),
           getRoles(),
           getSchoolRoleAssignments(school.school_id),
         ]);
 
-      if (systemsData) setAllSystems(systemsData);
+      setModules(modulesData.modules);
+      setCanManage(modulesData.canManage);
       if (schoolSystemsData) setSchoolSystems(schoolSystemsData);
       if (rolesData) setRoles(rolesData);
       if (assignmentsData) setRoleAssignments(assignmentsData);
@@ -248,7 +252,7 @@ const SchoolConfigurationModal = ({
     }
   };
 
-  const handleToggleSystem = async (system: System, isAssigned: boolean) => {
+  const handleToggleSystem = async (system: SchoolModuleState, isAssigned: boolean) => {
     if (isAssigned) {
       const granted = roleAssignments.filter((r) => r.system_id === system.system_id).length;
       const ok = await confirm({
@@ -263,19 +267,14 @@ const SchoolConfigurationModal = ({
     }
     setActionLoading(system.system_id);
     try {
-      if (isAssigned) {
-        // Remove
-        await removeSystemFromSchool(school.school_id, system.system_id);
-        setSchoolSystems((prev) =>
-          prev.filter((s) => s.system_id !== system.system_id),
-        );
-        showToast(`Removed ${system.name} from school`, "success");
-      } else {
-        // Assign
-        await assignSystemToSchool(school.school_id, system.system_id);
-        setSchoolSystems((prev) => [...prev, system]);
-        showToast(`Assigned ${system.name} to school`, "success");
-      }
+      if (isAssigned) await removeSystemFromSchool(school.school_id, system.system_id);
+      else await assignSystemToSchool(school.school_id, system.system_id);
+      // Read the result back: the server decides what is on (package, built-in apps).
+      const [modulesData, schoolSystemsData] = await Promise.all([getSchoolModules(school.school_id), getSchoolSystems(school.school_id)]);
+      setModules(modulesData.modules);
+      setCanManage(modulesData.canManage);
+      if (schoolSystemsData) setSchoolSystems(schoolSystemsData);
+      showToast(isAssigned ? `${system.name} is off for ${school.name}` : `${system.name} is on for ${school.name}`, "success");
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to update system assignment",
@@ -420,16 +419,21 @@ const SchoolConfigurationModal = ({
           {activeTab === "systems" ? (
             <div className="space-y-4">
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Enable or disable modules for this tenant. Enabled modules will
-                be available for role assignment.
+                {canManage
+                  ? "Switch a module on or off for this school. Modules that are on can be given to roles."
+                  : "These are the modules your school has. Modules are switched on with your subscription: see Subscription, or contact Amashuri support to add one."}
               </p>
               <div className="grid grid-cols-1 gap-4">
-                {allSystems.map((system) => {
-                  const isAssigned = schoolSystems.some(
-                    (s) => s.system_id === system.system_id,
-                  );
+                {modules.length === 0 && <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">No modules yet.</p>}
+                {modules.map((system) => {
+                  const isAssigned = system.on;
                   const isLoading = actionLoading === system.system_id;
-                  const locked = !isAssigned && !isSystemEntitled(system.client_id, tenantStatus.data?.entitlements);
+                  const locked = !canManage || (!isAssigned && system.needsPackage);
+                  const note = system.needsPackage
+                    ? "Not in this school's package"
+                    : system.source === "PACKAGE"
+                      ? `${system.description ? `${system.description} · ` : ""}Included in the package`
+                      : system.description;
 
                   return (
                     <div
@@ -455,7 +459,7 @@ const SchoolConfigurationModal = ({
                             {system.name}
                           </h4>
                           <p className="text-xs text-gray-500 max-w-[250px] truncate">
-                            {locked ? "Not in this school's package" : system.description}
+                            {note}
                           </p>
                         </div>
                       </div>
