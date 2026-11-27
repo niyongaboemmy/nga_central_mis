@@ -6,6 +6,7 @@ import {
   BookCopy,
   BookMarked,
   BookOpen,
+  BookOpenText,
   Bot,
   Briefcase,
   Building2,
@@ -225,6 +226,8 @@ export function buildNavAreas(ctx: NavContext): NavArea[] {
           ],
         },
         { label: "Files", items: [{ label: "Documents", path: "/documents", icon: Folder }] },
+        // How-to guides for staff, one folder per app (src/docs/README.md).
+        { label: "Help", items: [{ label: "Documentation", path: "/docs", icon: BookOpenText, userTypes: STAFF }] },
         {
           // Side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §6, §13).
           label: "Projects",
