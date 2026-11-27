@@ -58,6 +58,21 @@ describe("School profile", () => {
     expect(within(card).getByText("In use")).toBeInTheDocument();
   });
 
+  it("uses the address the server built, which names the school, for any school but the first", async () => {
+    // The image request carries no sign-in and school ids repeat, so an address
+    // without ?tenant= reads the first school's records: the logo came back "not found".
+    const lake = {
+      ...nga,
+      school_id: 2,
+      name: "Lake Academy",
+      logo_urls: { primary: "https://api.example/schools/2/logo/primary?tenant=lake&v=99", partner: null, documents: null },
+    };
+    api.getSchools.mockResolvedValue([lake]);
+    renderPage();
+    const img = (await screen.findByRole("img", { name: "Lake Academy" })) as HTMLImageElement;
+    expect(img.src).toBe("https://api.example/schools/2/logo/primary?tenant=lake&v=99");
+  });
+
   it("offers no way to add a second school, or to switch off the one in use", async () => {
     renderPage();
     await screen.findByText(nga.name);

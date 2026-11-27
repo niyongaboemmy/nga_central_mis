@@ -1,4 +1,5 @@
-import { isTenantUsable, runWithTenant } from "../vendor/nga-tenancy";
+import { PRIMARY_TENANT_ID, isTenantUsable, runWithTenant } from "../vendor/nga-tenancy";
+import { responseTenant } from "../tenancy/claims";
 import { findTenant } from "../tenancy/registry";
 import { Request, Response } from "express";
 import { db } from "../db";
@@ -6,6 +7,7 @@ import { School } from "../db/schema";
 import { asc, eq } from "drizzle-orm";
 import path from "path";
 import storageService from "../utils/fileServer";
+import { publicApiBase } from "../services/avatar/urls";
 
 // ─── Validation shared by create and update ─────────────────────────────────
 // Logos are never taken from these bodies: they are file-server paths written only by
@@ -203,6 +205,9 @@ const profileSchool = async () => {
 
 const profileOf = (school: any, req: Request) => {
   const base = `${req.protocol}://${req.get("host")}`;
+  const tenant = requestTenant();
+  const v = school.updated_at ? new Date(school.updated_at).getTime() : NaN;
+  const version = Number.isFinite(v) ? v : null;
   return {
     school_id: school.school_id,
     name: school.name,
@@ -215,8 +220,9 @@ const profileOf = (school: any, req: Request) => {
     trade: school.trade ?? null,
     qualification_title: school.qualification_title ?? null,
     head_teacher_name: school.head_teacher_name ?? null,
-    logo_url: isServableLogo(school.logo) ? `${base}/schools/${school.school_id}/logo/primary` : null,
-    documents_logo_url: isServableLogo(school.documents_logo) ? `${base}/schools/${school.school_id}/logo/documents` : null,
+    // The address names the school (schoolLogoUrl): Task Mentor prints these on report cards.
+    logo_url: isServableLogo(school.logo) ? schoolLogoUrl(base, school.school_id, "primary", tenant, version) : null,
+    documents_logo_url: isServableLogo(school.documents_logo) ? schoolLogoUrl(base, school.school_id, "documents", tenant, version) : null,
     updated_at: school.updated_at ?? null,
   };
 };
@@ -284,13 +290,63 @@ const parseLogoSlot = (value: unknown): LogoSlot | null =>
 export const isServableLogo = (v: unknown): v is string =>
   typeof v === "string" && !v.includes("..") && (/^https?:\/\/\S+$/i.test(v) || /^[\w./-]+\.(png|jpe?g|svg|webp)$/i.test(v));
 
-/** A School row as the API returns it: unusable logo values read as "no logo", plus a cache key. */
-export function withLogoState<T extends Record<string, any>>(row: T): T & { logo_version: number | null } {
+export type SchoolLogoSlot = "primary" | "partner" | "documents";
+
+/**
+ * The public address of a school's logo, for an <img src> or another app.
+ *
+ * GET /schools/:id/logo/:slot is public and carries no sign-in, and School ids
+ * repeat across school databases (every school's record is usually id 1 or its own
+ * tid), so the address itself must say which school: `?tenant=<slug>`. Without it
+ * the request is served from the primary school's records -- another school's logo
+ * came back as "not found" (or as the primary's). EVERY logo address is built here.
+ *
+ * `version` (School.updated_at in ms) is the cache key: it changes on every upload.
+ */
+export function schoolLogoUrl(
+  base: string,
+  schoolId: number,
+  slot: SchoolLogoSlot,
+  tenant: { tid: number; slug: string } | null,
+  version?: number | null,
+): string {
+  const params = new URLSearchParams();
+  if (tenant && tenant.tid !== PRIMARY_TENANT_ID) params.set("tenant", tenant.slug);
+  if (version !== null && version !== undefined && Number.isFinite(version)) params.set("v", String(version));
+  const q = params.toString();
+  return `${base.replace(/\/$/, "")}/schools/${schoolId}/logo/${slot}${q ? `?${q}` : ""}`;
+}
+
+/** The school the current request runs for, or null outside a request (jobs, scripts). */
+const requestTenant = (): { tid: number; slug: string } | null => {
+  try {
+    const t = responseTenant();
+    return { tid: t.tid, slug: t.slug };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * A School row as the API returns it: unusable logo values read as "no logo", a
+ * cache key, and `logo_urls` -- the ready-to-use address of each logo that is set,
+ * for the school the request runs in (see schoolLogoUrl).
+ */
+export function withLogoState<T extends Record<string, any>>(
+  row: T,
+): T & { logo_version: number | null; logo_urls: Record<SchoolLogoSlot, string | null> } {
   if (!row) return row as any;
   const out: any = { ...row };
   for (const col of Object.values(LOGO_SLOT_COLUMN)) if (!isServableLogo(out[col])) out[col] = null;
   const t = row.updated_at ? new Date(row.updated_at).getTime() : NaN;
   out.logo_version = Number.isFinite(t) ? t : null;
+  const tenant = requestTenant();
+  out.logo_urls = Object.fromEntries(
+    (Object.entries(LOGO_SLOT_COLUMN) as Array<[SchoolLogoSlot, string]>).map(([slot, col]) => [
+      slot,
+      out[col] ? schoolLogoUrl(publicApiBase(), Number(row.school_id), slot, tenant, out.logo_version) : null,
+    ]),
+  );
   return out;
 }
 

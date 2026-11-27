@@ -24,6 +24,12 @@ export interface School {
   updated_at?: string;
   /** Changes with every logo upload (School.updated_at in ms); the logo URL's cache key. */
   logo_version?: number | null;
+  /**
+   * The address of each logo that is set, built by the server for THIS school.
+   * Use these in <img src>: the address names the school, which the public image
+   * endpoint needs (school ids repeat across schools).
+   */
+  logo_urls?: Partial<Record<"primary" | "partner" | "documents", string | null>>;
 }
 
 /** Field rules shared with the server (schoolController readSchoolBody). */
@@ -72,14 +78,26 @@ export const LOGO_MAX_BYTES = 5 * 1024 * 1024;
 
 export type SchoolLogoSlot = "primary" | "partner" | "documents";
 
-/** Public, unauthenticated image URL for a school's logo -- safe to use directly in <img src>.
- * Appends a cache-busting param since a re-upload keeps the same URL shape otherwise. */
+/**
+ * Public, unauthenticated image URL for a school's logo -- safe to use directly in <img src>.
+ *
+ * `tenant` (the school's slug or number) is required for any school but the
+ * first: the image request carries no sign-in, so the address must say which
+ * school's records to read. Prefer `school.logo_urls[slot]`, which the server
+ * builds; this is the fallback for an API that does not send it yet.
+ */
 export const getSchoolLogoUrl = (
   schoolId: number,
   slot: SchoolLogoSlot = "primary",
   cacheBust?: string | number | null,
-): string =>
-  `${API_BASE_URL}/schools/${schoolId}/logo/${slot}${cacheBust ? `?v=${cacheBust}` : ""}`;
+  tenant?: string | number | null,
+): string => {
+  const params = new URLSearchParams();
+  if (tenant !== null && tenant !== undefined && tenant !== "" && String(tenant) !== "1") params.set("tenant", String(tenant));
+  if (cacheBust) params.set("v", String(cacheBust));
+  const q = params.toString();
+  return `${API_BASE_URL}/schools/${schoolId}/logo/${slot}${q ? `?${q}` : ""}`;
+};
 
 /** Uploads one logo slot; resolves with the school as saved. */
 export const uploadSchoolLogo = async (
