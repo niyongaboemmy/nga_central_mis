@@ -53,6 +53,23 @@ describe("developers guide content", () => {
     }
   });
 
+  it("names the school on every server-to-server sample (never on a user-token call)", () => {
+    for (const e of endpoints) {
+      const service = /client credentials|integration token/i.test(e.auth) && !/in the body/i.test(e.auth);
+      for (const smp of e.samples.filter((x) => x.lang === "curl")) {
+        expect(smp.code.includes("X-NGA-Tenant"), `${e.method} ${e.path}`).toBe(service);
+      }
+    }
+  });
+
+  it("explains how the school is chosen", () => {
+    const ids = ALL_SECTIONS.map((s) => s.id);
+    expect(ids).toContain("schools");
+    expect(ids).toContain("sso-schools");
+    const all = JSON.stringify(ALL_SECTIONS);
+    for (const word of ["X-NGA-Tenant", "TENANT_REQUIRED", "TENANT_MISMATCH", "SYSTEM_NOT_ASSIGNED", "tenant.tid", "`sid`"]) expect(all, word).toContain(word);
+  });
+
   it("keeps response examples valid JSON", () => {
     for (const e of endpoints) if (e.response) expect(() => JSON.parse(e.response!.body), e.path).not.toThrow();
     for (const s of samples) if (s.lang === "json") expect(() => JSON.parse(fillSample(s.code, DEFAULT_VALUES))).not.toThrow();
