@@ -734,8 +734,19 @@ export const getSession = asyncHandler(async (req: any, res: any) => {
     roles,
     systems,
     tenant: tenantBlock(),
+    // Answered from the session cookie alone (no Bearer): hand the same token back,
+    // so a browser whose saved token is gone can keep working instead of bouncing
+    // between the sign-in page and Home. It is the token this browser was given at
+    // sign-in; CORS limits who can read this answer to the Amashuri apps.
+    ...(cookieOnlyToken(req) ? { token: cookieOnlyToken(req) } : {}),
   });
 });
+
+/** The session cookie's token, when the request carried no Authorization header. */
+const cookieOnlyToken = (req: any): string | null =>
+  !req.header("Authorization") && typeof req.cookies?.nga_auth_token === "string" && req.cookies.nga_auth_token
+    ? req.cookies.nga_auth_token
+    : null;
 
 /** Cheap session-validity probe -- authenticate() has already done the real
  *  work (signature, expiry, and the logout-revocation tokenVersion check)

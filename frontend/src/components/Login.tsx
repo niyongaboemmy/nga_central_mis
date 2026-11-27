@@ -45,8 +45,8 @@ import {
   School,
 } from "lucide-react";
 import TenantLogo from "./brand/TenantLogo";
+import { getToken } from "../utils/auth";
 import { AmashuriMark } from "./brand/AmashuriLogo";
-import { loadBranding, readLastSchool } from "../hooks/useTenantBranding";
 
 interface LoginProps {
   onLoginSuccess?: () => void;
@@ -616,26 +616,11 @@ const FeatureCarousel = () => {
 
 // Branded left panel — desktop split-screen; compact banner on mobile
 /**
- * The sign-in page shows the logo of the school this browser last signed in to
- * (remembered by useTenantBranding), refreshed from GET /tenant/branding; NGA's
- * shield otherwise.
+ * The sign-in page is the product's front door, not a school's: it always shows
+ * Amashuri. (It used to show the school this browser last signed in to, which
+ * read as "this is that school's site" to everyone else using the browser.)
  */
-const useLoginBrand = () => {
-  const [brand, setBrand] = useState(() => {
-    const last = readLastSchool();
-    return last
-      ? { isPrimary: last.isPrimary, name: last.isPrimary ? "Amashuri" : last.name, logoUrl: last.logoUrl }
-      : { isPrimary: true, name: "Amashuri", logoUrl: null as string | null };
-  });
-  useEffect(() => {
-    let alive = true;
-    void loadBranding(readLastSchool()?.slug ?? "").then((d) => alive && d && setBrand((b) => ({ ...b, logoUrl: d.logo_url ?? null })));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return brand;
-};
+const LOGIN_BRAND = { isPrimary: true, name: "Amashuri", logoUrl: null as string | null };
 
 /** The e-mail inside a Google ID token (only to remember a school choice; never trusted). */
 const googleEmailOf = (credential: string): string => {
@@ -659,7 +644,7 @@ const takeAfterLogin = (): string | null => {
 };
 
 const LoginBrandPanel = () => {
-  const brand = useLoginBrand();
+  const brand = LOGIN_BRAND;
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 dark:from-blue-950 dark:via-blue-900 dark:to-blue-950">
       {/* Compact mobile banner */}
@@ -1107,8 +1092,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             handleSSOContinue();
           }, 1500);
         } else {
-          // If logged in but no SSO params, let parent handle navigation (e.g. to dashboard)
-          if (onLoginSuccess) onLoginSuccess();
+          // If logged in but no SSO params, let parent handle navigation (e.g. to dashboard).
+          // Only with a saved token: the app's pages need one, and without it they send
+          // the person straight back here -- an endless "Checking session..." (2026-11-27).
+          if (onLoginSuccess && getToken()) onLoginSuccess();
         }
       } catch (err) {
         // Not logged in, stay on login page
