@@ -1,6 +1,6 @@
 import { AxiosResponse } from "axios";
 import api from "../services/api";
-import { setToken, removeToken } from "../utils/auth";
+import { setToken, removeToken, getToken } from "../utils/auth";
 import type { SchoolChoice } from "../lib/tenant";
 
 export interface LoginData {
@@ -153,6 +153,12 @@ export const checkSession = async (): Promise<VerifyOTPResponse | void> => {
   try {
     const response: AxiosResponse<BackendResponse<VerifyOTPResponse>> =
       await api.get("/auth/session");
+
+    // Signed in through the shared session cookie with no token saved in this
+    // browser (the saved one expired, or the sign-in happened in another Amashuri
+    // app): the server hands the session's token back so this app can use it.
+    const sessionToken = (response.data.data as { token?: string } | undefined)?.token;
+    if (sessionToken && !getToken()) setToken(sessionToken);
 
     return response.data.data;
   } catch (error) {

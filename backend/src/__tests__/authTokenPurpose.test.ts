@@ -115,6 +115,25 @@ describe("authenticate refuses non-session tokens; their own endpoints still tak
   });
 });
 
+describe("a session answered from the cookie alone", () => {
+  // Sign-in page stuck on "Checking session..." (2026-11-27): the browser's saved token
+  // was gone while the shared cookie was still good, so the app had a session it could
+  // not use. The cookie-only answer carries the session's token; a Bearer one does not.
+  it("hands the session's token back only when no Bearer was sent", async () => {
+    const token = sign({});
+    const byCookie = await request(app).get("/auth/session").set("Cookie", `nga_auth_token=${token}`);
+    expect(byCookie.status).toBe(200);
+    expect(byCookie.body.data.token).toBe(token);
+    const byBearer = await request(app).get("/auth/session").set("Authorization", `Bearer ${token}`).set("Cookie", `nga_auth_token=${token}`);
+    expect(byBearer.status).toBe(200);
+    expect(byBearer.body.data.token).toBeUndefined();
+    // A cookie that is not a session gets nothing.
+    const half = await request(app).get("/auth/session").set("Cookie", `nga_auth_token=${sign({ requiresOTP: true })}`);
+    expect(half.status).toBe(401);
+    expect(half.body?.data?.token).toBeUndefined();
+  });
+});
+
 describe("OTP brute force", () => {
   it("locks after repeated wrong codes and burns the outstanding code", async () => {
     resetOtpAttempts(userId);
