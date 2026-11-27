@@ -283,15 +283,37 @@ for (;;) {
 }
 ```
 
-### ⚠️ Scoping: these endpoints are NOT school-scoped
+### ⚠️ Scoping: one school per call
 
-Every response carries `scope.schoolFilter: "instance"`. In this schema only
-`School`, `SchoolSystemAssignment` and `RoleSystemFragment` have a `school_id`;
-`User`, `Program`, `Grade`, `Subject`, `ClassGroup` and `AcademicYear` do not.
-So there is no honest way to filter by school, and a `school_id` parameter would
-silently return everything.
+Amashuri serves many schools, each in its own database. Every `/integrations/*`
+call answers for exactly one school: the one named in the `X-NGA-Tenant: <tid>`
+header.
 
-**A partner therefore receives the entire MIS instance and must scope on its own
-side.** If this MIS ever serves a second school, add `school_id` upstream and
-change `scope.schoolFilter` — a client can then detect the change rather than
-quietly importing another school's students.
+- Send `X-NGA-Tenant` on every server-to-server call. Without it the call is
+  treated as school 1: an app that is not enabled for school 1 gets
+  `400 TENANT_REQUIRED`, and a token from another school gets `401`.
+- An integration token belongs to the school it was created in (an administrator
+  of that school creates it under **Systems → Integration tokens**, signed in to
+  that school). A job that serves three schools needs three tokens.
+- Client credentials work for every school the app is switched on for; for any
+  other school the call answers `403 SYSTEM_NOT_ASSIGNED`.
+- IDs (users, subjects, class groups, terms) repeat between schools. Store every
+  row under its `tid`.
+- `scope.schoolFilter` is still `"instance"`: it means "the whole of this
+  school's database, with no further filter", not "every school".
+
+## 🏫 Sign-in and schools
+
+- One registration of your app serves every school, but the app is switched on
+  per school (by hand, or through the school's package).
+- The person picks their school on the Amashuri sign-in page when their e-mail
+  belongs to several. The code, the token (`tid` claim) and the `tenant` block of
+  `POST /sso/token`, `GET /users/me` and `GET /auth/verify` belong to that school.
+- Key your users by `tenant.tid` and `user.user_id` together. The same person in
+  a second school has another user ID; do not merge accounts by e-mail.
+- A user-token call needs no header. If `X-NGA-Tenant` is also sent and names
+  another school, the call is refused with `403 TENANT_MISMATCH`.
+- When a person switches school inside Amashuri, your back-channel logout
+  address receives a `logout_token` with `tid` (the school they left) and `sid`
+  (that browser session). End only the sessions with that `sid`; see
+  `docs/SINGLE_SIGN_OUT.md`.

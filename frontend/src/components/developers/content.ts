@@ -65,7 +65,7 @@ export const GROUPS: Group[] = [
           {
             kind: "steps",
             steps: [
-              { title: "Register your app", text: "A platform administrator adds it under **Systems** and gives you a client ID and a client secret." },
+              { title: "Register your app", text: "Amashuri adds it under **Systems**, gives you a client ID and a client secret, and switches it on for each school that will use it." },
               { title: "Add sign-in", text: "Send people to the Amashuri sign-in page, then exchange the code you get back for a token." },
               { title: "Read the school's data", text: "Call `/integrations/ping` to test your credentials, then pull people and classes." },
             ],
@@ -113,7 +113,7 @@ export const GROUPS: Group[] = [
             rows: [
               ["User token", "`Authorization: Bearer <jwt>`", "One signed-in person, for 24 hours", "`/users/me`, `/auth/verify` and any call made for that person"],
               ["Client credentials", "`Authorization: Basic base64(client_id:client_secret)`", "Your registered app", "`/sso/token` (in the body), `/integrations/*`, `/reminders/sources`"],
-              ["Integration token", "`Authorization: Bearer ngamis_<64 hex>`", "A sync job, with its own scopes", "`/integrations/*`, `/reminders/sources`"],
+              ["Integration token", "`Authorization: Bearer ngamis_<64 hex>`", "A sync job for one school, with its own scopes", "`/integrations/*`, `/reminders/sources`"],
             ],
           },
           {
@@ -124,16 +124,16 @@ export const GROUPS: Group[] = [
           },
           {
             kind: "p",
-            text: "An integration token is the more precise choice for a sync job: it can expire, it is revoked on its own, it carries only the scopes you chose, and it records when it was last used. A platform administrator creates one under **Systems → Integration tokens**. The value is shown once.",
+            text: "An integration token is the more precise choice for a sync job: it can expire, it is revoked on its own, it carries only its own scopes, and it records when it was last used. **A token belongs to one school.** An administrator of that school creates it while signed in to that school, under **Systems → Integration tokens**; the school's package must include the integration API. The value is shown once. A job that serves three schools needs three tokens.",
           },
           {
             kind: "table",
-            head: ["Scope", "Allows"],
+            head: ["Scope", "Allows", "How a token gets it"],
             rows: [
-              ["`sync:read`", "`/integrations/ping` and every `/integrations/sync/*` read"],
-              ["`learning-events:write`", "`POST /integrations/learning-events`"],
-              ["`reminders:write`", "`PUT` and `DELETE /reminders/sources`"],
-              ["`tenants:read`", "`GET /platform/tenants/active`"],
+              ["`sync:read`", "`/integrations/ping` and every `/integrations/sync/*` read", "Every token created on the screen has it."],
+              ["`learning-events:write`", "`POST /integrations/learning-events`", "Issued by Amashuri support. Or use client credentials."],
+              ["`reminders:write`", "`PUT` and `DELETE /reminders/sources`", "Issued by Amashuri support."],
+              ["`tenants:read`", "`GET /platform/tenants/active`", "Issued by Amashuri support. Or use client credentials."],
             ],
           },
           {
@@ -156,15 +156,24 @@ export const GROUPS: Group[] = [
         blocks: [
           {
             kind: "p",
-            text: "A school is identified by `tid`, a positive integer. Each school's data is kept apart, so the same user ID can belong to different people in two schools. Always store `tid` next to any Amashuri ID you keep.",
+            text: "A school is identified by `tid`, a positive integer. Each school's data is kept apart: every ID you receive (users, subjects, class groups, terms) is only meaningful inside its school, and the same number can name different things in two schools. Always store `tid` next to any Amashuri ID you keep.",
+          },
+          {
+            kind: "table",
+            head: ["Your call uses", "How the school is chosen", "What to send"],
+            rows: [
+              ["A user token", "The token carries the school (`tid` claim). Every answer includes a `tenant` block.", "Nothing extra. If you also send `X-NGA-Tenant` and it names another school, the call is refused with `TENANT_MISMATCH`."],
+              ["Client credentials", "The `X-NGA-Tenant` header. Your app must be switched on for that school.", "`X-NGA-Tenant: <tid>` on every call."],
+              ["An integration token", "The `X-NGA-Tenant` header, which must be the school the token was created in.", "`X-NGA-Tenant: <tid>` on every call."],
+            ],
           },
           {
             kind: "list",
             items: [
-              "**Calls with a user token** need nothing extra. The token names the school (`tid` claim), and the response includes a `tenant` block.",
-              "**Calls without a person** (client credentials or an integration token) send `X-NGA-Tenant: <tid>`.",
-              "Your app must be **enabled for that school**. If it is not, the call is refused with `SYSTEM_NOT_ASSIGNED`.",
-              "An integration token belongs to one school. Using it for another school returns `TENANT_MISMATCH`.",
+              "**Always send the header on calls without a person.** Without it the call is treated as school 1. Your app is then refused with `TENANT_REQUIRED` unless it is switched on for school 1, and a token from another school is refused with `401`.",
+              "**Your app is enabled per school.** Amashuri switches it on for a school by hand, or a school gets it with its package. For a school that does not have it, sign-in returns no code and server calls answer `SYSTEM_NOT_ASSIGNED`.",
+              "**One person can belong to several schools.** They have a separate account, with a different user ID, in each. Key your users by `tid` and user ID together. Do not merge two accounts because they share an e-mail address.",
+              "**Where to find `tid`.** It is `tenant.tid` in the answer of `POST /sso/token`, `GET /users/me` and `GET /auth/verify`. For a sync job with no sign-in, ask the school or Amashuri for its number.",
             ],
           },
           {
@@ -175,7 +184,7 @@ export const GROUPS: Group[] = [
               path: "/platform/tenants/active",
               summary: "List schools",
               auth: "Client credentials, or an integration token with `tenants:read`",
-              description: "Every school and its status. Filter on your side: only `ACTIVE` and `GRACE` schools are usable.",
+              description: "Every school on the platform and its status, whichever school the call is made for. Filter on your side: only `ACTIVE` and `GRACE` schools are usable, and your app only works for the schools it is switched on for. Keep the list on your server.",
               samples: [
                 { lang: "curl", code: `curl {{BASE}}/platform/tenants/active \\\n  -u "{{CLIENT_ID}}:$CLIENT_SECRET" \\\n  -H "X-NGA-Tenant: {{TENANT}}"` },
                 {
@@ -234,7 +243,7 @@ curl_close($ch);`,
             kind: "note",
             tone: "info",
             title: "Before you start",
-            text: "Ask a platform administrator to register your app under **Systems**. You need the client ID, the client secret, and your callback address on the list of allowed redirect addresses.",
+            text: "Ask Amashuri to register your app under **Systems**. You need the client ID, the client secret, and your callback address on the list of allowed redirect addresses. The app must also be switched on for every school whose people will sign in: one registration serves all schools, but each school is enabled separately.",
           },
           {
             kind: "code",
@@ -332,7 +341,7 @@ curl_close($ch);`,
               summary: "Exchange an authorization code for a token",
               auth: "Client ID and secret, in the body",
               description:
-                "Returns a token valid for 24 hours, the user, their permissions and their school. The answer is small on purpose: call `GET /users/me` next for the profile, roles and classes.",
+                "Returns a token valid for 24 hours, the user, their permissions and their school. You do not say which school: the code belongs to the school the person signed in to, and `tenant` in the answer tells you which one. The answer is small on purpose: call `GET /users/me` next for the profile, roles and classes.",
               params: [
                 { name: "code", in: "body", type: "string", required: true, description: "The code from the callback. Single use, valid for 5 minutes." },
                 { name: "client_id", in: "body", type: "string", required: true, description: "Your app's client ID." },
@@ -345,7 +354,7 @@ curl_close($ch);`,
                 },
                 {
                   lang: "node",
-                  code: `// Express route your callback page posts to\napp.post("/api/auth/sso", async (req, res) => {\n  const exchange = await fetch("{{BASE}}/sso/token", {\n    method: "POST",\n    headers: { "Content-Type": "application/json" },\n    body: JSON.stringify({\n      code: req.body.code,\n      client_id: process.env.SSO_CLIENT_ID,\n      client_secret: process.env.SSO_CLIENT_SECRET,\n    }),\n  });\n  if (!exchange.ok) return res.status(401).json({ error: "Sign-in failed" });\n\n  const { data } = await exchange.json();\n  const { token, user, permissions, tenant } = data;\n\n  // Create your own session. Keep the Amashuri token on the server.\n  req.session.user = { id: user.user_id, tid: tenant.tid, permissions };\n  req.session.amashuriToken = token;\n  res.json({ ok: true });\n});`,
+                  code: `// Express route your callback page posts to\napp.post("/api/auth/sso", async (req, res) => {\n  const exchange = await fetch("{{BASE}}/sso/token", {\n    method: "POST",\n    headers: { "Content-Type": "application/json" },\n    body: JSON.stringify({\n      code: req.body.code,\n      client_id: process.env.SSO_CLIENT_ID,\n      client_secret: process.env.SSO_CLIENT_SECRET,\n    }),\n  });\n  if (!exchange.ok) return res.status(401).json({ error: "Sign-in failed" });\n\n  const { data } = await exchange.json();\n  const { token, user, permissions, tenant } = data;\n\n  // Create your own session. Keep the Amashuri token on the server.\n  // A user is (school, id): the same id in another school is someone else.\n  req.session.user = { id: user.user_id, tid: tenant.tid, permissions };\n  req.session.amashuriToken = token;\n  res.json({ ok: true });\n});`,
                 },
                 {
                   lang: "python",
@@ -363,7 +372,7 @@ curl_close($ch);`,
                 { status: 401, meaning: "Invalid or already used authorization code. A code works once." },
                 { status: 401, meaning: "Authorization code expired (after 5 minutes)." },
                 { status: 401, meaning: "User account is not active." },
-                { status: 403, code: "TENANT_SUSPENDED", meaning: "The person's school is suspended or archived." },
+                { status: 401, code: "TENANT_SUSPENDED", meaning: "The school the code belongs to is suspended or archived. `TENANT_PENDING` (not active yet) and `TENANT_UNKNOWN` arrive the same way." },
               ],
             },
           },
@@ -473,6 +482,53 @@ function stillSignedIn(string $token): bool {
         ],
       },
       {
+        id: "sso-schools",
+        title: "Sign-in and schools",
+        lead: "One registration of your app serves every school. Each sign-in belongs to exactly one of them.",
+        keywords: "tenant school multi several schools switch school same email two accounts tid",
+        blocks: [
+          {
+            kind: "list",
+            items: [
+              "**The person chooses the school, on the Amashuri sign-in page.** When their e-mail address belongs to several schools, Amashuri asks which one. You cannot choose a school in the redirect, and you do not need to.",
+              "**Everything you receive belongs to that school.** The code, the token (`tid` claim), the `tenant` block and every ID in the profile.",
+              "**Your app must be switched on for that school.** If it is not, no code comes back to you: the person is signed in to Amashuri and stays there, and your callback is never called.",
+              "**Create your user from `tenant.tid` and `user.user_id` together.** The same person in a second school arrives with another user ID and must be a separate user in your app, with their own data.",
+            ],
+          },
+          {
+            kind: "code",
+            title: "Find or create the local user",
+            samples: [
+              {
+                lang: "node",
+                code: `const { token, user, tenant } = data; // from POST /sso/token\n\n// The key is the pair (school, Amashuri user id), never the id or the e-mail alone.\nconst local = await db.users.upsert({\n  where: { tid: tenant.tid, amashuriUserId: user.user_id },\n  create: { tid: tenant.tid, amashuriUserId: user.user_id, username: user.username, schoolName: tenant.name },\n  update: { username: user.username, schoolName: tenant.name },\n});\n\n// Keep the school and the Amashuri session id on your session.\nconst claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());\nreq.session.user = { id: local.id, tid: tenant.tid, sid: claims.sid ?? null };`,
+              },
+              {
+                lang: "python",
+                code: `import base64, json\n\ntoken, user, tenant = data["token"], data["user"], data["tenant"]  # from POST /sso/token\n\n# The key is the pair (school, Amashuri user id), never the id or the e-mail alone.\nlocal = upsert_user(\n    tid=tenant["tid"],\n    amashuri_user_id=user["user_id"],\n    username=user["username"],\n    school_name=tenant["name"],\n)\n\n# Keep the school and the Amashuri session id on your session.\npayload = token.split(".")[1]\nclaims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))\nsession["user"] = {"id": local.id, "tid": tenant["tid"], "sid": claims.get("sid")}`,
+              },
+              {
+                lang: "php",
+                code: `<?php\n// $data comes from POST /sso/token\n$user = $data["user"];\n$tenant = $data["tenant"];\n\n// The key is the pair (school, Amashuri user id), never the id or the e-mail alone.\n$local = upsertUser($tenant["tid"], $user["user_id"], $user["username"], $tenant["name"]);\n\n// Keep the school and the Amashuri session id on your session.\n$payload = explode(".", $data["token"])[1];\n$claims = json_decode(base64_decode(strtr($payload, "-_", "+/")), true);\n$_SESSION["user"] = ["id" => $local["id"], "tid" => $tenant["tid"], "sid" => $claims["sid"] ?? null];`,
+              },
+            ],
+          },
+          {
+            kind: "note",
+            tone: "info",
+            title: "When a person switches school",
+            text: "A person with accounts in two schools can switch between them inside Amashuri. Amashuri then sends your logout address a notice for the school they left, carrying the `sid` of that browser session. End that session only. When they open your app again they sign in as their account in the other school: a different `tid` and a different user ID.",
+          },
+          {
+            kind: "note",
+            tone: "warn",
+            title: "Read the token's claims, do not trust them for access",
+            text: "Decoding the token to read `tid` or `sid` is fine. Deciding what a person may do must come from an answer of the API (`/users/me`, `/auth/verify`), because only Amashuri can check the token's signature.",
+          },
+        ],
+      },
+      {
         id: "sso-authorize",
         title: "Get a code without the sign-in page",
         lead: "For a page that already holds an Amashuri session, such as an app launcher.",
@@ -542,7 +598,8 @@ $target = "{{REDIRECT_URI}}?" . http_build_query(["code" => $data["code"], "stat
               errors: [
                 { status: 400, meaning: "`client_id` or `redirect_uri` is missing, or the redirect address is not registered." },
                 { status: 401, meaning: "Not signed in, or the app is disabled." },
-                { status: 403, code: "APP_NOT_IN_PACKAGE", meaning: "The app is not in the school's package or not enabled for the school." },
+                { status: 403, code: "SYSTEM_NOT_ASSIGNED", meaning: "The app is not switched on for the person's school." },
+                { status: 403, code: "APP_NOT_IN_PACKAGE", meaning: "The school's package does not include the app." },
                 { status: 404, meaning: "No app has that `client_id`." },
               ],
             },
@@ -564,7 +621,7 @@ $target = "{{REDIRECT_URI}}?" . http_build_query(["code" => $data["code"], "stat
               ["`tid`, `tslug`, `tstatus`, `pkg`", "The school: number, short name, status and package."],
               ["`permissions`", "What the person may do in Amashuri."],
               ["`preferred_theme`", "`light` or `dark`. Use it to match the person's choice."],
-              ["`sid`", "The browser session the token came from."],
+              ["`sid`", "The Amashuri browser session the token came from. Store it with your session: a sign-out notice can name it."],
               ["`iss`, `aud`, `exp`", "Issuer `nga-mis`, your client ID, and an expiry 24 hours after issue."],
             ],
           },
@@ -601,7 +658,7 @@ $target = "{{REDIRECT_URI}}?" . http_build_query(["code" => $data["code"], "stat
               {
                 lang: "json",
                 label: "Token claims",
-                code: `{\n  "iss": "{{BASE}}",\n  "aud": "{{CLIENT_ID}}",\n  "sub": "1203",\n  "tid": 1,\n  "iat": 1795000000,\n  "exp": 1795000120,\n  "jti": "6f0d2c1e-...",\n  "events": {\n    "http://schemas.openid.net/event/backchannel-logout": {}\n  }\n}`,
+                code: `{\n  "iss": "{{BASE}}",\n  "aud": "{{CLIENT_ID}}",\n  "sub": "1203",\n  "tid": 1,\n  "sid": "A1b2C3d4E5",\n  "iat": 1795000000,\n  "exp": 1795000120,\n  "jti": "6f0d2c1e-...",\n  "events": {\n    "http://schemas.openid.net/event/backchannel-logout": {}\n  }\n}`,
               },
             ],
           },
@@ -613,7 +670,8 @@ $target = "{{REDIRECT_URI}}?" . http_build_query(["code" => $data["code"], "stat
               "Check `iss` is the API host, `aud` is your client ID, and the token has not expired.",
               "Check the `events` claim holds the back-channel logout event, and that there is no `nonce`.",
               "Accept each `jti` once.",
-              "End every session of the person named by `sub` in the school named by `tid`.",
+              "End the sessions of the person named by `sub` in the school named by `tid`. The same `sub` in another school is a different person: never end sessions on `sub` alone.",
+              "When the token has a `sid`, end only the sessions that came from that Amashuri session: the ones whose user token carried the same `sid`. This happens when the person switched school in one browser; their other devices stay signed in. Without a `sid`, end all of that person's sessions.",
               "Answer `200` with `Cache-Control: no-store`, or `400` for a token you reject.",
             ],
           },
@@ -623,11 +681,11 @@ $target = "{{REDIRECT_URI}}?" . http_build_query(["code" => $data["code"], "stat
             samples: [
               {
                 lang: "node",
-                code: `import express from "express";\nimport { createRemoteJWKSet, jwtVerify } from "jose";\n\nconst ISSUER = "{{BASE}}";\nconst EVENT = "http://schemas.openid.net/event/backchannel-logout";\nconst keys = createRemoteJWKSet(new URL(ISSUER + "/.well-known/jwks.json"));\nconst seen = new Map(); // jti -> expiry; use a shared store with several servers\n\napp.post("/sso/backchannel-logout", express.urlencoded({ extended: false }), async (req, res) => {\n  res.set("Cache-Control", "no-store");\n  try {\n    const { payload } = await jwtVerify(req.body.logout_token, keys, {\n      issuer: ISSUER,\n      audience: process.env.SSO_CLIENT_ID,\n      algorithms: ["RS256"],\n    });\n    if (!payload.sub || !payload.jti) throw new Error("missing claims");\n    if (!payload.events || !(EVENT in payload.events)) throw new Error("not a logout token");\n    if ("nonce" in payload) throw new Error("nonce not allowed");\n    if (seen.has(payload.jti)) throw new Error("replayed");\n    seen.set(payload.jti, payload.exp);\n\n    await endSessions({ tid: payload.tid ?? 1, amashuriUserId: payload.sub });\n    res.sendStatus(200);\n  } catch {\n    res.sendStatus(400);\n  }\n});`,
+                code: `import express from "express";\nimport { createRemoteJWKSet, jwtVerify } from "jose";\n\nconst ISSUER = "{{BASE}}";\nconst EVENT = "http://schemas.openid.net/event/backchannel-logout";\nconst keys = createRemoteJWKSet(new URL(ISSUER + "/.well-known/jwks.json"));\nconst seen = new Map(); // jti -> expiry; use a shared store with several servers\n\napp.post("/sso/backchannel-logout", express.urlencoded({ extended: false }), async (req, res) => {\n  res.set("Cache-Control", "no-store");\n  try {\n    const { payload } = await jwtVerify(req.body.logout_token, keys, {\n      issuer: ISSUER,\n      audience: process.env.SSO_CLIENT_ID,\n      algorithms: ["RS256"],\n    });\n    if (!payload.sub || !payload.jti) throw new Error("missing claims");\n    if (!payload.events || !(EVENT in payload.events)) throw new Error("not a logout token");\n    if ("nonce" in payload) throw new Error("nonce not allowed");\n    if (seen.has(payload.jti)) throw new Error("replayed");\n    seen.set(payload.jti, payload.exp);\n\n    await endSessions({ tid: payload.tid ?? 1, amashuriUserId: payload.sub, sid: payload.sid ?? null });\n    res.sendStatus(200);\n  } catch {\n    res.sendStatus(400);\n  }\n});`,
               },
               {
                 lang: "python",
-                code: `import os, jwt\nfrom flask import Flask, request\n\nISSUER = "{{BASE}}"\nEVENT = "http://schemas.openid.net/event/backchannel-logout"\nkeys = jwt.PyJWKClient(ISSUER + "/.well-known/jwks.json", cache_keys=True, lifespan=3600)\nseen = set()  # use a shared store with several servers\n\napp = Flask(__name__)\n\n@app.post("/sso/backchannel-logout")\ndef backchannel_logout():\n    headers = {"Cache-Control": "no-store"}\n    try:\n        token = request.form["logout_token"]\n        payload = jwt.decode(\n            token,\n            keys.get_signing_key_from_jwt(token).key,\n            algorithms=["RS256"],\n            issuer=ISSUER,\n            audience=os.environ["SSO_CLIENT_ID"],\n            options={"require": ["exp", "iat", "sub", "jti"]},\n        )\n        if EVENT not in payload.get("events", {}) or "nonce" in payload:\n            raise ValueError("not a logout token")\n        if payload["jti"] in seen:\n            raise ValueError("replayed")\n        seen.add(payload["jti"])\n\n        end_sessions(tid=payload.get("tid", 1), amashuri_user_id=payload["sub"])\n        return "", 200, headers\n    except Exception:\n        return "", 400, headers`,
+                code: `import os, jwt\nfrom flask import Flask, request\n\nISSUER = "{{BASE}}"\nEVENT = "http://schemas.openid.net/event/backchannel-logout"\nkeys = jwt.PyJWKClient(ISSUER + "/.well-known/jwks.json", cache_keys=True, lifespan=3600)\nseen = set()  # use a shared store with several servers\n\napp = Flask(__name__)\n\n@app.post("/sso/backchannel-logout")\ndef backchannel_logout():\n    headers = {"Cache-Control": "no-store"}\n    try:\n        token = request.form["logout_token"]\n        payload = jwt.decode(\n            token,\n            keys.get_signing_key_from_jwt(token).key,\n            algorithms=["RS256"],\n            issuer=ISSUER,\n            audience=os.environ["SSO_CLIENT_ID"],\n            options={"require": ["exp", "iat", "sub", "jti"]},\n        )\n        if EVENT not in payload.get("events", {}) or "nonce" in payload:\n            raise ValueError("not a logout token")\n        if payload["jti"] in seen:\n            raise ValueError("replayed")\n        seen.add(payload["jti"])\n\n        end_sessions(tid=payload.get("tid", 1), amashuri_user_id=payload["sub"], sid=payload.get("sid"))\n        return "", 200, headers\n    except Exception:\n        return "", 400, headers`,
               },
               {
                 lang: "php",
@@ -652,7 +710,7 @@ try {
     if (array_key_exists("nonce", $claims)) throw new Exception("nonce not allowed");
     if (!rememberJti($claims["jti"], $claims["exp"])) throw new Exception("replayed"); // false when seen before
 
-    endSessions((int) ($claims["tid"] ?? 1), (string) $claims["sub"]);
+    endSessions((int) ($claims["tid"] ?? 1), (string) $claims["sub"], $claims["sid"] ?? null);
     http_response_code(200);
 } catch (Throwable $e) {
     http_response_code(400);
@@ -692,6 +750,12 @@ try {
             text: "Sign-in tells you about one person at the moment they sign in. To mirror a school, use `/integrations/*`. These calls are read-only, need no signed-in person, and answer for the school named in `X-NGA-Tenant`.",
           },
           {
+            kind: "note",
+            tone: "warn",
+            title: "One school per call",
+            text: "Each call returns one school's data and nothing from any other. To serve several schools, run the whole sync once per school, with that school's number and, if you use tokens, that school's own token. Store every row under its `tid`: IDs repeat between schools.",
+          },
+          {
             kind: "table",
             head: ["Call", "Gives you", "Changes only"],
             rows: [
@@ -716,7 +780,7 @@ try {
               path: "/integrations/ping",
               summary: "Test your credentials",
               auth: "Client credentials, or an integration token with `sync:read`",
-              description: "Use it behind a “Test connection” button. A wrong host or a token from another environment shows here, not in the middle of a sync.",
+              description: "Use it behind a “Test connection” button. A wrong host, a wrong school number or a token from another environment shows here, not in the middle of a sync. The counts are for the school in `X-NGA-Tenant`; `scope.schoolFilter` is `instance` because the answer is that school's whole database, with no further filter.",
               samples: [
                 { lang: "curl", label: "cURL (token)", code: `curl {{BASE}}/integrations/ping \\\n  -H "Authorization: Bearer $AMASHURI_TOKEN" \\\n  -H "X-NGA-Tenant: {{TENANT}}"` },
                 { lang: "curl", label: "cURL (client)", code: `curl {{BASE}}/integrations/ping \\\n  -u "{{CLIENT_ID}}:$CLIENT_SECRET" \\\n  -H "X-NGA-Tenant: {{TENANT}}"` },
@@ -958,11 +1022,11 @@ curl_close($ch);`,
               method: "POST",
               path: "/integrations/learning-events",
               summary: "Send a batch of events",
-              auth: "Integration token with `learning-events:write`",
+              auth: "Client credentials, or an integration token with `learning-events:write`",
               description: "Up to 500 events per call. Each event is accepted, refused or recognised as a repeat on its own: read `results` to see which.",
               params: [
                 { name: "events", in: "body", type: "array", required: true, description: "The events, at most 500." },
-                { name: "events[].actor_user_id", in: "body", type: "integer", required: true, description: "The student's Amashuri user ID." },
+                { name: "events[].actor_user_id", in: "body", type: "integer", required: true, description: "The student's Amashuri user ID, in the school named by `X-NGA-Tenant`. Send each school's events in its own call." },
                 { name: "events[].verb", in: "body", type: "string", required: true, description: "`VIEWED`, `PROGRESSED`, `COMPLETED`, `MARKED_DONE`, `ATTEMPTED`, `SCORED`, `PASSED`, `FAILED`, `SUBMITTED`, `COMMENTED` or `ASKED_AI`." },
                 { name: "events[].object_type", in: "body", type: "string", required: true, description: "`COURSE_ITEM`, `COURSE_SECTION`, `COURSE`, `LESSON_NOTE`, `TASKMENTOR_QUIZ`, `TASKMENTOR_ASSIGNMENT` or `TUPO_THREAD`." },
                 { name: "events[].object_id", in: "body", type: "integer", required: true, description: "The object's ID. For a quiz or an assignment, your own ID (the item's `ref_id`)." },
@@ -1042,7 +1106,7 @@ $refused = array_filter($data["results"], fn($r) => $r["status"] === "rejected")
               path: "/reminders/sources/batch",
               summary: "Create or update up to 200 items",
               auth: "Integration token with `reminders:write`, or the client credentials of an allowed app",
-              description: "Each item succeeds or fails on its own. An item is identified by `source_app`, `source_type` and `external_id` together.",
+              description: "Each item succeeds or fails on its own. An item is identified by `source_app`, `source_type` and `external_id` together, inside the school named by `X-NGA-Tenant`. The subject and user IDs of the audience are that school's IDs, so send each school's items in its own call.",
               params: [
                 { name: "items", in: "body", type: "array", required: true, description: "The items, at most 200." },
                 { name: "items[].source_app", in: "body", type: "string", required: true, description: "A short name for your app, for example `taskmentor`." },
@@ -1252,13 +1316,13 @@ curl_close($ch);`,
             head: ["Status", "Code", "Meaning", "What to do"],
             rows: [
               ["400", "–", "A field is missing or has the wrong type.", "Read `message` and fix the request."],
-              ["400", "`TENANT_REQUIRED`", "The call does not say which school it is for.", "Send `X-NGA-Tenant`."],
-              ["401", "`UNAUTHORIZED`", "The credential is missing, wrong, expired or revoked.", "Check the header and the environment."],
+              ["400", "`TENANT_REQUIRED`", "The call does not say which school it is for, or the number is not valid.", "Send `X-NGA-Tenant` with the school's number."],
+              ["401", "`UNAUTHORIZED`", "The credential is missing, wrong, expired or revoked. Also an integration token sent with another school's number.", "Check the header, the environment and the school number."],
               ["401", "–", "On a user token: it expired, or the person signed out.", "End their session in your app."],
               ["401", "`TENANT_UNKNOWN`", "No school has that number.", "Check `tid`."],
               ["403", "`FORBIDDEN`", "The credential lacks the scope.", "Ask for the scope, or use another token."],
-              ["403", "`SYSTEM_NOT_ASSIGNED`", "Your app is not enabled for that school.", "Ask the platform administrator to enable it."],
-              ["403", "`TENANT_MISMATCH`", "The token and `X-NGA-Tenant` name different schools.", "Use that school's token."],
+              ["403", "`SYSTEM_NOT_ASSIGNED`", "Your app is not switched on for that school.", "Ask Amashuri to switch it on for the school."],
+              ["403", "`TENANT_MISMATCH`", "A user token and `X-NGA-Tenant` name different schools, or a token is used for a school it does not belong to.", "Drop the header on user-token calls. Use each school's own token."],
               ["403", "`APP_NOT_IN_PACKAGE`", "The school's package does not include your app.", "Tell the person their school has no access."],
               ["403", "`TENANT_PENDING`, `TENANT_SUSPENDED`", "The school is not usable yet, or is suspended.", "Stop calling for that school until it is active."],
               ["404", "–", "Nothing has that ID or address.", "Check the ID. Check you are calling the API host."],
@@ -1282,6 +1346,9 @@ curl_close($ch);`,
               ["“Invalid or already used authorization code”", "The code was sent twice, or is older than 5 minutes.", "Send it once. In React strict mode, guard the effect with a ref."],
               ["401 during the exchange", "Wrong secret, a disabled app, or an app not enabled for the school.", "Check the secret with the administrator."],
               ["400 `TENANT_REQUIRED` on a sync call", "No `X-NGA-Tenant` header.", "Send the school's `tid`."],
+              ["A token works for one school and returns 401 for another", "A token belongs to the school it was created in.", "Ask that school's administrator for its own token, and send its own number."],
+              ["Sign-in works for one school, not for another", "Your app is not switched on for the second school.", "Ask Amashuri to switch it on for that school."],
+              ["The same person appears twice, or sees another person's data", "Users were matched on user ID or e-mail alone.", "Key every user and every stored row by `tid` and ID together."],
               ["Sign-in works, then every call returns 401", "An old token is still stored.", "Clear the old token and use the one from the latest exchange."],
               ["400 or 431 from your own proxy", "The token is larger than the header limit.", "Allow headers up to 32 KB."],
               ["People stay signed in after an Amashuri sign-out", "No back-channel logout address is registered.", "Register it, and keep the `/auth/verify` check."],
@@ -1291,7 +1358,7 @@ curl_close($ch);`,
             kind: "note",
             tone: "info",
             title: "Need credentials or a new scope?",
-            text: "Clients, redirect addresses, logout addresses and integration tokens are managed under **Systems** by a platform administrator.",
+            text: "Clients, redirect addresses, logout addresses and which schools have your app are managed by Amashuri under **Systems**. An integration token is created by an administrator of the school it is for, signed in to that school, under **Systems → Integration tokens**.",
           },
         ],
       },
