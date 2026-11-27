@@ -62,7 +62,7 @@ describe("stampLetterhead", () => {
     expect(said.filter((t) => t === "Line one")).toHaveLength(3);
     expect(said).toEqual(expect.arrayContaining(["Page 1 of 3", "Page 2 of 3", "Page 3 of 3", "A report"]));
     // The footer image sits above the bottom margin, inside the reserved band.
-    const footerCall = images.mock.calls.find((c) => c[6] === "lh-footer")!;
+    const footerCall = (images.mock.calls as unknown as unknown[][]).find((c) => c[6] === "lh-footer")!;
     const [y, h] = [Number(footerCall[3]), Number(footerCall[5])];
     expect(y + h).toBeLessThanOrEqual(297 - 6);
     expect(y).toBeGreaterThanOrEqual(297 - letterheadLayout(lh, 210).bottomMm);
