@@ -1,6 +1,7 @@
 import React from "react";
 import { X, Printer } from "lucide-react";
 import { AssignedStudent, SubmitSessionPayload } from "../../api/mentorship";
+import { PrintLetterhead } from "../ui/PrintLetterhead";
 
 interface Props {
   student: AssignedStudent;
@@ -42,6 +43,8 @@ const SessionPrintPreview: React.FC<Props> = ({ student, session, onClose }) => 
 
   return (
     <>
+      {/* The school's header and footer on the printed sheet */}
+      <PrintLetterhead note="Mentorship session log" />
       {/* Print-only styles injected into head */}
       <style>{`
         @media print {

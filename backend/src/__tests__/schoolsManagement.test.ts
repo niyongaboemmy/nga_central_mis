@@ -131,6 +131,21 @@ describe("school records", () => {
     expect(img.headers["x-content-type-options"]).toBe("nosniff");
   });
 
+  it("takes the letterhead footer as its own slot, and the branding lists it", async () => {
+    const up = await request(app).post(`/schools/${id}/logo`).set(auth(admin)).field("slot", "footer").attach("file", PNG, "footer.png");
+    expect(up.status).toBe(200);
+    expect(up.body.path).toMatch(/^schools\/\d+\/logo-footer-\d+\.png$/);
+    expect(up.body.data.documents_footer).toBe(up.body.path);
+    expect(up.body.data.logo_urls.footer).toMatch(/\/schools\/\d+\/logo\/footer/);
+    const img = await request(app).get(`/schools/${id}/logo/footer`);
+    expect(img.status).toBe(200);
+    // Public branding: the apps fetch it to draw the letterhead into PDFs.
+    expect(img.headers["access-control-allow-origin"]).toBeTruthy();
+    const removed = await request(app).delete(`/schools/${id}/logo/footer`).set(auth(admin));
+    expect(removed.status).toBe(200);
+    expect(removed.body.data.documents_footer).toBeNull();
+  });
+
   it("refuses files that aren't images, and unsafe SVGs", async () => {
     const fake = await request(app).post(`/schools/${id}/logo`).set(auth(admin)).field("slot", "primary").attach("file", Buffer.from("not really"), "x.png");
     expect(fake.status).toBe(400);

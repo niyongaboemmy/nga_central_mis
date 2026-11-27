@@ -20,6 +20,7 @@ import { mentorshipApi, AdminLogEntry, SessionStatus, MenteeCheckInRecord } from
 import { useToast } from "../../contexts/ToastContext";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import SelectField from "../ui/SelectField";
+import { PrintLetterhead } from "../ui/PrintLetterhead";
 
 const CATEGORY_LABEL: Record<string, string> = {
   APPRECIATION: "Appreciation",
@@ -682,6 +683,8 @@ const AdminMentoringLogView: React.FC = () => {
         </div>
       )}
 
+      {/* ── The school's header and footer on the printed sheets ─── */}
+      <PrintLetterhead note="Mentoring log" />
       {/* ── Print styles injected inline ─────────────────────────── */}
       <style>{`
         @media print {

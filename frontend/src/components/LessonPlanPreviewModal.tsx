@@ -21,6 +21,7 @@ import {
 import { LessonPlan } from "../api/lessonPlan";
 import { LessonPlanDocumentService } from "../services/LessonPlanDocumentService";
 import { useToast } from "../contexts/ToastContext";
+import { PrintLetterhead } from "./ui/PrintLetterhead";
 
 interface LessonPlanPreviewModalProps {
   isOpen: boolean;
@@ -43,11 +44,11 @@ const LessonPlanPreviewModal: React.FC<LessonPlanPreviewModalProps> = ({
 
   if (!plan) return null;
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     setIsDownloadMenuOpen(false);
     setDownloadingFormat("pdf");
     try {
-      LessonPlanDocumentService.downloadPDF(plan);
+      await LessonPlanDocumentService.downloadPDF(plan);
       showToast("Lesson plan PDF downloaded", "success");
     } catch (error) {
       console.error("Failed to generate PDF:", error);
@@ -107,6 +108,8 @@ const LessonPlanPreviewModal: React.FC<LessonPlanPreviewModalProps> = ({
 
   return (
     <AnimatePresence>
+      {/* The school's header and footer when the plan is printed */}
+      {isOpen && <PrintLetterhead key="print-letterhead" note="Lesson plan" />}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}

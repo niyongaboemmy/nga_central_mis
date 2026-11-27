@@ -5,7 +5,7 @@ import { School } from "../db/schema";
 import { PRIMARY_TENANT_ID, TenantCtx, isTenantUsable, runWithTenant } from "../vendor/nga-tenancy";
 import { findTenant, primaryTenant, responseTenant } from "../tenancy";
 import { publicApiBase } from "../services/avatar/urls";
-import { isServableLogo, schoolLogoUrl } from "../controllers/schoolController";
+import { LOGO_SLOT_COLUMN, SchoolLogoSlot, isServableLogo, schoolLogoUrl } from "../controllers/schoolController";
 
 /**
  * GET /tenant/branding?slug=<slug>|tid=<tid>  (public, MIS-S10)
@@ -19,12 +19,8 @@ import { isServableLogo, schoolLogoUrl } from "../controllers/schoolController";
  */
 const router = express.Router();
 
-type LogoSlot = "primary" | "partner" | "documents";
-const SLOTS: Array<[LogoSlot, "logo" | "partner_logo" | "documents_logo"]> = [
-  ["primary", "logo"],
-  ["partner", "partner_logo"],
-  ["documents", "documents_logo"],
-];
+type LogoSlot = SchoolLogoSlot;
+const SLOTS = Object.entries(LOGO_SLOT_COLUMN) as Array<[LogoSlot, (typeof LOGO_SLOT_COLUMN)[LogoSlot]]>;
 
 const HEX = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i;
 
@@ -49,7 +45,7 @@ export async function brandingFor(tenant: TenantCtx) {
     } catch {
       school = undefined;
     }
-    const logos: Record<LogoSlot, string | null> = { primary: null, partner: null, documents: null };
+    const logos: Record<LogoSlot, string | null> = { primary: null, partner: null, documents: null, footer: null };
     if (school) {
       // ?v= changes with every upload (School.updated_at), so a new logo shows at once.
       const v = school.updated_at ? new Date(school.updated_at as any).getTime() : NaN;
@@ -67,6 +63,8 @@ export async function brandingFor(tenant: TenantCtx) {
       school_name: school?.name ?? null,
       school_id: school?.school_id ?? null,
       logos,
+      // The letterhead footer's text lines (the footer image is logos.footer).
+      documents_footer_text: (school as any)?.documents_footer_text ?? null,
       logo_url: logos.primary,
       primary_color: primaryColor,
       // camelCase aliases: frontend/src/api/tenantMgmt.ts publicApi.branding

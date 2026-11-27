@@ -12,6 +12,10 @@ export interface School {
   // Dedicated logo for reports/documents (e.g. the Scheme of Work PDF's running header on every
   // page) -- distinct from logo/partner_logo, which are the two cover-page slots.
   documents_logo?: string;
+  /** The letterhead footer printed on every page of the school's documents (migration 150). */
+  documents_footer?: string;
+  /** Footer text, one printed line per row (at most 4). */
+  documents_footer_text?: string;
   // Scheme of Work PDF cover-page fields, shared by every scheme this school produces.
   sector?: string;
   trade?: string;
@@ -29,7 +33,7 @@ export interface School {
    * Use these in <img src>: the address names the school, which the public image
    * endpoint needs (school ids repeat across schools).
    */
-  logo_urls?: Partial<Record<"primary" | "partner" | "documents", string | null>>;
+  logo_urls?: Partial<Record<SchoolLogoSlot, string | null>>;
 }
 
 /** Field rules shared with the server (schoolController readSchoolBody). */
@@ -44,7 +48,9 @@ export const SCHOOL_LIMITS = {
   trade: 150,
   qualification_title: 255,
   head_teacher_name: 150,
+  documents_footer_text: 500,
 } as const;
+export const FOOTER_TEXT_MAX_LINES = 4;
 export type SchoolTextField = keyof typeof SCHOOL_LIMITS;
 
 export function validateSchool(values: Partial<School>): Partial<Record<SchoolTextField, string>> {
@@ -60,6 +66,8 @@ export function validateSchool(values: Partial<School>): Partial<Record<SchoolTe
   if (code && !/^[A-Za-z0-9][A-Za-z0-9-]{1,19}$/.test(code)) errors.school_code = "2-20 letters, digits or dashes";
   const email = String(values.contact_email ?? "").trim();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.contact_email = "Doesn't look like an email address";
+  const footerLines = String(values.documents_footer_text ?? "").split(/\r?\n/).filter((l) => l.trim()).length;
+  if (footerLines > FOOTER_TEXT_MAX_LINES) errors.documents_footer_text = `At most ${FOOTER_TEXT_MAX_LINES} lines`;
   const phone = String(values.contact_phone ?? "").trim();
   const digits = phone.replace(/\D/g, "").length;
   if (phone && (!/^\+?[0-9][0-9 ()-]{5,24}$/.test(phone) || digits < 7 || digits > 15)) errors.contact_phone = "Use a phone number such as +250 788 000 000";
@@ -76,7 +84,7 @@ export function schoolPayload(values: Partial<School>): Partial<School> {
 
 export const LOGO_MAX_BYTES = 5 * 1024 * 1024;
 
-export type SchoolLogoSlot = "primary" | "partner" | "documents";
+export type SchoolLogoSlot = "primary" | "partner" | "documents" | "footer";
 
 /**
  * Public, unauthenticated image URL for a school's logo -- safe to use directly in <img src>.

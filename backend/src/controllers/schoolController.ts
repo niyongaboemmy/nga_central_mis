@@ -26,7 +26,14 @@ export const SCHOOL_LIMITS: Record<string, number> = {
   trade: 150,
   qualification_title: 255,
   head_teacher_name: 150,
+  documents_footer_text: 500,
 };
+/** Fields that keep their line breaks (one printed line per row). */
+const MULTILINE_FIELDS = new Set(["documents_footer_text"]);
+/** Trims each line, drops empty ones; at most 4 lines are printed. */
+export const cleanLines = (raw: string): string =>
+  raw.split(/\r?\n/).map((l) => l.trim().replace(/\s+/g, " ")).filter(Boolean).join("\n");
+export const FOOTER_TEXT_MAX_LINES = 4;
 export const SCHOOL_STATUSES = ["ACTIVE", "INACTIVE", "SUSPENDED"] as const;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^\+?[0-9][0-9 ()-]{5,24}$/;
@@ -45,8 +52,9 @@ export function readSchoolBody(body: Record<string, unknown>, creating: boolean)
       errors[field] = "must be text";
       continue;
     }
-    const v = (raw ?? "").trim().replace(/\s+/g, " ");
+    const v = MULTILINE_FIELDS.has(field) ? cleanLines(raw ?? "") : (raw ?? "").trim().replace(/\s+/g, " ");
     if (v.length > max) errors[field] = `is at most ${max} characters`;
+    else if (field === "documents_footer_text" && v.split("\n").length > FOOTER_TEXT_MAX_LINES) errors[field] = `is at most ${FOOTER_TEXT_MAX_LINES} lines`;
     else if (field === "contact_email" && v && !EMAIL_RE.test(v)) errors[field] = "doesn't look like an email address";
     else if (field === "contact_phone" && v && (!PHONE_RE.test(v) || v.replace(/\D/g, "").length < 7 || v.replace(/\D/g, "").length > 15))
       errors[field] = "should be a phone number such as +250 788 000 000";
@@ -71,6 +79,7 @@ const LABELS: Record<string, string> = {
   contact_phone: "Contact phone",
   head_teacher_name: "Head of school",
   qualification_title: "Qualification title",
+  documents_footer_text: "Footer text",
   status: "Status",
 };
 const labelOf = (f: string) => LABELS[f] ?? f.charAt(0).toUpperCase() + f.slice(1).replace(/_/g, " ");
@@ -196,6 +205,7 @@ export const PROFILE_FIELDS: Record<string, number> = {
   trade: 150,
   qualification_title: 255,
   head_teacher_name: 150,
+  documents_footer_text: 500,
 };
 
 const profileSchool = async () => {
@@ -223,6 +233,9 @@ const profileOf = (school: any, req: Request) => {
     // The address names the school (schoolLogoUrl): Task Mentor prints these on report cards.
     logo_url: isServableLogo(school.logo) ? schoolLogoUrl(base, school.school_id, "primary", tenant, version) : null,
     documents_logo_url: isServableLogo(school.documents_logo) ? schoolLogoUrl(base, school.school_id, "documents", tenant, version) : null,
+    // The letterhead footer printed on every page of the school's documents (migration 150).
+    documents_footer_url: isServableLogo(school.documents_footer) ? schoolLogoUrl(base, school.school_id, "footer", tenant, version) : null,
+    documents_footer_text: school.documents_footer_text ?? null,
     updated_at: school.updated_at ?? null,
   };
 };
@@ -251,7 +264,9 @@ export const updateSchoolProfile = async (req: Request, res: Response) => {
       if (!(field in body)) continue;
       const v = body[field];
       if (v != null && typeof v !== "string") return res.status(400).json({ message: `${field} must be text` });
-      const t = (v ?? "").trim();
+      const t = field === "documents_footer_text" ? cleanLines(v ?? "") : (v ?? "").trim();
+      if (field === "documents_footer_text" && t.split("\n").length > FOOTER_TEXT_MAX_LINES)
+        return res.status(400).json({ message: `The footer text is at most ${FOOTER_TEXT_MAX_LINES} lines` });
       if (t.length > max) return res.status(400).json({ message: `${field} is at most ${max} characters` });
       if (field === "name" && !t) return res.status(400).json({ message: "The school needs a name" });
       if (field === "contact_email" && t && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)) return res.status(400).json({ message: "That email address doesn't look right" });
@@ -271,26 +286,32 @@ export const updateSchoolProfile = async (req: Request, res: Response) => {
   }
 };
 
-type LogoSlot = "primary" | "partner" | "documents";
+/**
+ * The school's images. `primary` is the app logo (and the left cover-page mark), `partner` the
+ * right cover-page mark, and `documents` + `footer` are the letterhead: the header mark and the
+ * footer strip printed on every page of the school's documents (services/documents/letterhead.ts).
+ */
+export const SCHOOL_LOGO_SLOTS = ["primary", "partner", "documents", "footer"] as const;
+export type SchoolLogoSlot = (typeof SCHOOL_LOGO_SLOTS)[number];
+type LogoSlot = SchoolLogoSlot;
+type LogoColumn = "logo" | "partner_logo" | "documents_logo" | "documents_footer";
 
-const LOGO_SLOT_COLUMN: Record<LogoSlot, "logo" | "partner_logo" | "documents_logo"> = {
+export const LOGO_SLOT_COLUMN: Record<LogoSlot, LogoColumn> = {
   primary: "logo",
   partner: "partner_logo",
   documents: "documents_logo",
+  footer: "documents_footer",
 };
 
+const SLOT_MESSAGE = "slot must be 'primary', 'partner', 'documents' or 'footer'";
+const isLogoSlot = (value: unknown): value is LogoSlot => (SCHOOL_LOGO_SLOTS as readonly unknown[]).includes(value);
+
 const parseLogoSlot = (value: unknown): LogoSlot | null =>
-  value === undefined || value === "" || value === "primary"
-    ? "primary"
-    : value === "partner" || value === "documents"
-      ? value
-      : null;
+  value === undefined || value === "" ? "primary" : isLogoSlot(value) ? value : null;
 
 /** A stored logo that can really be served: a file-server image path or an http(s) URL. */
 export const isServableLogo = (v: unknown): v is string =>
   typeof v === "string" && !v.includes("..") && (/^https?:\/\/\S+$/i.test(v) || /^[\w./-]+\.(png|jpe?g|svg|webp)$/i.test(v));
-
-export type SchoolLogoSlot = "primary" | "partner" | "documents";
 
 /**
  * The public address of a school's logo, for an <img src> or another app.
@@ -373,8 +394,8 @@ export function sniffImage(buf: Buffer): ImageKind | { error: string } {
 
 /**
  * Uploads a logo image and stores its file-server path on School.logo (`slot: "primary"`, the
- * default), School.partner_logo (`slot: "partner"`), or School.documents_logo
- * (`slot: "documents"`). `logo`/`partner_logo` are the Scheme of Work PDF's two cover-page logo
+ * default), School.partner_logo (`slot: "partner"`), School.documents_logo
+ * (`slot: "documents"`) or School.documents_footer (`slot: "footer"`, the letterhead footer). `logo`/`partner_logo` are the Scheme of Work PDF's two cover-page logo
  * slots, and `logo` is also the app's logo for everyone signed in to this school;
  * `documents_logo` is the mark in the running header of reports/documents. Stored as a remote
  * file-server path (resolved at render time), never a full URL.
@@ -383,7 +404,7 @@ export const uploadSchoolLogo = async (req: Request & { file?: Express.Multer.Fi
   try {
     const id = Number(req.params.id);
     const slot = parseLogoSlot(req.body?.slot);
-    if (!slot) return res.status(400).json({ message: "slot must be 'primary', 'partner', or 'documents'" });
+    if (!slot) return res.status(400).json({ message: SLOT_MESSAGE });
     if (!req.file?.buffer?.length) return res.status(400).json({ message: "Choose an image to upload" });
 
     const [existing] = await db.select().from(School).where(eq(School.school_id, id));
@@ -412,7 +433,7 @@ export const removeSchoolLogo = async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     const slot = parseLogoSlot(req.params.slot);
-    if (!slot) return res.status(400).json({ message: "slot must be 'primary', 'partner', or 'documents'" });
+    if (!slot) return res.status(400).json({ message: SLOT_MESSAGE });
     const [existing] = await db.select().from(School).where(eq(School.school_id, id));
     if (!existing) return res.status(404).json({ message: "School not found" });
     await db
@@ -451,9 +472,7 @@ const MIME: Record<string, string> = { ".jpg": "image/jpeg", ".jpeg": "image/jpe
 const serveSchoolLogo = async (req: Request, res: Response) => {
   try {
     const { id, slot } = req.params;
-    if (slot !== "primary" && slot !== "partner" && slot !== "documents") {
-      return res.status(400).json({ message: "slot must be 'primary', 'partner', or 'documents'" });
-    }
+    if (!isLogoSlot(slot)) return res.status(400).json({ message: SLOT_MESSAGE });
     const [school] = await db
       .select()
       .from(School)
@@ -476,6 +495,9 @@ const serveSchoolLogo = async (req: Request, res: Response) => {
     // An SVG opened directly must not run anything, even if an old upload had a script in it.
     res.setHeader("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    // Public branding: any of the school's apps may read the bytes (they draw the letterhead
+    // into PDFs with it). Only when the CORS middleware did not already answer for this origin.
+    if (!res.getHeader("Access-Control-Allow-Origin")) res.setHeader("Access-Control-Allow-Origin", "*");
     // ?v=<logo_version> changes with every upload, so a versioned URL can be kept longer.
     res.setHeader("Cache-Control", req.query.v ? "public, max-age=86400" : "public, max-age=300");
     res.send(buffer);

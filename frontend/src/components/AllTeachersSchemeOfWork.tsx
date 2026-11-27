@@ -129,7 +129,7 @@ const AllTeachersSchemeOfWork: React.FC = () => {
   };
 
   const handleExportPdf = () => {
-    exportSowReportPdf(teachers, reportContext);
+    void exportSowReportPdf(teachers, reportContext);
     setExportMenuOpen(false);
   };
 

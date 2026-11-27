@@ -1,7 +1,6 @@
-import puppeteer from "puppeteer";
 import * as XLSX from "xlsx";
 import { sql } from "drizzle-orm";
-import { LOGO_DATA_URI } from "../pdfAssets";
+import { renderPdf } from "../documents/letterhead";
 import { one } from "./core";
 import type { MonitorFilters } from "./monitor";
 
@@ -220,7 +219,7 @@ export function buildReportHtml(rows: any[], filters: string[], meta: { generate
   .bar span { display: block; height: 100%; background: #2563eb; }
   .more { margin-top: 8px; color: #b45309; font-size: 9px; }
   </style></head><body>
-  <div class="head"><img src="${LOGO_DATA_URI}" alt=""><div><h1>Projects report</h1><div class="meta">Generated ${esc(kigali())} (Kigali) by ${esc(meta.generatedBy)}</div></div></div>
+  <div class="head"><div><h1>Projects report</h1><div class="meta">Generated ${esc(kigali())} (Kigali) by ${esc(meta.generatedBy)}</div></div></div>
   <div class="filters"><b>Filters:</b> ${filters.length ? esc(filters.join(" · ")) : "none"}</div>
   <div class="tiles">
     ${tile("Projects", t.total)}
@@ -239,21 +238,6 @@ export function buildReportHtml(rows: any[], filters: string[], meta: { generate
 
 export async function buildPdf(rows: any[], f: MonitorFilters, generatedBy: string): Promise<Buffer> {
   const html = buildReportHtml(rows, await describeFilters(f), { generatedBy, total: rows.length });
-  const browser = await puppeteer.launch({ headless: true, executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
-  try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "load" });
-    const pdf = await page.pdf({
-      format: "A4",
-      landscape: true,
-      printBackground: true,
-      margin: { top: "12mm", bottom: "14mm", left: "10mm", right: "10mm" },
-      displayHeaderFooter: true,
-      headerTemplate: "<span></span>",
-      footerTemplate: `<div style="width:100%;font-size:8px;color:#94a3b8;padding:0 10mm;display:flex;justify-content:space-between"><span>NGA Central MIS · Projects report</span><span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>`,
-    });
-    return Buffer.from(pdf);
-  } finally {
-    await browser.close();
-  }
+  // The school's letterhead on every page (services/documents/letterhead.ts).
+  return renderPdf(html, { landscape: true, sideMm: 10, note: "Projects report", minBottomMm: 14 });
 }

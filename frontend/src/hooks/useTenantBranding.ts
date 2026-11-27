@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../services/api";
 import { useUser } from "../contexts/UserContext";
 import { PRIMARY_TID } from "../lib/tenant";
+import { preloadLetterhead, resetLetterhead } from "../utils/documentLetterhead";
 
 /**
  * The signed-in school's name and logo for the app chrome (MIS-S10).
@@ -105,10 +106,13 @@ export function useTenantBranding(): TenantBranding {
 
   useEffect(() => {
     let alive = true;
+    // The document letterhead follows the same events: sign-in, school switch, logo change.
+    resetLetterhead();
     if (!signedIn) {
       setData(null);
       return;
     }
+    preloadLetterhead();
     void loadBranding(slug).then((d) => {
       if (!alive) return;
       setData(d);

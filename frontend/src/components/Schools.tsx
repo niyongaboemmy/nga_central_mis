@@ -36,6 +36,7 @@ import {
   validateSchool,
   schoolPayload,
   SCHOOL_LIMITS,
+  FOOTER_TEXT_MAX_LINES,
   LOGO_MAX_BYTES,
   School,
   SchoolLogoSlot,
@@ -75,7 +76,7 @@ const brandSchoolId = (schools: School[]): number | null =>
   [...schools].sort((a, b) => a.school_id - b.school_id).find((s) => s.status === "ACTIVE")?.school_id ?? null;
 
 const logoUrl = (school: School, slot: SchoolLogoSlot = "primary") => {
-  const col = slot === "primary" ? school.logo : slot === "partner" ? school.partner_logo : school.documents_logo;
+  const col = { primary: school.logo, partner: school.partner_logo, documents: school.documents_logo, footer: school.documents_footer }[slot];
   if (!col) return null;
   // The server's address names the school; the image endpoint needs that (ids repeat across schools).
   return school.logo_urls?.[slot] ?? getSchoolLogoUrl(school.school_id, slot, school.logo_version);
@@ -655,14 +656,49 @@ const EMPTY: Partial<School> = {
   qualification_title: "",
   district: "",
   head_teacher_name: "",
+  documents_footer_text: "",
   status: "ACTIVE",
 };
 
 const LOGO_SLOTS: { slot: SchoolLogoSlot; title: string; hint: string }[] = [
   { slot: "primary", title: "Logo", hint: "App, sign-in page, cover page (left)" },
   { slot: "partner", title: "Partner logo", hint: "Cover page (right)" },
-  { slot: "documents", title: "Documents logo", hint: "Report and PDF header" },
 ];
+
+/** The letterhead printed on every page of the school's documents (PDFs and printed pages). */
+const LETTERHEAD_SLOTS: { slot: SchoolLogoSlot; title: string; hint: string }[] = [
+  { slot: "documents", title: "Header", hint: "Top-left of every page. Without it, the logo is used." },
+  { slot: "footer", title: "Footer image", hint: "A wide strip across the bottom of every page." },
+];
+const ALL_SLOTS = [...LOGO_SLOTS, ...LETTERHEAD_SLOTS];
+
+/** A small A4 sheet showing where the header and footer print. */
+const LetterheadPreview = ({ headerUrl, footerUrl, lines, name }: { headerUrl: string | null; footerUrl: string | null; lines: string[]; name: string }) => (
+  <figure className="w-full max-w-[220px] mx-auto" aria-label="Letterhead preview">
+    <div className="relative aspect-[210/297] bg-white border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden flex flex-col px-[7%] py-[3%]">
+      <div className="h-[6%] flex items-center">
+        {headerUrl ? (
+          <img src={headerUrl} alt="" className="h-full w-auto max-w-[45%] object-contain" />
+        ) : (
+          <span className="text-[7px] font-bold text-gray-800 truncate">{name}</span>
+        )}
+      </div>
+      <div className="flex-1 mt-[4%] space-y-[3%]" aria-hidden="true">
+        {Array.from({ length: 9 }, (_, i) => (
+          <div key={i} className="h-[3px] rounded-full bg-gray-100" style={{ width: `${[92, 80, 88, 70, 95, 84, 60, 90, 76][i]}%` }} />
+        ))}
+      </div>
+      <div className="mt-[2%]">
+        {footerUrl && <img src={footerUrl} alt="" className="w-full h-auto max-h-[44px] object-contain" />}
+        {lines.map((l, i) => (
+          <p key={i} className="text-[5px] leading-[7px] text-center text-gray-700 truncate">{l}</p>
+        ))}
+        <p className="text-[4.5px] text-right text-gray-400 mt-[1px]">Page 1 of 1</p>
+      </div>
+    </div>
+    <figcaption className="text-[11px] text-center text-gray-500 dark:text-gray-400 mt-1.5">Every page of every document</figcaption>
+  </figure>
+);
 
 const inputCls = (error?: string) =>
   `w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400 ${
@@ -803,7 +839,7 @@ const SchoolModal = ({
     setLogoBusy(slot);
     try {
       const fresh = await uploadSchoolLogo(current.school_id, file, slot);
-      afterLogo(fresh, `${LOGO_SLOTS.find((l) => l.slot === slot)!.title} uploaded`);
+      afterLogo(fresh, `${ALL_SLOTS.find((l) => l.slot === slot)!.title} uploaded`);
     } catch (error: any) {
       showToast(error.response?.data?.message || "Failed to upload logo", "error");
     } finally {
@@ -813,7 +849,7 @@ const SchoolModal = ({
 
   const handleLogoRemove = async (slot: SchoolLogoSlot) => {
     if (!current) return;
-    const title = LOGO_SLOTS.find((l) => l.slot === slot)!.title;
+    const title = ALL_SLOTS.find((l) => l.slot === slot)!.title;
     const ok = await confirm({
       title: `Remove the ${title.toLowerCase()}?`,
       message: slot === "primary" && isBrand ? "The app shows the default mark until a new logo is uploaded." : "You can upload another one at any time.",
@@ -847,6 +883,62 @@ const SchoolModal = ({
     </Field>
   );
 
+  /** One image slot: preview, Upload/Replace and Remove. `wide` for the footer strip. */
+  const slotCard = (slot: SchoolLogoSlot, title: string, hint: string, wide = false) => {
+    const url = current ? logoUrl(current, slot) : null;
+    const busy = logoBusy === slot;
+    return (
+      <div key={slot} className="p-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/30 rounded-xl">
+        <div className={wide ? "flex flex-col gap-2" : "flex items-center gap-3"}>
+          <div className={`${wide ? "w-full h-14" : "w-14 h-14"} rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 flex items-center justify-center overflow-hidden shrink-0 p-1`}>
+            {busy ? (
+              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+            ) : url ? (
+              <TenantLogo src={url} name={`${title} of ${current!.name}`} isPrimary={false} className="w-full h-full" rounded="rounded" />
+            ) : (
+              <Building className="w-6 h-6 text-gray-300" aria-hidden="true" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{title}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">{hint}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mt-3">
+          <label
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-colors ${
+              current && !logoBusy
+                ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                : "text-gray-400 bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+            }`}
+          >
+            <Upload className="w-3.5 h-3.5" aria-hidden="true" />
+            {!current ? "Save first" : url ? "Replace" : "Upload"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml,image/webp"
+              disabled={!current || logoBusy !== null}
+              onChange={(e) => handleLogoFile(slot, e.currentTarget)}
+              className="sr-only"
+              aria-label={`Upload ${title.toLowerCase()}`}
+            />
+          </label>
+          {url && (
+            <button
+              type="button"
+              onClick={() => handleLogoRemove(slot)}
+              disabled={logoBusy !== null}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-red-600 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+              aria-label={`Remove ${title.toLowerCase()}`}
+            >
+              <X className="w-3.5 h-3.5" aria-hidden="true" /> Remove
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -872,63 +964,48 @@ const SchoolModal = ({
           <h3 id="school-logos" className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
             Logos
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {LOGO_SLOTS.map(({ slot, title, hint }) => {
-              const url = current ? logoUrl(current, slot) : null;
-              const busy = logoBusy === slot;
-              return (
-                <div key={slot} className="p-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/30 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-14 h-14 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 flex items-center justify-center overflow-hidden shrink-0 p-1">
-                      {busy ? (
-                        <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                      ) : url ? (
-                        <TenantLogo src={url} name={`${title} of ${current!.name}`} isPrimary={false} className="w-full h-full" rounded="rounded" />
-                      ) : (
-                        <Building className="w-6 h-6 text-gray-300" aria-hidden="true" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{title}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">{hint}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <label
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full transition-colors ${
-                        current && !logoBusy
-                          ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40"
-                          : "text-gray-400 bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
-                      }`}
-                    >
-                      <Upload className="w-3.5 h-3.5" aria-hidden="true" />
-                      {!current ? "Save first" : url ? "Replace" : "Upload"}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/svg+xml,image/webp"
-                        disabled={!current || logoBusy !== null}
-                        onChange={(e) => handleLogoFile(slot, e.currentTarget)}
-                        className="sr-only"
-                        aria-label={`Upload ${title.toLowerCase()}`}
-                      />
-                    </label>
-                    {url && (
-                      <button
-                        type="button"
-                        onClick={() => handleLogoRemove(slot)}
-                        disabled={logoBusy !== null}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-red-600 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
-                        aria-label={`Remove ${title.toLowerCase()}`}
-                      >
-                        <X className="w-3.5 h-3.5" aria-hidden="true" /> Remove
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {LOGO_SLOTS.map(({ slot, title, hint }) => slotCard(slot, title, hint))}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-1">PNG, JPG, WEBP or SVG, up to 5 MB. A square image looks best in the app.</p>
+        </section>
+
+        <section aria-labelledby="school-letterhead">
+          <h3 id="school-letterhead" className="text-sm font-semibold text-gray-900 dark:text-white">
+            Document letterhead
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            Printed at the top and bottom of every page of this school's PDFs and printed pages: reports, schemes of work, lesson notes and plans, timetables.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-4">
+            <div className="space-y-3">
+              {LETTERHEAD_SLOTS.map(({ slot, title, hint }) => slotCard(slot, title, hint, slot === "footer"))}
+              <Field
+                id="school-documents_footer_text"
+                label="Footer text"
+                error={errors.documents_footer_text}
+                hint={`Optional, up to ${FOOTER_TEXT_MAX_LINES} lines, printed under the footer image (or alone). For example contacts or an accreditation line.`}
+              >
+                <textarea
+                  id="school-documents_footer_text"
+                  value={formData.documents_footer_text || ""}
+                  maxLength={SCHOOL_LIMITS.documents_footer_text}
+                  onChange={(e) => set("documents_footer_text", e.target.value)}
+                  rows={3}
+                  aria-invalid={!!errors.documents_footer_text}
+                  aria-describedby={errors.documents_footer_text ? "school-documents_footer_text-error" : undefined}
+                  className={`${inputCls(errors.documents_footer_text)} resize-none text-sm`}
+                  placeholder={"Tel: +250 788 000 000 · info@school.rw\nKG 7 Ave, Kigali"}
+                />
+              </Field>
+            </div>
+            <LetterheadPreview
+              name={formData.name || current?.name || "School name"}
+              headerUrl={current ? logoUrl(current, "documents") ?? logoUrl(current, "primary") : null}
+              footerUrl={current ? logoUrl(current, "footer") : null}
+              lines={String(formData.documents_footer_text || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, FOOTER_TEXT_MAX_LINES)}
+            />
+          </div>
         </section>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

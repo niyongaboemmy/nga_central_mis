@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-import puppeteer, { Browser } from "puppeteer";
+import { Browser } from "puppeteer";
 import QRCode from "qrcode";
 import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
@@ -20,6 +20,7 @@ import { NotFoundError } from "../errors/CustomError";
 import logger from "../utils/logger";
 import { schemeVerifyPath } from "./schemeVerifyLink";
 import { scopeTid } from "../tenancy/scoped";
+import { LetterheadFrame, launchPdfBrowser, letterheadFrame, letterheadOf, printWithFrame } from "./documents/letterhead";
 
 // Same design language as pdfExport.ts (Lesson Notes), kept as an independent, self-contained
 // copy rather than a shared import so this renderer's cover-page/table layout can evolve freely
@@ -101,30 +102,6 @@ async function resolveLogoSrc(value: string | null | undefined): Promise<string 
   }
 }
 
-/* Puppeteer's headerTemplate/footerTemplate renders in an isolated frame that cannot fetch
- * external resources -- a plain http(s) <img src> silently renders blank there (unlike the main
- * page, which can load remote images fine). So the header logo specifically must always be a
- * data: URI, even when the stored value is already a full external URL. */
-async function resolveLogoForHeader(value: string | null | undefined): Promise<string | null> {
-  if (!value) return null;
-  if (/^https?:\/\//i.test(value)) {
-    try {
-      const res = await fetch(value);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const buffer = Buffer.from(await res.arrayBuffer());
-      const contentType = res.headers.get("content-type") || mimeFromExt(value);
-      return `data:${contentType};base64,${buffer.toString("base64")}`;
-    } catch (err) {
-      logger.warn("Failed to fetch remote logo for Scheme of Work PDF header", {
-        value,
-        error: (err as Error).message,
-      });
-      return null;
-    }
-  }
-  return resolveLogoSrc(value);
-}
-
 /** Base URL of the deployed frontend, used only to build the verification link encoded in the
  * QR code below -- falls back to the local dev server since this app has never needed a
  * frontend-linking env var before now (unlike password-reset emails etc., which this codebase
@@ -155,52 +132,10 @@ async function buildVerificationQr(schemeId: number): Promise<string | null> {
   }
 }
 
-// Puppeteer renders headerTemplate/footerTemplate in a constrained frame with no access to the
-// page's own <style> or external stylesheets, and only inline styles reliably apply there (same
-// constraint documented in pdfExport.ts for Lesson Notes) -- every rule below is inlined.
-//
-// Chromium's header/footer frame always spans the FULL page width, ignoring the left/right
-// margins passed to page.pdf() -- those only carve out the body content's margin, not the
-// header/footer's. Using CSS `margin` on the inner table (the previous approach) doesn't fix
-// this: width:100% plus an additional margin just pushes the box past the frame's right edge
-// instead of insetting it symmetrically. `padding` with `box-sizing:border-box` keeps the table
-// at exactly 100% of the frame while insetting its content on both sides -- using the same
-// MARGIN_SIDE_MM as the body content below, so the header/footer visually lines up with the
-// page's actual side margins instead of sitting flush against the paper edge.
-//
-// The running header repeated on every page shows the school's mark top-left, sized generously
-// (48px) to read as a real document header rather than a small watermark -- matching the correct
-// template (its header is one logo image with the academy's wordmark baked in, not two
-// side-by-side marks; that's only true of the cover page). This logo is School.documents_logo
-// specifically (a mark dedicated to reports/documents, distinct from the two cover-page logo
-// slots), falling back to School.logo so a school that hasn't set the new field yet doesn't lose
-// its header logo. The verification QR code lives once in the document body next to the
-// signatures (see buildHtml), not repeated here on every page.
-const buildHeaderTemplate = (documentsLogo: string | null, schoolName: string) => `
-  <table style="width:100%;box-sizing:border-box;padding:0 ${MARGIN_SIDE_MM}mm;font-family:${FONT};border-collapse:collapse;">
-    <tr>
-      <td style="text-align:left;vertical-align:middle;">
-        ${
-          documentsLogo
-            ? `<img src="${documentsLogo}" style="height:48px;width:auto;max-width:260px;vertical-align:middle;" />`
-            : schoolName
-              ? `<span style="font-size:13px;font-weight:700;color:${INK};">${escapeHtml(schoolName)}</span>`
-              : ""
-        }
-      </td>
-    </tr>
-  </table>
-`;
-
-const buildFooterTemplate = (footerText: string) => `
-  <table style="width:100%;box-sizing:border-box;padding:0 ${MARGIN_SIDE_MM}mm;font-family:${FONT};border-collapse:collapse;">
-    <tr>
-      <td style="text-align:center;">
-        <span style="font-size:8.5px;color:${MUTED};">${escapeHtml(footerText)} <span class="pageNumber"></span></span>
-      </td>
-    </tr>
-  </table>
-`;
+// The running header and footer on every page are the school's letterhead
+// (services/documents/letterhead.ts): the documents logo on top, the school's footer and
+// "{School} | {Module} — {Term} Scheme of Work · Page N of M" below. The verification QR code
+// lives once in the document body next to the signatures (see buildHtml), not on every page.
 
 export interface SchemeReportRow {
   entry_id: number;
@@ -341,6 +276,7 @@ const MARGIN_TOP_MM = 20; // roomier than the body's other margins so a professi
 const MARGIN_BOTTOM_MM = 14;
 const MARGIN_SIDE_MM = 10;
 const CONTENT_WIDTH_PX = Math.round((PAGE_WIDTH_MM - 2 * MARGIN_SIDE_MM) * PX_PER_MM);
+/** Content height when the school has no letterhead footer; the real budget comes from the letterhead frame. */
 const CONTENT_HEIGHT_PX = (PAGE_HEIGHT_MM - MARGIN_TOP_MM - MARGIN_BOTTOM_MM) * PX_PER_MM;
 
 const PAGE_CSS = `
@@ -617,13 +553,15 @@ async function measureLayout(
 export function planPagination(
   rows: SchemeReportRow[],
   heights: { topBlockHeight: number; theadHeight: number; rowHeights: number[] },
+  // What one page really holds: a school's letterhead footer takes room from every page.
+  contentHeightPx: number = CONTENT_HEIGHT_PX,
 ): PlanEntry[] {
   // Small safety cushion against sub-pixel rounding differences between this measurement pass
   // and the actual print layout (different internal rounding for border/font metrics), so a row
   // that measures as *just* fitting doesn't end up overflowing by a pixel or two in the real PDF.
   const SAFETY_MARGIN_PX = 8;
-  const firstPageAvail = CONTENT_HEIGHT_PX - heights.topBlockHeight - heights.theadHeight - SAFETY_MARGIN_PX;
-  const laterPageAvail = CONTENT_HEIGHT_PX - heights.theadHeight - SAFETY_MARGIN_PX;
+  const firstPageAvail = contentHeightPx - heights.topBlockHeight - heights.theadHeight - SAFETY_MARGIN_PX;
+  const laterPageAvail = contentHeightPx - heights.theadHeight - SAFETY_MARGIN_PX;
 
   const plan: PlanEntry[] = rows.map(() => ({ isGroupStart: false, rowSpan: 1, pageBreakBefore: false }));
 
@@ -715,35 +653,6 @@ const buildHtml = (
 </html>`;
 };
 
-async function printHtmlToPdf(
-  browser: Browser,
-  html: string,
-  headerTemplate: string,
-  footerTemplate: string,
-): Promise<Buffer> {
-  const page = await browser.newPage();
-  try {
-    await page.setContent(html, { waitUntil: "load" });
-    const pdf = await page.pdf({
-      format: "a4",
-      landscape: true,
-      printBackground: true,
-      margin: {
-        top: `${MARGIN_TOP_MM}mm`,
-        bottom: `${MARGIN_BOTTOM_MM}mm`,
-        left: `${MARGIN_SIDE_MM}mm`,
-        right: `${MARGIN_SIDE_MM}mm`,
-      },
-      displayHeaderFooter: true,
-      headerTemplate,
-      footerTemplate,
-    });
-    return Buffer.from(pdf);
-  } finally {
-    await page.close();
-  }
-}
-
 /** Renders the full Scheme of Work report (identification block, weekly table, and signatures --
  * one continuous flowing document, matching the correct printed template) to a PDF buffer. Used
  * by both the preview (streamed inline) and download endpoints, so preview and export are always
@@ -757,12 +666,6 @@ async function printHtmlToPdf(
  * straddles a page break -- see its doc comment for why that matters. */
 export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
   const { scheme, school, rows, numberOfClasses } = await buildReportData(schemeId);
-  // Reports/documents header uses the dedicated documents_logo when a school has set one, and
-  // falls back to the primary cover-page logo otherwise (so nothing goes blank for a school that
-  // simply hasn't uploaded the new, more specific logo yet). Resolved via resolveLogoForHeader
-  // (always a data: URI), since Puppeteer's header/footer frame can't fetch external http(s)
-  // images the way the main page can.
-  const headerLogo = await resolveLogoForHeader(school?.documents_logo || school?.logo);
   const verificationQr = await buildVerificationQr(schemeId);
 
   const trainerName = `${scheme.first_name || ""} ${scheme.last_name || ""}`.trim() || "N/A";
@@ -772,26 +675,27 @@ export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
   const docTitle = `${escapeHtml(scheme.term_name)} Scheme of Work for ${escapeHtml(subjectLabel)}`;
   const topBlockHtml = buildTopBlockHtml(scheme, school, numberOfClasses, docTitle, trainerName);
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  const footerLabel = [
+    school?.name,
+    [scheme.module_code, `${scheme.term_name} Scheme of Work`].filter(Boolean).join(" — "),
+  ]
+    .filter(Boolean)
+    .join(" | ");
+  // The school's letterhead decides how much of each page the content gets.
+  const frame: LetterheadFrame = letterheadFrame(await letterheadOf(school, String(scopeTid("scheme letterhead"))), {
+    landscape: true,
+    sideMm: MARGIN_SIDE_MM,
+    minTopMm: MARGIN_TOP_MM,
+    minBottomMm: MARGIN_BOTTOM_MM,
+    note: footerLabel,
   });
+
+  const browser = await launchPdfBrowser();
   try {
     const heights = await measureLayout(browser, topBlockHtml, rows);
-    const plan = planPagination(rows, heights);
+    const plan = planPagination(rows, heights, frame.contentHeightMm * PX_PER_MM);
     const html = buildHtml(scheme, school, numberOfClasses, rows, plan, verificationQr);
-
-    const footerLabel = [
-      school?.name,
-      [scheme.module_code, `${scheme.term_name} Scheme of Work`].filter(Boolean).join(" — "),
-    ]
-      .filter(Boolean)
-      .join(" | ");
-    const headerTemplate = buildHeaderTemplate(headerLogo, school?.name || "");
-    const footerTemplate = buildFooterTemplate(`${footerLabel}${footerLabel ? " | Page" : "Page"}`);
-
-    return await printHtmlToPdf(browser, html, headerTemplate, footerTemplate);
+    return await printWithFrame(browser, html, frame, true);
   } finally {
     await browser.close();
   }

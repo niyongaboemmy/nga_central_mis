@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { Letterhead, currentLetterhead, letterheadFrame, loadLetterhead, stampLetterhead } from "../utils/documentLetterhead";
 import { LessonReportsRollup } from "../api/reports";
 
 // Client-side PDF generation for the Subject × Class Group × Date Range
@@ -22,8 +23,11 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export const LessonReportRollupService = {
-  buildReport: (rollup: LessonReportsRollup, metadata: RollupReportMetadata) => {
+  // `lh` is the school's letterhead (header and footer on every page); the callers below load it.
+  buildReport: (rollup: LessonReportsRollup, metadata: RollupReportMetadata, lh: Letterhead = currentLetterhead()) => {
     const doc = new jsPDF("p", "mm", "a4");
+    const frame = letterheadFrame(doc, lh, { sideMm: 15 });
+    const dy = frame.shift(12);
     const docWidth = doc.internal.pageSize.getWidth();
     const BLACK: [number, number, number] = [0, 0, 0];
     const GRAY: [number, number, number] = [100, 100, 100];
@@ -43,24 +47,24 @@ export const LessonReportRollupService = {
         doc.text(
           `${subject.subject_code ? `[${subject.subject_code}] ` : ""}${subject.subject_name}`,
           15,
-          18,
+          18 + dy,
         );
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(11);
         doc.setTextColor(...GRAY);
-        doc.text(classGroup.class_group_name, 15, 25);
+        doc.text(classGroup.class_group_name, 15, 25 + dy);
 
         doc.setFontSize(9);
         doc.text(
           `${metadata.academicTermName} · ${rollup.period.start_date} to ${rollup.period.end_date} · ${metadata.schoolName}`,
           15,
-          31,
+          31 + dy,
         );
 
         doc.setDrawColor(...ACCENT);
         doc.setLineWidth(0.5);
-        doc.line(15, 34, docWidth - 15, 34);
+        doc.line(15, 34 + dy, docWidth - 15, 34 + dy);
 
         // ── Body rows: one per week, weeks separated by a header row ───────
         const body: any[] = [];
@@ -81,7 +85,7 @@ export const LessonReportRollupService = {
         }
 
         autoTable(doc, {
-          startY: 38,
+          startY: 38 + dy,
           head: [["Date", "Instructor", "Topic / Activity", "Status", "Completion", "Reflection"]],
           body,
           theme: "grid",
@@ -95,14 +99,14 @@ export const LessonReportRollupService = {
             4: { cellWidth: 20 },
             5: { cellWidth: "auto" as "auto" },
           },
-          margin: { left: 15, right: 15 },
+          margin: { left: 15, right: 15, top: frame.top, bottom: frame.bottom },
         });
 
         if (classGroup.weeks.length === 0) {
           doc.setFont("helvetica", "italic");
           doc.setFontSize(10);
           doc.setTextColor(...GRAY);
-          doc.text("No lesson reports in this range.", 15, 45);
+          doc.text("No lesson reports in this range.", 15, 45 + dy);
         }
       }
     }
@@ -110,14 +114,15 @@ export const LessonReportRollupService = {
     if (rollup.subjects.length === 0) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(14);
-      doc.text("No lesson reports found for this selection.", 15, 20);
+      doc.text("No lesson reports found for this selection.", 15, 20 + dy);
     }
 
+    stampLetterhead(doc, lh, { sideMm: 15, note: `Lesson reports · ${rollup.period.start_date} to ${rollup.period.end_date}` });
     return doc;
   },
 
-  generate: (rollup: LessonReportsRollup, metadata: RollupReportMetadata) => {
-    const doc = LessonReportRollupService.buildReport(rollup, metadata);
+  generate: async (rollup: LessonReportsRollup, metadata: RollupReportMetadata) => {
+    const doc = LessonReportRollupService.buildReport(rollup, metadata, await loadLetterhead());
     doc.save(`Lesson_Reports_Rollup_${rollup.period.start_date}_to_${rollup.period.end_date}.pdf`);
   },
 

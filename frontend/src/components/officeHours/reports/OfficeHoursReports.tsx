@@ -21,6 +21,7 @@ import { AttendancePill, BandPill, Card, CardTitle, EmptyState, inputCls, labelC
 import PeriodPicker from "./PeriodPicker";
 import { exportCsv, exportPdf, exportXlsx, ExportTable, pct } from "./exports";
 import SelectField from "../../ui/SelectField";
+import { PrintLetterhead } from "../../ui/PrintLetterhead";
 
 /**
  * Office-hours reports (plan §14): any day, week, month, term, year or custom
@@ -391,6 +392,8 @@ const DailyView: React.FC<{ termId: number | null; anchor: string }> = ({ termId
         </div>
       </div>
       <h2 id="oh-daily" className="sr-only">Daily register sheet</h2>
+      {/* The school's header and footer on the printed register */}
+      <PrintLetterhead note={`Office hours register · ${formatYmd(date, { weekday: true, year: true })}`} />
       {!data ? (
         <Spinner />
       ) : data.sessions.length === 0 ? (

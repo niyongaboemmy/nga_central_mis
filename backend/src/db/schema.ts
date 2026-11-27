@@ -653,6 +653,10 @@ export const School = mysqlTable("School", {
   // Dedicated logo for reports/documents (e.g. the Scheme of Work PDF's running header on every
   // page) -- migration 080. Distinct from logo/partner_logo, which are the two cover-page slots.
   documents_logo: varchar("documents_logo", { length: 500 }),
+  // The footer of the same letterhead (migration 150): an image printed across the bottom of
+  // every page, and/or lines of text (one per row). See services/documents/letterhead.ts.
+  documents_footer: varchar("documents_footer", { length: 500 }),
+  documents_footer_text: varchar("documents_footer_text", { length: 500 }),
   // Report/PDF cover-page fields (migration 079) -- Sector/Trade/Qualification are the same for
   // every scheme this school produces, so they live here rather than being re-entered per scheme.
   sector: varchar("sector", { length: 100 }),

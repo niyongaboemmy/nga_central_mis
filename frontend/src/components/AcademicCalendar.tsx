@@ -349,7 +349,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     const termName = academicTerms.find(
       (t) => t.academic_term_id === selectedTerm,
     )?.name;
-    exportTimetablePdf(slots, filteredActivities, {
+    void exportTimetablePdf(slots, filteredActivities, {
       classGroupName: currentClassGroupName || "Class Timetable",
       yearName,
       termName,
