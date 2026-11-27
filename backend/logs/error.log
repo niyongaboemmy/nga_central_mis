@@ -311,3 +311,4 @@
 {"cause":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":5004,"syscall":"connect"},"level":"error","message":"file-server exists check failed: fetch failed","service":"nga-central-mis","stack":"TypeError: fetch failed","timestamp":"2026-11-25T13:08:23.502Z"}
 {"cause":{"address":"127.0.0.1","code":"ECONNREFUSED","errno":-61,"port":5004,"syscall":"connect"},"level":"error","message":"file-server exists check failed: fetch failed","service":"nga-central-mis","stack":"TypeError: fetch failed","timestamp":"2026-11-25T13:08:23.531Z"}
 {"level":"error","message":"[billing] provisioning did not start for application 136: provisioning.startProvisioning not implemented","service":"nga-central-mis","timestamp":"2026-11-25T13:08:46.434Z"}
+{"level":"error","message":"[billing] provisioning did not start for application 189: provisioning.startProvisioning not implemented","service":"nga-central-mis","timestamp":"2026-11-27T07:48:39.703Z"}

@@ -16,6 +16,7 @@ import {
   GraduationCap,
   HardDrive,
   HeartHandshake,
+  Boxes,
   KeyRound,
   LayoutGrid,
   MessageCircle,
@@ -80,7 +81,8 @@ export const ENT_ICONS: Record<string, LucideIcon> = {
   "limit.tupo_meeting_minutes_month": Timer,
 };
 
-export const entIcon = (key: string): LucideIcon => ENT_ICONS[key] ?? KeyRound;
+/** A module added on the Modules screen ("module.<id>") has no icon of its own. */
+export const entIcon = (key: string): LucideIcon => ENT_ICONS[key] ?? (key.startsWith("module.") ? Boxes : KeyRound);
 
 /** The applicant journey: one icon per tracker step. */
 export const STEP_ICONS: Record<TrackerStep, LucideIcon> = {

@@ -7,29 +7,35 @@ import { RowDataPacket } from "mysql2/promise";
 import { controlPool } from "../../db/platform";
 import { NotFoundError, ValidationError } from "../../errors/CustomError";
 import { platformAudit } from "../../tenancy/audit";
-import { APP_KEYS, EntKind, FEATURES, LIMITS, kindOfKey } from "./catalog";
+import { APP_KEYS, EntKind, FEATURES, LIMITS, kindOfKey, moduleIdOfKey } from "./catalog";
 import { onEntitlementsChanged } from "./entitlementsChanged";
 import { inControlTx } from "./applicationStore";
 import { coded } from "./billing";
+import { listModules, moduleCatalogRows, moduleLabels } from "./modules";
 
-export function labelOf(key: string): string {
+export function labelOf(key: string, modules?: Map<string, string>): string {
   if (key in APP_KEYS) return APP_KEYS[key].label;
   if (key in FEATURES) return FEATURES[key];
   if (key in LIMITS) return `${LIMITS[key].label}${LIMITS[key].unit ? ` (${LIMITS[key].unit.replace(/^\//, "per ")})` : ""}`;
-  return key;
+  return modules?.get(key) ?? key;
 }
 
-/** Every known APP / FEATURE / LIMIT key with its label (package editor rows). */
-export function entitlementCatalog() {
+/**
+ * Every APP / FEATURE / LIMIT key with its label (package editor rows): the
+ * built-in apps, then the modules added on the Modules screen (`module: true`),
+ * then features and limits.
+ */
+export async function entitlementCatalog() {
   const row = (key: string, kind: EntKind) => ({ key, kind, value: null as number | null, label: labelOf(key) });
   return [
     ...Object.keys(APP_KEYS).map((k) => row(k, "APP")),
+    ...(await moduleCatalogRows()),
     ...Object.keys(FEATURES).map((k) => row(k, "FEATURE")),
     ...Object.keys(LIMITS).map((k) => row(k, "LIMIT")),
   ];
 }
 
-function serializePackage(p: RowDataPacket, ents: RowDataPacket[]) {
+function serializePackage(p: RowDataPacket, ents: RowDataPacket[], modules: Map<string, string>) {
   return {
     code: String(p.code),
     name: String(p.name),
@@ -48,7 +54,7 @@ function serializePackage(p: RowDataPacket, ents: RowDataPacket[]) {
         key: String(e.ent_key),
         kind: e.kind as EntKind,
         value: e.value_int === null ? null : Number(e.value_int),
-        label: labelOf(String(e.ent_key)),
+        label: labelOf(String(e.ent_key), modules),
       })),
   };
 }
@@ -57,14 +63,15 @@ export type SerializedPackage = ReturnType<typeof serializePackage>;
 export async function listPackages(): Promise<SerializedPackage[]> {
   const [pkgs] = await controlPool().query<RowDataPacket[]>("SELECT * FROM Package ORDER BY tier, code");
   const [ents] = await controlPool().query<RowDataPacket[]>("SELECT * FROM PackageEntitlement ORDER BY kind, ent_key");
-  return pkgs.map((p) => serializePackage(p, ents));
+  const modules = await moduleLabels();
+  return pkgs.map((p) => serializePackage(p, ents, modules));
 }
 
 export async function getPackage(code: string): Promise<SerializedPackage> {
   const [pkgs] = await controlPool().query<RowDataPacket[]>("SELECT * FROM Package WHERE code = ?", [code]);
   if (!pkgs[0]) throw new NotFoundError("Package not found");
   const [ents] = await controlPool().query<RowDataPacket[]>("SELECT * FROM PackageEntitlement WHERE package_code = ? ORDER BY kind, ent_key", [code]);
-  return serializePackage(pkgs[0], ents);
+  return serializePackage(pkgs[0], ents, await moduleLabels());
 }
 
 /** A Package / PackageEntitlement edit: every school's entitlements, snapshots and TenantSystem rows. */
@@ -112,10 +119,13 @@ export async function replaceEntitlements(code: string, list: unknown, actorId: 
   await getPackage(code);
   if (!Array.isArray(list)) throw coded(new ValidationError("entitlements must be a list."), "INVALID_ENTITLEMENTS");
   const seen = new Set<string>();
+  const knownModules = new Set((await listModules()).map((m) => m.systemId));
   const rows = list.map((e: any) => {
     const key = String(e?.key ?? "");
     const kind = kindOfKey(key);
     if (!kind) throw coded(new ValidationError(`Unknown entitlement: ${key}`), "UNKNOWN_ENTITLEMENT");
+    const moduleId = moduleIdOfKey(key);
+    if (moduleId !== null && !knownModules.has(moduleId)) throw coded(new ValidationError(`Unknown module: ${key}`), "UNKNOWN_ENTITLEMENT");
     if (seen.has(key)) throw coded(new ValidationError(`Listed twice: ${key}`), "INVALID_ENTITLEMENTS");
     seen.add(key);
     let value: number | null = null;

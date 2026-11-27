@@ -282,14 +282,14 @@ const DashboardTab: React.FC<{ d: TenantDetail; onRun: (r: ProvisioningRun) => v
         <Panel
           title="Apps"
           icon={LayoutGrid}
-          aside={`${d.apps.filter((a) => a.status === "ACTIVE").length} on`}
+          aside={`${d.apps.filter(moduleWorks).length} on`}
           action={<LinkBtn onClick={() => go("plan")} label="Plan & apps" />}
         >
           {d.apps.length ? (
             <ul className="grid grid-cols-3 gap-2" aria-label="Apps">
               {d.apps.map((a) => {
-                const Icon = entIcon(appKeyOf(a.name, a.clientId));
-                const on = a.status === "ACTIVE";
+                const Icon = entIcon(a.key ?? appKeyOf(a.name, a.clientId));
+                const on = moduleWorks(a);
                 return (
                   <li key={a.systemId} title={`${a.name}: ${on ? "on" : "off"}`} className="flex flex-col items-center gap-1.5 rounded-xl p-2 text-center">
                     <span className={cx("relative flex h-11 w-11 items-center justify-center rounded-xl", on ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-400 dark:bg-gray-800/70 dark:text-gray-500")}>
@@ -598,7 +598,7 @@ const PackageTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => voi
         )}
       </AnimatePresence>
       {apps && (
-        <Panel title="Apps" icon={LayoutGrid} aside={`${d.apps.filter((a) => a.status === "ACTIVE").length} of ${d.apps.length} on`}>
+        <Panel title="Apps & modules" icon={LayoutGrid} aside={`${d.apps.filter(moduleWorks).length} of ${d.apps.length} on`}>
           {apps}
         </Panel>
       )}
@@ -793,49 +793,74 @@ const APP_HINTS: Array<[string, string]> = [
 /** TenantSystem rows carry a name / client id, not the entitlement key: match for the icon. */
 const appKeyOf = (name: string, clientId: string | null) => {
   const hay = `${clientId ?? ""} ${name}`.toLowerCase();
-  return APP_HINTS.find(([h]) => hay.includes(h))?.[1] ?? "";
+  return APP_HINTS.find(([h]) => hay.includes(h))?.[1] ?? "module.";
 };
 
+/** A module is usable when it is switched on and, for a built-in app, in the package. */
+const moduleWorks = (a: TenantDetail["apps"][number]) => a.status === "ACTIVE" && !a.needsPackage;
+
+/**
+ * Every module, on or off for this school. A module added after the school was
+ * created is listed too (off, "Not assigned"), so it can be switched on here.
+ * A switch set here is kept whatever the package says; a module that comes with
+ * the package is managed in Packages.
+ */
 const AppsTab: React.FC<{ d: TenantDetail; onChange: (d: TenantDetail) => void }> = ({ d, onChange }) => {
   const { can } = usePlatform();
   const [busy, setBusy] = useState<number | null>(null);
   const edit = can("entitlements");
   if (!d.apps.length) return <EmptyState icon={LayoutGrid} title="No apps" />;
+  const chip = "rounded-full px-1.5 text-[11px] font-bold";
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {d.apps.map((a) => {
-        const Icon = entIcon(appKeyOf(a.name, a.clientId));
-        const on = a.status === "ACTIVE";
-        return (
-          <li key={a.systemId} className={cx("flex items-center gap-3 rounded-2xl p-3 transition-colors", on ? "bg-blue-50 ring-1 ring-inset ring-blue-500/20 dark:bg-blue-500/10 dark:ring-blue-400/20" : "bg-white dark:bg-gray-800/40")}>
-            <span className={cx("flex h-10 w-10 items-center justify-center rounded-xl", on ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300")}>
-              <Icon className="h-5 w-5" aria-hidden />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold text-gray-900 dark:text-white">{a.name}</p>
-              <span className={cx("rounded-full px-1.5 text-[11px] font-bold", a.source === "OVERRIDE" ? "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200" : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200")}>
-                {a.source === "OVERRIDE" ? "Override" : "Package"}
+    <>
+      <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+        Switch a module on or off for this school. A switch you set here stays as set, whatever the package includes.
+      </p>
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {d.apps.map((a) => {
+          const Icon = entIcon(a.key ?? appKeyOf(a.name, a.clientId));
+          const on = a.status === "ACTIVE";
+          const works = moduleWorks(a);
+          const retired = a.moduleStatus === "DISABLED";
+          return (
+            <li key={a.systemId} className={cx("flex items-center gap-3 rounded-2xl p-3 transition-colors", works ? "bg-blue-50 ring-1 ring-inset ring-blue-500/20 dark:bg-blue-500/10 dark:ring-blue-400/20" : "bg-white dark:bg-gray-800/40")}>
+              <span className={cx("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", works ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300")}>
+                <Icon className="h-5 w-5" aria-hidden />
               </span>
-            </div>
-            {busy === a.systemId ? (
-              <Loader2 className="h-5 w-5 animate-spin text-blue-500" aria-label="Saving" />
-            ) : (
-              <Switch
-                checked={on}
-                label={a.name}
-                disabled={!edit}
-                onChange={async (v) => {
-                  setBusy(a.systemId);
-                  const next = await act(() => platformApi.setTenantApp(d.tenant.tid, a.systemId, v ? "ACTIVE" : "DISABLED"));
-                  setBusy(null);
-                  if (next) onChange(next);
-                }}
-              />
-            )}
-          </li>
-        );
-      })}
-    </ul>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-gray-900 dark:text-white">{a.name}</p>
+                <div className="mt-0.5 flex flex-wrap gap-1">
+                  <span className={cx(chip, a.source === "OVERRIDE" ? "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200" : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200")}>
+                    {a.source === "OVERRIDE" ? "Set by hand" : a.source === "PACKAGE" ? "Package" : "Not assigned"}
+                  </span>
+                  {a.needsPackage && (
+                    <span className={cx(chip, "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200")} title="This app is not in the school's package. Change the package or add an override below.">
+                      Not in package
+                    </span>
+                  )}
+                  {retired && <span className={cx(chip, "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200")} title="This module is disabled on the Modules screen, for every school.">Module disabled</span>}
+                </div>
+              </div>
+              {busy === a.systemId ? (
+                <Loader2 className="h-5 w-5 animate-spin text-blue-500" aria-label="Saving" />
+              ) : (
+                <Switch
+                  checked={on}
+                  label={a.name}
+                  disabled={!edit}
+                  onChange={async (v) => {
+                    setBusy(a.systemId);
+                    const next = await act(() => platformApi.setTenantApp(d.tenant.tid, a.systemId, v ? "ACTIVE" : "DISABLED"), v ? `${a.name} is on for this school` : `${a.name} is off for this school`);
+                    setBusy(null);
+                    if (next) onChange(next);
+                  }}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 };
 

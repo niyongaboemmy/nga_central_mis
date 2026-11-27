@@ -163,6 +163,26 @@ export const getSchoolSystems = async (
   }
 };
 
+/** A module's state for the school the session is in (School profile -> Configure). */
+export interface SchoolModuleState {
+  system_id: number;
+  name: string;
+  description: string | null;
+  icon_url: string | null;
+  /** usable now: switched on and, for a built-in app, in the package */
+  on: boolean;
+  /** PACKAGE: comes with the subscription. OVERRIDE: set by hand. NONE: never switched on. */
+  source: "PACKAGE" | "OVERRIDE" | "NONE";
+  inPackage: boolean;
+  needsPackage: boolean;
+}
+
+/** Every module with its state for this school; `canManage` is true for the platform only. */
+export const getSchoolModules = async (schoolId: number): Promise<{ canManage: boolean; modules: SchoolModuleState[] }> => {
+  const response = await api.get<{ canManage: boolean; modules: SchoolModuleState[] }>(`/systems/school/${schoolId}/modules`);
+  return response.data;
+};
+
 export interface RoleAssignment {
   fragment_id: number;
   school_id: number;

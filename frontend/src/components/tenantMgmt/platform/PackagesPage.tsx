@@ -191,6 +191,11 @@ const PackagesPage: React.FC = () => {
                                 <Icon className="h-3.5 w-3.5" />
                               </span>
                               <span className="truncate">{e.label}</span>
+                              {e.module && (
+                                <span className="shrink-0 rounded-full bg-blue-50 px-1.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" title="A module added on the Modules screen. Schools on a package that includes it get it automatically.">
+                                  Module
+                                </span>
+                              )}
                             </span>
                           </th>
                           {packages.map((p) => {
